@@ -1,0 +1,23 @@
+.intro {
+  align-items: center;
+  animation: introIn .45s ease-out both;
+  background: #000;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  overflow: hidden;
+  position: fixed;
+  z-index: 2000;
+}
+.leaving { animation: introOut .4s cubic-bezier(.4,0,.2,1) both; }
+.glow { animation: glowPulse 1.1s ease-out both; background: radial-gradient(circle,rgba(111,124,255,.2),transparent 68%); height: 420px; position: absolute; width: 420px; }
+.identity { align-items: center; display: flex; flex-direction: column; gap: 15px; position: relative; }
+.logo { animation: logoReveal .72s cubic-bezier(.16,1,.3,1) both; border: 1px solid #2a2a2e; border-radius: 25px; box-shadow: 0 20px 80px rgba(0,0,0,.7); height: 92px; overflow: hidden; width: 92px; }
+.logo img { height: 100%; object-fit: cover; width: 100%; }
+.identity span { animation: wordReveal .62s .28s cubic-bezier(.16,1,.3,1) both; color: #f7f7f8; font-size: 1.3rem; font-weight: 720; letter-spacing: -.035em; }
+@keyframes introIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes introOut { to { opacity: 0; transform: scale(1.012); visibility: hidden; } }
+@keyframes glowPulse { 0% { opacity: 0; transform: scale(.55); } 65% { opacity: 1; } 100% { opacity: .65; transform: scale(1); } }
+@keyframes logoReveal { from { filter: blur(10px); opacity: 0; transform: scale(.78); } to { filter: blur(0); opacity: 1; transform: scale(1); } }
+@keyframes wordReveal { from { clip-path: inset(0 100% 0 0); opacity: 0; transform: translateY(5px); } to { clip-path: inset(0); opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .intro, .leaving, .glow, .logo, .identity span { animation-duration: .01ms; animation-delay: 0s; } }

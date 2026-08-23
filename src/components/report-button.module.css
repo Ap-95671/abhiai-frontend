@@ -1,0 +1,17 @@
+.backdrop { align-items: center; background: rgba(0,0,0,.76); display: flex; inset: 0; justify-content: center; padding: 18px; position: fixed; z-index: 1000; backdrop-filter: blur(8px); }
+.dialog { background: #0d0d0f; border: 1px solid #303034; border-radius: 18px; box-shadow: 0 28px 90px rgba(0,0,0,.7); max-width: 500px; padding: 24px; width: 100%; }
+.dialog header { align-items: flex-start; display: flex; justify-content: space-between; }
+.dialog header p { color: #929bff; font-size: .7rem; font-weight: 850; letter-spacing: .1em; margin: 0; text-transform: uppercase; }
+.dialog h2 { letter-spacing: -.03em; margin: 5px 0; }
+.dialog header button { background: #202024; border: 0; border-radius: 50%; color: #ccc; font-size: 1.2rem; height: 32px; width: 32px; }
+.help { color: #898990; font-size: .82rem; line-height: 1.5; }
+.dialog form, .dialog label { display: grid; gap: 8px; }
+.dialog form { gap: 15px; }
+.dialog label { color: #c2c2c7; font-size: .76rem; font-weight: 750; }
+.dialog label small, .count { color: #77777e; }
+.dialog select, .dialog textarea { background: #141416; border: 1px solid #343439; border-radius: 10px; color: #f4f4f5; font: inherit; padding: 11px; resize: vertical; }
+.count { font-size: .68rem; text-align: right; }
+.dialog footer { display: flex; gap: 10px; justify-content: flex-end; }
+.dialog footer button { background: #242428; border: 0; border-radius: 9px; color: #ddd; font-weight: 750; padding: 10px 15px; }
+.submit { background: #df425c !important; color: #fff !important; }
+@media (max-width: 600px) { .backdrop { align-items: flex-end; padding: 0; } .dialog { border-radius: 20px 20px 0 0; padding: 22px 18px 28px; } }
