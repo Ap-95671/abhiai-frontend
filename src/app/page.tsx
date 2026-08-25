@@ -2,9 +2,13 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 
 import { AuthScreen } from "@/components/auth/auth-screen";
+import { AuthenticatedImage } from "@/components/authenticated-image";
 import { BrandIntro } from "@/components/branding/brand-intro";
+import { ThinkingIndicator } from "@/components/chat/thinking-indicator";
+import { ToolMenu, UploadPurpose } from "@/components/chat/tool-menu";
 import { LandingPage } from "@/components/landing/landing-page";
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { FeedPanel } from "@/components/feed-panel";
@@ -34,8 +38,12 @@ const SESSION_TOKEN_STORAGE_KEY = "abhiai.session-access-token";
 type AuthMode = "login" | "register";
 type GuestView = "landing" | "auth";
 type ActiveView = "chat" | "feed" | "explore" | "communities" | "articles" | "creator" | "messages" | "stories" | "videos" | "hashtags" | "search" | "notifications" | "profile";
+type ComposerMode = "chat" | "image";
 
 function errorMessage(error: unknown) {
+  if (error instanceof TypeError && /fetch|network/i.test(error.message)) {
+    return "Unable to reach the AbhiAI backend. Check the API URL, CORS settings, and your connection.";
+  }
   return error instanceof ApiError || error instanceof Error
     ? error.message
     : "Something went wrong. Please try again.";
@@ -51,9 +59,11 @@ function formatDate(value: string) {
 }
 
 export default function Home() {
+  const pathname = usePathname();
+  const router = useRouter();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [sessionResolved, setSessionResolved] = useState(false);
-  const [guestView, setGuestView] = useState<GuestView>("landing");
+  const [guestView, setGuestView] = useState<GuestView>(pathname === "/login" ? "auth" : "landing");
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -72,7 +82,9 @@ export default function Home() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [chatError, setChatError] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
+  const [composerMode, setComposerMode] = useState<ComposerMode>("chat");
   const [isSending, setIsSending] = useState(false);
+  const [hasStartedResponding, setHasStartedResponding] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [chatAttachments, setChatAttachments] = useState<ConversationAttachment[]>([]);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
@@ -83,6 +95,7 @@ export default function Home() {
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
 
   const conversationId = selectedConversation?.id;
+  const socialWorkspace = pathname === "/social";
   const sortedMessages = useMemo(
     () => selectedConversation?.messages ?? [],
     [selectedConversation],
@@ -98,6 +111,7 @@ export default function Home() {
     setSelectedConversation(null);
     setChatError("");
     setMessageDraft("");
+    setComposerMode("chat");
     setActiveView("chat");
     setUnreadNotificationCount(0);
     setAuthError(message);
@@ -106,7 +120,8 @@ export default function Home() {
   const handleSessionExpired = useCallback(() => {
     setGuestView("auth");
     expireSession("Your session has expired. Please sign in again.");
-  }, [expireSession]);
+    router.replace(`/login?next=${encodeURIComponent(pathname === "/social" ? "/social" : "/chat")}`);
+  }, [expireSession, pathname, router]);
 
   const viewProfile = useCallback((username?: string) => {
     setProfileUsername(username);
@@ -127,6 +142,33 @@ export default function Home() {
       setSessionResolved(true);
     });
   }, []);
+
+  useEffect(() => {
+    if (!sessionResolved) return;
+    queueMicrotask(() => {
+      if (accessToken) {
+        if (pathname === "/" || pathname === "/login") {
+          router.replace("/chat");
+          return;
+        }
+        if (pathname === "/social") {
+          setActiveView((current) => current === "chat" ? "feed" : current);
+        } else if (pathname === "/chat") {
+          setActiveView("chat");
+        }
+        return;
+      }
+
+      if (pathname === "/login") {
+        setGuestView("auth");
+      } else if (pathname === "/chat" || pathname === "/social") {
+        setGuestView("auth");
+        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      } else {
+        setGuestView("landing");
+      }
+    });
+  }, [accessToken, pathname, router, sessionResolved]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -246,6 +288,8 @@ export default function Home() {
       }
       setAccessToken(session.accessToken);
       setPassword("");
+      const requestedPath = new URLSearchParams(window.location.search).get("next");
+      router.replace(requestedPath === "/social" ? "/social" : "/chat");
     } catch (error) {
       setAuthError(errorMessage(error));
     } finally {
@@ -255,7 +299,8 @@ export default function Home() {
 
   function signOut() {
     expireSession();
-    setGuestView("landing");
+    setGuestView("auth");
+    router.replace("/login");
   }
 
   async function createConversation() {
@@ -279,6 +324,10 @@ export default function Home() {
     event.preventDefault();
     const content = messageDraft.trim();
     if (!accessToken || !conversationId || !content || isSending || isUploadingAttachment) return;
+    if (composerMode === "image") {
+      await generateImage(content);
+      return;
+    }
     if (chatAttachments.some((attachment) => attachment.processingStatus !== "READY")) {
       setChatError("Remove failed attachments or wait until processing completes.");
       return;
@@ -290,6 +339,7 @@ export default function Home() {
 
     setChatError("");
     setIsSending(true);
+    setHasStartedResponding(false);
     setMessageDraft("");
     const abortController = new AbortController();
     streamAbortController.current = abortController;
@@ -327,6 +377,7 @@ export default function Home() {
         conversationId,
         content,
         (chunk) => {
+          setHasStartedResponding(true);
           setSelectedConversation((current) =>
             current && current.id === conversationId
               ? {
@@ -393,12 +444,84 @@ export default function Home() {
       }
     } finally {
       streamAbortController.current = null;
+      setHasStartedResponding(false);
       setIsSending(false);
     }
   }
 
-  async function uploadChatAttachment(file: File) {
+  async function generateImage(prompt: string) {
+    if (!accessToken || !conversationId) return;
+    setChatError("");
+    setIsSending(true);
+    setHasStartedResponding(false);
+    setMessageDraft("");
+    const abortController = new AbortController();
+    streamAbortController.current = abortController;
+    const pendingTimestamp = new Date().toISOString();
+    const pendingUserMessage: ChatMessage = {
+      id: `pending-image-user-${pendingTimestamp}`,
+      role: "USER",
+      content: prompt,
+      createdAt: pendingTimestamp,
+    };
+    setSelectedConversation((current) => current && current.id === conversationId
+      ? { ...current, messages: [...current.messages, pendingUserMessage] }
+      : current);
+    try {
+      const exchange = await api.generateImage(accessToken, conversationId, prompt, abortController.signal);
+      setSelectedConversation((current) => current && current.id === conversationId
+        ? {
+            ...current,
+            title: exchange.conversation.title,
+            updatedAt: exchange.assistantMessage.createdAt,
+            messages: [
+              ...current.messages.filter((message) => message.id !== pendingUserMessage.id),
+              exchange.userMessage,
+              exchange.assistantMessage,
+            ],
+          }
+        : current);
+      setConversations((current) => current
+        .map((item) => item.id === conversationId ? exchange.conversation : item)
+        .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)));
+      setComposerMode("chat");
+    } catch (error) {
+      setMessageDraft(prompt);
+      setSelectedConversation((current) => current && current.id === conversationId
+        ? { ...current, messages: current.messages.filter((message) => message.id !== pendingUserMessage.id) }
+        : current);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setChatError("Image generation stopped.");
+      } else {
+        handleAuthenticatedError(error);
+      }
+    } finally {
+      streamAbortController.current = null;
+      setIsSending(false);
+    }
+  }
+
+  async function uploadChatAttachment(file: File, purpose: UploadPurpose) {
     if (!accessToken || !conversationId || isUploadingAttachment) return;
+    const normalizedType = file.type.toLowerCase();
+    const allowed = purpose === "image"
+      ? ["image/jpeg", "image/png", "image/webp"]
+      : purpose === "pdf"
+        ? ["application/pdf"]
+        : ["application/pdf", "text/plain"];
+    if (!allowed.includes(normalizedType)) {
+      setChatError(purpose === "image"
+        ? "Choose a JPEG, PNG, or WebP image."
+        : purpose === "pdf"
+          ? "Choose a PDF document."
+          : "Choose a PDF or plain-text document.");
+      return;
+    }
+    const sizeLimit = purpose === "image" ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > sizeLimit) {
+      setChatError(`This ${purpose === "image" ? "image" : "document"} exceeds the ${sizeLimit / 1024 / 1024} MB limit.`);
+      return;
+    }
     setIsUploadingAttachment(true);
     setChatError("");
     try {
@@ -470,7 +593,7 @@ export default function Home() {
   if (!sessionResolved) {
     return (
       <>
-        <BrandIntro />
+        {pathname === "/" && <BrandIntro />}
         <main className="session-loader" aria-label="Loading AbhiAI">
           <Image alt="AbhiAI" height={64} priority src="/abhiai-logo.png" width={64} />
         </main>
@@ -486,11 +609,13 @@ export default function Home() {
           onLogin={() => {
             setAuthMode("login");
             setGuestView("auth");
+            router.push("/login");
           }}
           onStart={(prompt) => {
             if (prompt) setMessageDraft(prompt);
             setAuthMode("register");
             setGuestView("auth");
+            router.push("/login");
           }}
         />
       </>
@@ -500,14 +625,16 @@ export default function Home() {
   if (!accessToken) {
     return (
       <>
-        <BrandIntro />
         <AuthScreen
           authError={authError}
           displayName={displayName}
           email={email}
           isAuthenticating={isAuthenticating}
           mode={authMode}
-          onBack={() => setGuestView("landing")}
+          onBack={() => {
+            setGuestView("landing");
+            router.push("/");
+          }}
           onDisplayNameChange={setDisplayName}
           onEmailChange={setEmail}
           onModeChange={(mode) => {
@@ -526,7 +653,6 @@ export default function Home() {
 
   return (
     <>
-    <BrandIntro />
     <main className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-header">
@@ -536,20 +662,38 @@ export default function Home() {
             </span>
             AbhiAI
           </div>
-          <button className="new-chat-button" disabled={isCreatingConversation} onClick={createConversation} type="button">
-            <span>＋</span> New chat
+          {!socialWorkspace && (
+            <button className="new-chat-button" disabled={isCreatingConversation} onClick={createConversation} type="button">
+              <span>＋</span> New chat
+            </button>
+          )}
+        </div>
+
+        <div aria-label="Choose workspace" className="workspace-switcher" role="navigation">
+          <button
+            aria-current={!socialWorkspace ? "page" : undefined}
+            className={!socialWorkspace ? "active" : ""}
+            onClick={() => { setActiveView("chat"); router.push("/chat"); }}
+            type="button"
+          >
+            <span aria-hidden="true">✦</span> AbhiAI
+          </button>
+          <button
+            aria-current={socialWorkspace ? "page" : undefined}
+            className={socialWorkspace ? "active" : ""}
+            onClick={() => { setActiveView("feed"); router.push("/social"); }}
+            type="button"
+          >
+            <span aria-hidden="true">◎</span> Social
           </button>
         </div>
 
         <nav className="primary-navigation" aria-label="Workspace">
-          <button
-            aria-current={activeView === "chat" ? "page" : undefined}
-            className={activeView === "chat" ? "active" : ""}
-            onClick={() => setActiveView("chat")}
-            type="button"
-          >
-            <span aria-hidden="true">◇</span> Chat
-          </button>
+          {!socialWorkspace ? (
+            <button aria-current="page" className="active" onClick={() => setActiveView("chat")} type="button">
+              <span aria-hidden="true">◇</span> AI Chat
+            </button>
+          ) : (<>
           <button
             aria-current={activeView === "feed" ? "page" : undefined}
             className={activeView === "feed" ? "active" : ""}
@@ -651,9 +795,10 @@ export default function Home() {
           >
             <span aria-hidden="true">○</span> Profile
           </button>
+          </>)}
         </nav>
 
-        <nav className={activeView === "chat" ? "conversation-list" : "conversation-list hidden"} aria-label="Conversations">
+        <nav className={!socialWorkspace ? "conversation-list" : "conversation-list hidden"} aria-label="Conversations">
           <p className="list-label">Recent chats</p>
           {isLoadingConversations && <p className="muted-text">Loading conversations…</p>}
           {!isLoadingConversations && conversations.length === 0 && (
@@ -675,35 +820,37 @@ export default function Home() {
         <button className="sign-out-button" onClick={signOut} type="button">Sign out</button>
       </aside>
 
-      {activeView === "feed" ? (
+      {socialWorkspace && activeView === "feed" ? (
         <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
-      ) : activeView === "explore" ? (
+      ) : socialWorkspace && activeView === "explore" ? (
         <ExplorePanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
-      ) : activeView === "communities" ? (
+      ) : socialWorkspace && activeView === "communities" ? (
         <CommunityPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
-      ) : activeView === "articles" ? (
+      ) : socialWorkspace && activeView === "articles" ? (
         <ArticlesPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewProfile={viewProfile} />
-      ) : activeView === "creator" ? (
+      ) : socialWorkspace && activeView === "creator" ? (
         <CreatorDashboard accessToken={accessToken} onUnauthorized={handleSessionExpired} />
-      ) : activeView === "messages" ? (
+      ) : socialWorkspace && activeView === "messages" ? (
         <MessagesPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewProfile={viewProfile} />
-      ) : activeView === "stories" ? (
+      ) : socialWorkspace && activeView === "stories" ? (
         <StoriesPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewProfile={viewProfile} />
-      ) : activeView === "videos" ? (
+      ) : socialWorkspace && activeView === "videos" ? (
         <VideoFeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewProfile={viewProfile} />
-      ) : activeView === "hashtags" ? (
+      ) : socialWorkspace && activeView === "hashtags" ? (
         <HashtagPanel accessToken={accessToken} initialTag={selectedHashtag} onUnauthorized={handleSessionExpired} onViewProfile={viewProfile} />
-      ) : activeView === "search" ? (
+      ) : socialWorkspace && activeView === "search" ? (
         <SearchPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
-      ) : activeView === "notifications" ? (
+      ) : socialWorkspace && activeView === "notifications" ? (
         <NotificationsPanel
           accessToken={accessToken}
           onUnauthorized={handleSessionExpired}
           onUnreadCountChange={setUnreadNotificationCount}
           onViewProfile={viewProfile}
         />
-      ) : activeView === "profile" ? (
+      ) : socialWorkspace && activeView === "profile" ? (
         <ProfilePanel accessToken={accessToken} onUnauthorized={handleSessionExpired} username={profileUsername} />
+      ) : socialWorkspace ? (
+        <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : (
       <section className="chat-panel">
         {selectedConversation ? (
@@ -733,6 +880,7 @@ export default function Home() {
               ) : (
                 sortedMessages.map((message) => (
                   <MessageBubble
+                    accessToken={accessToken}
                     copied={copiedMessageId === message.id}
                     key={message.id}
                     message={message}
@@ -740,17 +888,26 @@ export default function Home() {
                   />
                 ))
               )}
-              {isSending && <div className="assistant-status">AbhiAI is thinking…</div>}
+              {isSending && !hasStartedResponding && <ThinkingIndicator />}
               <div aria-hidden="true" ref={latestMessageRef} />
             </div>
 
             {chatError && <p className="chat-error">{chatError}</p>}
             <form className="composer" onSubmit={sendMessage}>
+              {composerMode === "image" && (
+                <div className="composer-mode">
+                  <span><b>✦</b> Image generation</span>
+                  <button aria-label="Exit image generation mode" onClick={() => setComposerMode("chat")} type="button">×</button>
+                </div>
+              )}
               {chatAttachments.length > 0 && (
                 <div className="chat-attachments">
                   {chatAttachments.map((attachment) => (
                     <span key={attachment.id}>
-                      <strong>{attachment.kind === "IMAGE" ? "Image" : "PDF"}</strong>
+                      {attachment.kind === "IMAGE" && (
+                        <AuthenticatedImage accessToken={accessToken} alt={attachment.filename} className="chat-attachment-thumbnail" mediaId={attachment.mediaId} thumbnail />
+                      )}
+                      <strong>{attachment.kind === "IMAGE" ? "Image" : attachment.contentType === "text/plain" ? "Text" : "PDF"}</strong>
                       {attachment.filename}
                       <small>{attachment.processingStatus.toLowerCase()}</small>
                       <button
@@ -764,19 +921,16 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              <label className="chat-attachment-picker" title="Attach image or PDF">
-                <span aria-hidden="true">＋</span>
-                <input
-                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
-                  disabled={isSending || isUploadingAttachment || chatAttachments.length >= 5}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void uploadChatAttachment(file);
-                  }}
-                  type="file"
-                />
-              </label>
+              <ToolMenu
+                disabled={isSending || isUploadingAttachment || chatAttachments.length >= 5}
+                onGenerateImage={() => {
+                  setChatAttachments([]);
+                  setExternalProcessingAllowed(false);
+                  setComposerMode("image");
+                  setChatError("");
+                }}
+                onUpload={(file, purpose) => void uploadChatAttachment(file, purpose)}
+              />
               <textarea
                 aria-label="Message AbhiAI"
                 disabled={isSending}
@@ -787,7 +941,7 @@ export default function Home() {
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                placeholder="Message AbhiAI…"
+                placeholder={composerMode === "image" ? "Describe the image you want to create…" : "Message AbhiAI…"}
                 rows={1}
                 value={messageDraft}
               />
@@ -805,13 +959,14 @@ export default function Home() {
             </form>
             <div className="chat-consent-controls">
               {chatAttachments.length > 0 && (
-                <label>
+                <label className={!externalProcessingAllowed ? "required-consent" : undefined}>
                   <input
                     checked={externalProcessingAllowed}
                     onChange={(event) => setExternalProcessingAllowed(event.target.checked)}
                     type="checkbox"
                   />
-                  Send selected attachment content to {process.env.NEXT_PUBLIC_AI_PROVIDER_NAME ?? "the configured AI provider"}
+                  Allow AbhiAI to send this attachment to {process.env.NEXT_PUBLIC_AI_PROVIDER_NAME ?? "the configured AI provider"}
+                  {!externalProcessingAllowed && <strong>Required</strong>}
                 </label>
               )}
               <label>
@@ -845,10 +1000,12 @@ export default function Home() {
 }
 
 function MessageBubble({
+  accessToken,
   copied,
   message,
   onCopy,
 }: {
+  accessToken: string;
   copied: boolean;
   message: ChatMessage;
   onCopy: (message: ChatMessage) => void;
@@ -856,7 +1013,9 @@ function MessageBubble({
   const isUser = message.role === "USER";
   return (
     <article className={isUser ? "message user-message" : "message assistant-message"}>
-      <div className="message-avatar">{isUser ? "You" : "A"}</div>
+      <div className="message-avatar">
+        {isUser ? "You" : <Image alt="AbhiAI" height={32} src="/abhiai-logo.png" width={32} />}
+      </div>
       <div className="message-body">
         <div className="message-meta">
           <p className="message-role">{isUser ? "You" : "AbhiAI"}</p>
@@ -870,6 +1029,21 @@ function MessageBubble({
           </button>
         </div>
         <p className="message-content">{message.content}</p>
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="message-attachments">
+            {message.attachments.map((attachment) => attachment.kind === "IMAGE" ? (
+              <AuthenticatedImage
+                accessToken={accessToken}
+                alt={attachment.filename}
+                className="generated-chat-image"
+                key={attachment.id}
+                mediaId={attachment.mediaId}
+              />
+            ) : (
+              <span className="message-document" key={attachment.id}>▤ {attachment.filename}</span>
+            ))}
+          </div>
+        )}
       </div>
     </article>
   );

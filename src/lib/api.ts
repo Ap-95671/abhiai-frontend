@@ -14,6 +14,7 @@ export type ChatMessage = {
   role: MessageRole;
   content: string;
   createdAt: string;
+  attachments?: ConversationAttachment[];
 };
 
 export type ConversationDetail = ConversationSummary & {
@@ -947,6 +948,35 @@ export const api = {
     );
   },
 
+  async generateImage(
+    accessToken: string,
+    conversationId: string,
+    prompt: string,
+    signal?: AbortSignal,
+  ): Promise<ChatExchange> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/images`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+      signal,
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+      throw new ApiError(
+        payload.message ?? (response.status === 503
+          ? "Image generation is not configured on the backend."
+          : "Image generation failed. Please try again."),
+        response.status,
+        payload.validationErrors ?? {},
+      );
+    }
+    return response.json() as Promise<ChatExchange>;
+  },
+
   async sendMessageStream(
     accessToken: string,
     conversationId: string,
@@ -1028,7 +1058,11 @@ export const api = {
     if (!response.ok) {
       const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
       throw new ApiError(
-        payload.message ?? "Conversation attachment upload failed.",
+        payload.message ?? (response.status === 413
+          ? "This file is larger than the server upload limit."
+          : response.status === 415
+            ? "This file format is not supported."
+            : "Conversation attachment upload failed. Check the storage configuration and try again."),
         response.status,
         payload.validationErrors ?? {},
       );
