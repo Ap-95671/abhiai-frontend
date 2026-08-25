@@ -30,6 +30,7 @@ import {
   ConversationAttachment,
   ConversationDetail,
   ConversationSummary,
+  ModelOption,
 } from "@/lib/api";
 
 const TOKEN_STORAGE_KEY = "abhiai.access-token";
@@ -81,6 +82,8 @@ export default function Home() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [isChangingModel, setIsChangingModel] = useState(false);
   const [messageDraft, setMessageDraft] = useState("");
   const [composerMode, setComposerMode] = useState<ComposerMode>("chat");
   const [isSending, setIsSending] = useState(false);
@@ -173,6 +176,18 @@ export default function Home() {
   useEffect(() => {
     if (!accessToken) return;
 
+    let active = true;
+    api.getModels(accessToken)
+      .then((items) => { if (active) setModels(items); })
+      .catch((error: unknown) => {
+        if (active && error instanceof ApiError && error.status === 401) handleSessionExpired();
+      });
+    return () => { active = false; };
+  }, [accessToken, handleSessionExpired]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+
     let isCurrent = true;
     queueMicrotask(() => {
       if (isCurrent) {
@@ -215,6 +230,23 @@ export default function Home() {
       isCurrent = false;
     };
   }, [accessToken, handleSessionExpired]);
+
+  async function changeConversationModel(value: string) {
+    if (!accessToken || !selectedConversation || isChangingModel) return;
+    const selectionMode = value === "AUTO" ? "AUTO" : "MANUAL";
+    const selectedModelId = selectionMode === "AUTO" ? null : value;
+    setChatError("");
+    setIsChangingModel(true);
+    try {
+      const updated = await api.updateConversationModel(accessToken, selectedConversation.id, selectionMode, selectedModelId);
+      setSelectedConversation((current) => current && current.id === updated.id ? { ...current, ...updated } : current);
+      setConversations((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (error) {
+      handleAuthenticatedError(error);
+    } finally {
+      setIsChangingModel(false);
+    }
+  }
 
   useEffect(() => {
     if (!accessToken) return;
@@ -860,6 +892,26 @@ export default function Home() {
                 <p className="eyebrow">Conversation</p>
                 <h1>{selectedConversation.title}</h1>
               </div>
+              <label className="model-selector">
+                <span>Model</span>
+                <select
+                  aria-label="AI model"
+                  disabled={isChangingModel || isSending}
+                  onChange={(event) => void changeConversationModel(event.target.value)}
+                  value={selectedConversation.modelSelectionMode === "MANUAL" ? selectedConversation.preferredModelId ?? "AUTO" : "AUTO"}
+                >
+                  <option value="AUTO">✦ AbhiAI Auto</option>
+                  {models.map((model) => (
+                    <option
+                      disabled={model.status === "UNAVAILABLE" || model.status === "RATE_LIMITED" || model.status === "COMING_SOON" || !model.configured}
+                      key={model.id}
+                      value={model.id}
+                    >
+                      {model.displayName} · {model.provider}{model.status === "COMING_SOON" ? " — Coming soon" : model.status === "RATE_LIMITED" ? " — Rate limited" : !model.configured ? " — Not configured" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="conversation-actions">
                 <button onClick={renameConversation} type="button">Rename</button>
                 <button className="danger-button" onClick={deleteConversation} type="button">Delete</button>
@@ -1029,6 +1081,11 @@ function MessageBubble({
           </button>
         </div>
         <p className="message-content">{message.content}</p>
+        {!isUser && message.model && (
+          <p className="model-attribution">
+            Answered using {providerLabel(message.provider)} · {message.model}{message.fallbackUsed ? " · fallback used" : ""}
+          </p>
+        )}
         {message.attachments && message.attachments.length > 0 && (
           <div className="message-attachments">
             {message.attachments.map((attachment) => attachment.kind === "IMAGE" ? (
@@ -1047,4 +1104,13 @@ function MessageBubble({
       </div>
     </article>
   );
+}
+
+function providerLabel(provider?: string | null) {
+  const labels: Record<string, string> = {
+    openai: "OpenAI", gemini: "Google Gemini", groq: "Groq", ollama: "Local / Ollama",
+    anthropic: "Anthropic", xai: "xAI", deepseek: "DeepSeek", mistral: "Mistral",
+    cohere: "Cohere", openrouter: "OpenRouter", abhena: "Abhena",
+  };
+  return provider ? labels[provider] ?? provider : "AbhiAI";
 }

@@ -7,6 +7,8 @@ export type ConversationSummary = {
   title: string;
   createdAt: string;
   updatedAt: string;
+  modelSelectionMode: "AUTO" | "MANUAL";
+  preferredModelId: string | null;
 };
 
 export type ChatMessage = {
@@ -15,6 +17,23 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
   attachments?: ConversationAttachment[];
+  provider?: string | null;
+  model?: string | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  latencyMs?: number | null;
+  fallbackUsed?: boolean;
+};
+
+export type ModelOption = {
+  id: string;
+  provider: string;
+  displayName: string;
+  description: string;
+  contextWindow: number;
+  capabilities: string[];
+  status: "AVAILABLE" | "DEGRADED" | "UNAVAILABLE" | "RATE_LIMITED" | "COMING_SOON";
+  configured: boolean;
 };
 
 export type ConversationDetail = ConversationSummary & {
@@ -1038,6 +1057,23 @@ export const api = {
 
   getAiCapabilities(accessToken: string): Promise<AiCapabilities> {
     return request("/ai/capabilities", {}, accessToken);
+  },
+
+  getModels(accessToken: string): Promise<ModelOption[]> {
+    return request("/models", {}, accessToken);
+  },
+
+  updateConversationModel(
+    accessToken: string,
+    conversationId: string,
+    selectionMode: "AUTO" | "MANUAL",
+    selectedModelId: string | null,
+  ): Promise<ConversationSummary> {
+    return request(
+      `/conversations/${conversationId}/model`,
+      { method: "PATCH", body: JSON.stringify({ selectionMode, selectedModelId }) },
+      accessToken,
+    );
   },
 
   async uploadConversationAttachment(
