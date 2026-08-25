@@ -40,6 +40,10 @@ type AuthMode = "login" | "register";
 type GuestView = "landing" | "auth";
 type ActiveView = "chat" | "feed" | "explore" | "communities" | "articles" | "creator" | "messages" | "stories" | "videos" | "hashtags" | "search" | "notifications" | "profile";
 type ComposerMode = "chat" | "image";
+type AttachmentUploadState = {
+  filename: string;
+  label: string;
+};
 
 function errorMessage(error: unknown) {
   if (error instanceof TypeError && /fetch|network/i.test(error.message)) {
@@ -57,6 +61,12 @@ function formatDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 export default function Home() {
@@ -91,10 +101,12 @@ export default function Home() {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [chatAttachments, setChatAttachments] = useState<ConversationAttachment[]>([]);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [attachmentUpload, setAttachmentUpload] = useState<AttachmentUploadState | null>(null);
   const [externalProcessingAllowed, setExternalProcessingAllowed] = useState(false);
   const [webSearchAllowed, setWebSearchAllowed] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const streamAbortController = useRef<AbortController | null>(null);
+  const activeConversationIdRef = useRef<string | undefined>(undefined);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
 
   const conversationId = selectedConversation?.id;
@@ -103,6 +115,10 @@ export default function Home() {
     () => selectedConversation?.messages ?? [],
     [selectedConversation],
   );
+
+  useEffect(() => {
+    activeConversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   const expireSession = useCallback((message = "") => {
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -115,6 +131,11 @@ export default function Home() {
     setChatError("");
     setMessageDraft("");
     setComposerMode("chat");
+    setChatAttachments([]);
+    setAttachmentUpload(null);
+    setIsUploadingAttachment(false);
+    setExternalProcessingAllowed(false);
+    setWebSearchAllowed(false);
     setActiveView("chat");
     setUnreadNotificationCount(0);
     setAuthError(message);
@@ -277,9 +298,11 @@ export default function Home() {
   }, [isSending, sortedMessages]);
 
   async function selectConversation(token: string, id: string) {
+    activeConversationIdRef.current = id;
     setIsLoadingHistory(true);
     setChatError("");
     setChatAttachments([]);
+    setAttachmentUpload(null);
     setExternalProcessingAllowed(false);
     setWebSearchAllowed(false);
     try {
@@ -535,18 +558,19 @@ export default function Home() {
 
   async function uploadChatAttachment(file: File, purpose: UploadPurpose) {
     if (!accessToken || !conversationId || isUploadingAttachment) return;
+    const targetConversationId = conversationId;
     const normalizedType = file.type.toLowerCase();
     const allowed = purpose === "image"
       ? ["image/jpeg", "image/png", "image/webp"]
       : purpose === "pdf"
         ? ["application/pdf"]
-        : ["application/pdf", "text/plain"];
+        : ["text/plain"];
     if (!allowed.includes(normalizedType)) {
       setChatError(purpose === "image"
         ? "Choose a JPEG, PNG, or WebP image."
         : purpose === "pdf"
           ? "Choose a PDF document."
-          : "Choose a PDF or plain-text document.");
+          : "Choose a plain-text document.");
       return;
     }
     const sizeLimit = purpose === "image" ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
@@ -555,9 +579,17 @@ export default function Home() {
       return;
     }
     setIsUploadingAttachment(true);
+    setAttachmentUpload({
+      filename: file.name,
+      label: purpose === "image" ? "Image" : purpose === "pdf" ? "PDF" : "Text",
+    });
     setChatError("");
     try {
-      const attachment = await api.uploadConversationAttachment(accessToken, conversationId, file);
+      const attachment = await api.uploadConversationAttachment(accessToken, targetConversationId, file);
+      if (activeConversationIdRef.current !== targetConversationId) {
+        await api.deleteConversationAttachment(accessToken, targetConversationId, attachment.id).catch(() => undefined);
+        return;
+      }
       setChatAttachments((current) => [...current, attachment]);
       if (attachment.processingStatus === "FAILED") {
         setChatError(attachment.processingError ?? "Attachment processing failed.");
@@ -566,6 +598,7 @@ export default function Home() {
       handleAuthenticatedError(error);
     } finally {
       setIsUploadingAttachment(false);
+      setAttachmentUpload(null);
     }
   }
 
@@ -686,7 +719,7 @@ export default function Home() {
   return (
     <>
     <main className="app-shell">
-      <aside className="sidebar">
+      <aside className={socialWorkspace ? "sidebar social-sidebar" : "sidebar"}>
         <div className="sidebar-header">
           <div className="brand-lockup">
             <span className="brand-mark small">
@@ -952,16 +985,28 @@ export default function Home() {
                   <button aria-label="Exit image generation mode" onClick={() => setComposerMode("chat")} type="button">×</button>
                 </div>
               )}
-              {chatAttachments.length > 0 && (
-                <div className="chat-attachments">
+              {(attachmentUpload || chatAttachments.length > 0) && (
+                <div aria-live="polite" className="chat-attachments">
+                  {attachmentUpload && (
+                    <span className="uploading-attachment" role="status">
+                      <i aria-hidden="true" className="attachment-spinner" />
+                      <strong>{attachmentUpload.label}</strong>
+                      <b title={attachmentUpload.filename}>{attachmentUpload.filename}</b>
+                      <small>uploading…</small>
+                    </span>
+                  )}
                   {chatAttachments.map((attachment) => (
                     <span key={attachment.id}>
                       {attachment.kind === "IMAGE" && (
                         <AuthenticatedImage accessToken={accessToken} alt={attachment.filename} className="chat-attachment-thumbnail" mediaId={attachment.mediaId} thumbnail />
                       )}
                       <strong>{attachment.kind === "IMAGE" ? "Image" : attachment.contentType === "text/plain" ? "Text" : "PDF"}</strong>
-                      {attachment.filename}
-                      <small>{attachment.processingStatus.toLowerCase()}</small>
+                      <b title={attachment.filename}>{attachment.filename}</b>
+                      <small>
+                        {attachment.processingStatus === "READY"
+                          ? `ready · ${formatFileSize(attachment.byteSize)}`
+                          : attachment.processingStatus.toLowerCase()}
+                      </small>
                       <button
                         aria-label={`Remove ${attachment.filename}`}
                         onClick={() => void removeChatAttachment(attachment)}

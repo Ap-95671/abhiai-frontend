@@ -16,7 +16,7 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const documentInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,15 +61,15 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
       </button>
       {open && (
         <div aria-label="AI tools" className={styles.menu} role="menu">
-          <ToolItem detail="JPEG, PNG, or WebP" icon="▧" label="Upload image" onClick={() => selectFile(imageInputRef.current)} />
-          <ToolItem detail="PDF or plain text" icon="▤" label="Upload document" onClick={() => selectFile(documentInputRef.current)} />
-          <ToolItem detail="Extract or OCR a PDF" icon="⌕" label="Scan / analyze PDF" onClick={() => selectFile(pdfInputRef.current)} />
+          <ToolItem detail="JPEG, PNG, or WebP · up to 5 MB" icon="▧" label="Upload image" onClick={() => selectFile(imageInputRef.current)} />
+          <ToolItem detail="Extract text or OCR · up to 10 MB" icon="▤" label="Upload PDF" onClick={() => selectFile(pdfInputRef.current)} />
+          <ToolItem detail="UTF-8 plain text · up to 10 MB" icon="⌕" label="Upload text file" onClick={() => selectFile(textInputRef.current)} />
           <ToolItem detail="Create an image from a prompt" icon="✦" label="Generate image" onClick={() => { setOpen(false); onGenerateImage(); }} />
-          <ToolItem detail="More tools coming soon" disabled icon="•••" label="More tools" onClick={() => undefined} />
+          <ToolItem detail="Not available yet" disabled icon="•••" label="More tools" onClick={() => undefined} />
         </div>
       )}
       <input accept="image/jpeg,image/png,image/webp" className={styles.fileInput} onChange={(event) => handleFile(event, "image")} ref={imageInputRef} type="file" />
-      <input accept="application/pdf,text/plain,.pdf,.txt" className={styles.fileInput} onChange={(event) => handleFile(event, "document")} ref={documentInputRef} type="file" />
+      <input accept="text/plain,.txt" className={styles.fileInput} onChange={(event) => handleFile(event, "document")} ref={textInputRef} type="file" />
       <input accept="application/pdf,.pdf" className={styles.fileInput} onChange={(event) => handleFile(event, "pdf")} ref={pdfInputRef} type="file" />
     </div>
   );
