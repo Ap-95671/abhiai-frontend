@@ -1002,7 +1002,14 @@ export const api = {
     content: string,
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { attachmentIds?: string[]; externalProcessingAllowed?: boolean; webSearchAllowed?: boolean },
+    options?: {
+      attachmentIds?: string[];
+      externalProcessingAllowed?: boolean;
+      webSearchAllowed?: boolean;
+      selectionMode?: "AUTO" | "MANUAL";
+      selectedModelId?: string | null;
+      fallbackAllowed?: boolean;
+    },
   ): Promise<ChatExchange> {
     const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
       method: "POST",
@@ -1012,6 +1019,9 @@ export const api = {
         attachmentIds: options?.attachmentIds ?? [],
         externalProcessingAllowed: options?.externalProcessingAllowed ?? false,
         webSearchAllowed: options?.webSearchAllowed ?? false,
+        selectionMode: options?.selectionMode,
+        selectedModelId: options?.selectedModelId,
+        fallbackAllowed: options?.fallbackAllowed,
       }),
       signal,
     });

@@ -451,6 +451,9 @@ export default function Home() {
           attachmentIds: chatAttachments.map((attachment) => attachment.id),
           externalProcessingAllowed,
           webSearchAllowed,
+          selectionMode: selectedConversation.modelSelectionMode,
+          selectedModelId: selectedConversation.preferredModelId,
+          fallbackAllowed: selectedConversation.modelSelectionMode === "AUTO",
         },
       );
       setChatAttachments([]);
@@ -933,7 +936,7 @@ export default function Home() {
                   onChange={(event) => void changeConversationModel(event.target.value)}
                   value={selectedConversation.modelSelectionMode === "MANUAL" ? selectedConversation.preferredModelId ?? "AUTO" : "AUTO"}
                 >
-                  <option value="AUTO">✦ AbhiAI Auto</option>
+                  <option value="AUTO">✦ AbhiAI Auto · smart routing</option>
                   {models.map((model) => (
                     <option
                       disabled={model.status === "UNAVAILABLE" || model.status === "RATE_LIMITED" || model.status === "COMING_SOON" || !model.configured}
