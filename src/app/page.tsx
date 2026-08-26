@@ -499,6 +499,13 @@ export default function Home() {
         setChatError("Generation stopped.");
       } else {
         handleAuthenticatedError(error);
+        void api.getModels(accessToken)
+          .then(setModels)
+          .catch((catalogError: unknown) => {
+            if (catalogError instanceof ApiError && catalogError.status === 401) {
+              handleSessionExpired();
+            }
+          });
       }
     } finally {
       streamAbortController.current = null;
@@ -943,7 +950,7 @@ export default function Home() {
                       key={model.id}
                       value={model.id}
                     >
-                      {model.displayName} · {model.provider}{model.status === "COMING_SOON" ? " — Coming soon" : model.status === "RATE_LIMITED" ? " — Rate limited" : !model.configured ? " — Not configured" : ""}
+                      {model.displayName} · {model.provider}{model.status === "COMING_SOON" ? " — Coming soon" : model.status === "RATE_LIMITED" ? " — Rate limited" : model.status === "UNAVAILABLE" ? " — Unavailable" : model.status === "DEGRADED" ? " — Degraded" : !model.configured ? " — Not configured" : ""}
                     </option>
                   ))}
                 </select>
