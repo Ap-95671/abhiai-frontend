@@ -131,7 +131,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
           </div>
         </form>
         {error && <p className="inline-error" role="alert">{error}</p>}
-        {isLoading && posts.length === 0 && <div className="feed-loading">Loading your feed…</div>}
+        {isLoading && posts.length === 0 && <div aria-label="Loading your feed" className="feed-loading" role="status"><span/><span/><span/></div>}
         {!isLoading && posts.length === 0 && !error && <div className="feature-empty-state compact"><h2>Your feed is ready</h2><p>Create a post or follow people from Search to bring your network to life.</p></div>}
         <div className="social-feed">
           {posts.map((post) => <FeedPost accessToken={accessToken} currentUserId={profile?.id} key={post.id} onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}

@@ -173,14 +173,14 @@ export function MessagesPanel({ accessToken, onUnauthorized, onViewProfile }: Me
       </header>
 
       {messageMode === "groups" ? <GroupMessagesPanel accessToken={accessToken} onUnauthorized={onUnauthorized} onViewProfile={onViewProfile} /> :
-      <div className="dm-workspace">
+      <div className={selected ? "dm-workspace dm-mobile-thread-open" : "dm-workspace"}>
         <aside className="dm-conversation-panel">
           <form className="dm-start-form" onSubmit={startConversation}>
             <label htmlFor="dm-recipient">Start a conversation</label>
             <div><input id="dm-recipient" maxLength={31} onChange={(event) => setRecipient(event.target.value)} placeholder="@username" value={recipient} /><button disabled={isStarting || !recipient.trim()} type="submit">{isStarting ? "…" : "+"}</button></div>
           </form>
           <div className="dm-list" aria-label="Direct conversations">
-            {isLoading && <p className="dm-empty">Loading conversations…</p>}
+            {isLoading && <div aria-label="Loading conversations" className="dm-list-skeletons" role="status"><i/><i/><i/></div>}
             {!isLoading && conversations.length === 0 && <p className="dm-empty">No direct messages yet. Start with a username above.</p>}
             {conversations.map((conversation) => (
               <button className={selected?.id === conversation.id ? "active" : ""} key={conversation.id} onClick={() => void loadHistory(conversation)} type="button">
@@ -196,12 +196,13 @@ export function MessagesPanel({ accessToken, onUnauthorized, onViewProfile }: Me
           {error && <p className="inline-error dm-error" role="alert">{error}</p>}
           {!selected ? <div className="feature-empty-state"><span className="empty-state-icon" aria-hidden="true">✉</span><h2>Your private inbox</h2><p>Select a conversation or start a new one using someone&apos;s username.</p></div> : <>
             <header className="dm-thread-header">
+              <button aria-label="Back to conversations" className="dm-mobile-back" onClick={() => setSelected(null)} type="button">←</button>
               <button className="profile-avatar" onClick={() => onViewProfile(selected.participant.username)} type="button">{initials(selected.participant.displayName)}</button>
               <div><button onClick={() => onViewProfile(selected.participant.username)} type="button">{selected.participant.displayName}</button><p>@{selected.participant.username}</p></div>
             </header>
             <div className="dm-history" aria-live="polite">
               {messagePage && !messagePage.last && <button className="dm-load-older" disabled={isLoadingHistory} onClick={() => void loadHistory(selected, messagePage.page + 1, true)} type="button">{isLoadingHistory ? "Loading…" : "Load older messages"}</button>}
-              {isLoadingHistory && messages.length === 0 && <p className="dm-empty">Loading messages…</p>}
+              {isLoadingHistory && messages.length === 0 && <div aria-label="Loading messages" className="dm-message-skeletons" role="status"><i/><i/><i/></div>}
               {!isLoadingHistory && messages.length === 0 && <div className="dm-begin"><span>✦</span><p>This is the beginning of your conversation with <strong>{selected.participant.displayName}</strong>.</p></div>}
               {chronologicalMessages.map((message) => {
                 const own = message.sender.id === currentUserId;

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -22,6 +22,7 @@ import { StoriesPanel } from "@/components/stories-panel";
 import { HashtagPanel } from "@/components/hashtag-panel";
 import { ArticlesPanel } from "@/components/articles-panel";
 import { CreatorDashboard } from "@/components/creator-dashboard";
+import { AppIcon, AppIconName } from "@/components/ui/app-icon";
 
 import {
   api,
@@ -31,10 +32,12 @@ import {
   ConversationDetail,
   ConversationSummary,
   ModelOption,
+  UserProfile,
 } from "@/lib/api";
 
 const TOKEN_STORAGE_KEY = "abhiai.access-token";
 const SESSION_TOKEN_STORAGE_KEY = "abhiai.session-access-token";
+const SIDEBAR_STORAGE_KEY = "abhiai.sidebar-collapsed";
 
 type AuthMode = "login" | "register";
 type GuestView = "landing" | "auth";
@@ -44,6 +47,24 @@ type AttachmentUploadState = {
   filename: string;
   label: string;
 };
+
+type ToastMessage = { id: number; message: string; tone?: "default" | "error" };
+type ConversationGroup = { label: string; items: ConversationSummary[] };
+
+const socialNavigation: Array<{ view: ActiveView; label: string; icon: AppIconName }> = [
+  { view: "feed", label: "Feed", icon: "feed" },
+  { view: "explore", label: "Explore", icon: "explore" },
+  { view: "communities", label: "Communities", icon: "community" },
+  { view: "articles", label: "Articles", icon: "article" },
+  { view: "creator", label: "Creator Studio", icon: "create" },
+  { view: "messages", label: "Messages", icon: "message" },
+  { view: "stories", label: "Stories", icon: "story" },
+  { view: "videos", label: "Videos", icon: "video" },
+  { view: "hashtags", label: "Tags", icon: "hash" },
+  { view: "search", label: "Search", icon: "search" },
+  { view: "notifications", label: "Notifications", icon: "bell" },
+  { view: "profile", label: "Profile", icon: "profile" },
+];
 
 function errorMessage(error: unknown) {
   if (error instanceof TypeError && /fetch|network/i.test(error.message)) {
@@ -69,6 +90,30 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function initials(value: string) {
+  return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "A";
+}
+
+function groupConversations(items: ConversationSummary[]): ConversationGroup[] {
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const day = 86_400_000;
+  const groups = [
+    { label: "Today", min: startToday },
+    { label: "Yesterday", min: startToday - day },
+    { label: "Previous 7 days", min: startToday - 7 * day },
+    { label: "Older", min: Number.NEGATIVE_INFINITY },
+  ];
+  return groups.map((group, index) => ({
+    label: group.label,
+    items: items.filter((item) => {
+      const value = new Date(item.updatedAt).getTime();
+      const max = index === 0 ? Number.POSITIVE_INFINITY : groups[index - 1].min;
+      return value >= group.min && value < max;
+    }),
+  })).filter((group) => group.items.length > 0);
+}
+
 export default function Home() {
   const pathname = usePathname();
   const router = useRouter();
@@ -86,6 +131,14 @@ export default function Home() {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [profileUsername, setProfileUsername] = useState<string | undefined>();
   const [selectedHashtag, setSelectedHashtag] = useState<string | undefined>();
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [conversationDialog, setConversationDialog] = useState<"rename" | "delete" | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [conversationMenuId, setConversationMenuId] = useState<string | null>(null);
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
@@ -105,9 +158,14 @@ export default function Home() {
   const [externalProcessingAllowed, setExternalProcessingAllowed] = useState(false);
   const [webSearchAllowed, setWebSearchAllowed] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [showLatest, setShowLatest] = useState(false);
   const streamAbortController = useRef<AbortController | null>(null);
   const activeConversationIdRef = useRef<string | undefined>(undefined);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const shouldFollowStreamRef = useRef(true);
 
   const conversationId = selectedConversation?.id;
   const socialWorkspace = pathname === "/social";
@@ -115,10 +173,55 @@ export default function Home() {
     () => selectedConversation?.messages ?? [],
     [selectedConversation],
   );
+  const conversationGroups = useMemo(() => groupConversations(conversations), [conversations]);
+
+  const showToast = useCallback((message: string, tone: ToastMessage["tone"] = "default") => {
+    setToast({ id: Date.now(), message, tone });
+  }, []);
 
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    queueMicrotask(() => setSidebarCollapsed(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true"));
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    const closeAccountMenu = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+      if (!(event.target as Element).closest?.(".conversation-row")) setConversationMenuId(null);
+    };
+    document.addEventListener("pointerdown", closeAccountMenu);
+    return () => document.removeEventListener("pointerdown", closeAccountMenu);
+  }, []);
+
+  useEffect(() => {
+    const closeOverlays = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setAccountMenuOpen(false);
+      setMobileSidebarOpen(false);
+      setConversationDialog(null);
+      setConversationMenuId(null);
+    };
+    document.addEventListener("keydown", closeOverlays);
+    return () => document.removeEventListener("keydown", closeOverlays);
+  }, []);
+
+  useEffect(() => {
+    const textarea = composerTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 176)}px`;
+  }, [messageDraft, conversationId]);
 
   const expireSession = useCallback((message = "") => {
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -138,6 +241,9 @@ export default function Home() {
     setWebSearchAllowed(false);
     setActiveView("chat");
     setUnreadNotificationCount(0);
+    setCurrentUser(null);
+    setMobileSidebarOpen(false);
+    setAccountMenuOpen(false);
     setAuthError(message);
   }, []);
 
@@ -200,6 +306,11 @@ export default function Home() {
     let active = true;
     api.getModels(accessToken)
       .then((items) => { if (active) setModels(items); })
+      .catch((error: unknown) => {
+        if (active && error instanceof ApiError && error.status === 401) handleSessionExpired();
+      });
+    api.getCurrentProfile(accessToken)
+      .then((profile) => { if (active) setCurrentUser(profile); })
       .catch((error: unknown) => {
         if (active && error instanceof ApiError && error.status === 401) handleSessionExpired();
       });
@@ -294,11 +405,42 @@ export default function Home() {
   }, [accessToken, handleSessionExpired]);
 
   useEffect(() => {
+    if (!shouldFollowStreamRef.current) return;
     latestMessageRef.current?.scrollIntoView({ behavior: isSending ? "smooth" : "auto", block: "end" });
   }, [isSending, sortedMessages]);
 
+  function handleMessageScroll() {
+    const container = messagesRef.current;
+    if (!container) return;
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+    shouldFollowStreamRef.current = nearBottom;
+    setShowLatest(!nearBottom);
+  }
+
+  function scrollToLatest() {
+    shouldFollowStreamRef.current = true;
+    setShowLatest(false);
+    latestMessageRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }
+
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+      return next;
+    });
+  }
+
+  function navigateWorkspace(view: ActiveView, workspace: "chat" | "social" = "social") {
+    setActiveView(view);
+    setMobileSidebarOpen(false);
+    router.push(workspace === "chat" ? "/chat" : "/social");
+  }
+
   async function selectConversation(token: string, id: string) {
     activeConversationIdRef.current = id;
+    shouldFollowStreamRef.current = true;
+    setShowLatest(false);
     setIsLoadingHistory(true);
     setChatError("");
     setChatAttachments([]);
@@ -306,9 +448,12 @@ export default function Home() {
     setExternalProcessingAllowed(false);
     setWebSearchAllowed(false);
     try {
-      setSelectedConversation(await api.getConversation(token, id));
+      const conversation = await api.getConversation(token, id);
+      setSelectedConversation(conversation);
+      return conversation;
     } catch (error) {
       handleAuthenticatedError(error);
+      return null;
     } finally {
       setIsLoadingHistory(false);
     }
@@ -368,10 +513,34 @@ export default function Home() {
       setActiveView("chat");
       setConversations((current) => [conversation, ...current]);
       await selectConversation(accessToken, conversation.id);
+      setMobileSidebarOpen(false);
     } catch (error) {
       handleAuthenticatedError(error);
     } finally {
       setIsCreatingConversation(false);
+    }
+  }
+
+  async function openConversationAction(conversation: ConversationSummary, action: "rename" | "delete") {
+    if (!accessToken) return;
+    if (selectedConversation?.id !== conversation.id && !await selectConversation(accessToken, conversation.id)) return;
+    setRenameDraft(conversation.title);
+    setConversationMenuId(null);
+    setConversationDialog(action);
+  }
+
+  async function startQuickAction(mode: ComposerMode, draft: string, allowWebSearch = false) {
+    setComposerMode(mode);
+    setMessageDraft(draft);
+    setWebSearchAllowed(allowWebSearch);
+    await createConversation();
+    window.setTimeout(() => composerTextareaRef.current?.focus(), 80);
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
     }
   }
 
@@ -601,10 +770,12 @@ export default function Home() {
         return;
       }
       setChatAttachments((current) => [...current, attachment]);
+      showToast(`${file.name} is ready`);
       if (attachment.processingStatus === "FAILED") {
         setChatError(attachment.processingError ?? "Attachment processing failed.");
       }
     } catch (error) {
+      showToast("Upload failed", "error");
       handleAuthenticatedError(error);
     } finally {
       setIsUploadingAttachment(false);
@@ -630,6 +801,7 @@ export default function Home() {
     try {
       await navigator.clipboard.writeText(message.content);
       setCopiedMessageId(message.id);
+      showToast("Copied to clipboard");
       window.setTimeout(() => setCopiedMessageId(null), 1800);
     } catch {
       setChatError("Unable to copy this message. Please select the text manually.");
@@ -638,13 +810,15 @@ export default function Home() {
 
   async function renameConversation() {
     if (!accessToken || !selectedConversation) return;
-    const title = window.prompt("Conversation title", selectedConversation.title)?.trim();
+    const title = renameDraft.trim();
     if (!title || title === selectedConversation.title) return;
 
     try {
       const updated = await api.renameConversation(accessToken, selectedConversation.id, title);
       setSelectedConversation((current) => (current ? { ...current, ...updated } : current));
       setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setConversationDialog(null);
+      showToast("Conversation renamed");
     } catch (error) {
       handleAuthenticatedError(error);
     }
@@ -652,7 +826,6 @@ export default function Home() {
 
   async function deleteConversation() {
     if (!accessToken || !selectedConversation) return;
-    if (!window.confirm("Delete this conversation and its messages?")) return;
 
     try {
       await api.deleteConversation(accessToken, selectedConversation.id);
@@ -660,6 +833,8 @@ export default function Home() {
       setConversations(remaining);
       setSelectedConversation(null);
       if (remaining[0]) await selectConversation(accessToken, remaining[0].id);
+      setConversationDialog(null);
+      showToast("Conversation deleted");
     } catch (error) {
       handleAuthenticatedError(error);
     }
@@ -728,18 +903,38 @@ export default function Home() {
 
   return (
     <>
-    <main className="app-shell">
-      <aside className={socialWorkspace ? "sidebar social-sidebar" : "sidebar"}>
+    <main className={sidebarCollapsed ? "app-shell sidebar-is-collapsed" : "app-shell"}>
+      <button
+        aria-label={mobileSidebarOpen ? "Close navigation" : "Open navigation"}
+        className="mobile-sidebar-trigger"
+        onClick={() => setMobileSidebarOpen((current) => !current)}
+        type="button"
+      >
+        <AppIcon name={mobileSidebarOpen ? "chevron-left" : "menu"} />
+      </button>
+      {mobileSidebarOpen && <button aria-label="Close navigation" className="sidebar-scrim" onClick={() => setMobileSidebarOpen(false)} type="button" />}
+      <aside className={`${socialWorkspace ? "sidebar social-sidebar" : "sidebar"}${mobileSidebarOpen ? " mobile-open" : ""}`}>
         <div className="sidebar-header">
-          <div className="brand-lockup">
+          <div className="sidebar-brand-row">
+          <div className="brand-lockup" title="AbhiAI">
             <span className="brand-mark small">
               <Image alt="" height={40} priority src="/abhiai-logo.png" width={40} />
             </span>
-            AbhiAI
+            <span className="sidebar-label">AbhiAI</span>
+          </div>
+          <button
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="sidebar-collapse-button"
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            type="button"
+          >
+            <AppIcon name={sidebarCollapsed ? "chevron-right" : "chevron-left"} />
+          </button>
           </div>
           {!socialWorkspace && (
             <button className="new-chat-button" disabled={isCreatingConversation} onClick={createConversation} type="button">
-              <span>＋</span> New chat
+              <AppIcon name="plus" /> <span className="sidebar-label">New chat</span>
             </button>
           )}
         </div>
@@ -748,151 +943,95 @@ export default function Home() {
           <button
             aria-current={!socialWorkspace ? "page" : undefined}
             className={!socialWorkspace ? "active" : ""}
-            onClick={() => { setActiveView("chat"); router.push("/chat"); }}
+            onClick={() => navigateWorkspace("chat", "chat")}
+            title="AbhiAI"
             type="button"
           >
-            <span aria-hidden="true">✦</span> AbhiAI
+            <AppIcon name="ai" /> <span className="sidebar-label">AbhiAI</span>
           </button>
           <button
             aria-current={socialWorkspace ? "page" : undefined}
             className={socialWorkspace ? "active" : ""}
-            onClick={() => { setActiveView("feed"); router.push("/social"); }}
+            onClick={() => navigateWorkspace("feed")}
+            title="Social"
             type="button"
           >
-            <span aria-hidden="true">◎</span> Social
+            <AppIcon name="social" /> <span className="sidebar-label">Social</span>
           </button>
         </div>
 
         <nav className="primary-navigation" aria-label="Workspace">
           {!socialWorkspace ? (
-            <button aria-current="page" className="active" onClick={() => setActiveView("chat")} type="button">
-              <span aria-hidden="true">◇</span> AI Chat
+            <button aria-current="page" className="active" onClick={() => navigateWorkspace("chat", "chat")} title="AI Chat" type="button">
+              <AppIcon name="ai" /> <span className="sidebar-label">AI Chat</span>
             </button>
           ) : (<>
-          <button
-            aria-current={activeView === "feed" ? "page" : undefined}
-            className={activeView === "feed" ? "active" : ""}
-            onClick={() => setActiveView("feed")}
-            type="button"
-          >
-            <span aria-hidden="true">◎</span> Feed
-          </button>
-          <button
-            aria-current={activeView === "explore" ? "page" : undefined}
-            className={activeView === "explore" ? "active" : ""}
-            onClick={() => setActiveView("explore")}
-            type="button"
-          >
-            <span aria-hidden="true">✦</span> Explore
-          </button>
-          <button
-            aria-current={activeView === "communities" ? "page" : undefined}
-            className={activeView === "communities" ? "active" : ""}
-            onClick={() => setActiveView("communities")}
-            type="button"
-          >
-            <span aria-hidden="true">◈</span> Communities
-          </button>
-          <button
-            aria-current={activeView === "articles" ? "page" : undefined}
-            className={activeView === "articles" ? "active" : ""}
-            onClick={() => setActiveView("articles")}
-            type="button"
-          >
-            <span aria-hidden="true">▤</span> Articles
-          </button>
-          <button
-            aria-current={activeView === "creator" ? "page" : undefined}
-            className={activeView === "creator" ? "active" : ""}
-            onClick={() => setActiveView("creator")}
-            type="button"
-          >
-            <span aria-hidden="true">⌁</span> Creator Studio
-          </button>
-          <button
-            aria-current={activeView === "messages" ? "page" : undefined}
-            className={activeView === "messages" ? "active" : ""}
-            onClick={() => setActiveView("messages")}
-            type="button"
-          >
-            <span aria-hidden="true">✉</span> Messages
-          </button>
-          <button
-            aria-current={activeView === "stories" ? "page" : undefined}
-            className={activeView === "stories" ? "active" : ""}
-            onClick={() => setActiveView("stories")}
-            type="button"
-          >
-            <span aria-hidden="true">◌</span> Stories
-          </button>
-          <button
-            aria-current={activeView === "videos" ? "page" : undefined}
-            className={activeView === "videos" ? "active" : ""}
-            onClick={() => setActiveView("videos")}
-            type="button"
-          >
-            <span aria-hidden="true">▶</span> Videos
-          </button>
-          <button
-            aria-current={activeView === "hashtags" ? "page" : undefined}
-            className={activeView === "hashtags" ? "active" : ""}
-            onClick={() => viewHashtag()}
-            type="button"
-          >
-            <span aria-hidden="true">#</span> Tags
-          </button>
-          <button
-            aria-current={activeView === "search" ? "page" : undefined}
-            className={activeView === "search" ? "active" : ""}
-            onClick={() => setActiveView("search")}
-            type="button"
-          >
-            <span aria-hidden="true">⌕</span> Search
-          </button>
-          <button
-            aria-current={activeView === "notifications" ? "page" : undefined}
-            className={activeView === "notifications" ? "active" : ""}
-            onClick={() => setActiveView("notifications")}
-            type="button"
-          >
-            <span aria-hidden="true">♢</span> Notifications
-            {unreadNotificationCount > 0 && (
-              <strong className="notification-badge" aria-label={`${unreadNotificationCount} unread notifications`}>
-                {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-              </strong>
-            )}
-          </button>
-          <button
-            aria-current={activeView === "profile" ? "page" : undefined}
-            className={activeView === "profile" ? "active" : ""}
-            onClick={() => viewProfile()}
-            type="button"
-          >
-            <span aria-hidden="true">○</span> Profile
-          </button>
+          {socialNavigation.map((item) => (
+            <button
+              aria-current={activeView === item.view ? "page" : undefined}
+              className={activeView === item.view ? "active" : ""}
+              key={item.view}
+              onClick={() => item.view === "hashtags" ? (viewHashtag(), setMobileSidebarOpen(false)) : item.view === "profile" ? (viewProfile(), setMobileSidebarOpen(false)) : (setActiveView(item.view), setMobileSidebarOpen(false))}
+              title={item.label}
+              type="button"
+            >
+              <AppIcon name={item.icon} /> <span className="sidebar-label">{item.label}</span>
+              {item.view === "notifications" && unreadNotificationCount > 0 && (
+                <strong className="notification-badge" aria-label={`${unreadNotificationCount} unread notifications`}>
+                  {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                </strong>
+              )}
+            </button>
+          ))}
           </>)}
         </nav>
 
         <nav className={!socialWorkspace ? "conversation-list" : "conversation-list hidden"} aria-label="Conversations">
           <p className="list-label">Recent chats</p>
-          {isLoadingConversations && <p className="muted-text">Loading conversations…</p>}
+          {isLoadingConversations && <div aria-label="Loading conversations" className="conversation-skeletons" role="status"><i/><i/><i/></div>}
           {!isLoadingConversations && conversations.length === 0 && (
             <p className="muted-text">Start a new chat to begin.</p>
           )}
-          {conversations.map((conversation) => (
+          {conversationGroups.map((group) => <div className="conversation-group" key={group.label}>
+            <p className="conversation-group-label">{group.label}</p>
+            {group.items.map((conversation) => (
+            <div className="conversation-row" key={conversation.id}>
             <button
               className={conversation.id === conversationId ? "conversation-item selected" : "conversation-item"}
-              key={conversation.id}
-              onClick={() => void selectConversation(accessToken, conversation.id)}
+              onClick={() => { setConversationMenuId(null); setMobileSidebarOpen(false); void selectConversation(accessToken, conversation.id); }}
+              title={conversation.title}
               type="button"
             >
               <span>{conversation.title}</span>
               <small>{formatDate(conversation.updatedAt)}</small>
             </button>
-          ))}
+            <button aria-expanded={conversationMenuId === conversation.id} aria-haspopup="menu" aria-label={`Actions for ${conversation.title}`} className="conversation-more-button" onClick={() => setConversationMenuId((current) => current === conversation.id ? null : conversation.id)} type="button"><AppIcon name="more"/></button>
+            {conversationMenuId === conversation.id && <div className="conversation-menu" role="menu"><button onClick={() => void openConversationAction(conversation, "rename")} role="menuitem" type="button">Rename</button><button className="danger-menu-item" onClick={() => void openConversationAction(conversation, "delete")} role="menuitem" type="button">Delete</button></div>}
+            </div>
+            ))}
+          </div>)}
         </nav>
 
-        <button className="sign-out-button" onClick={signOut} type="button">Sign out</button>
+        <div className="account-control" ref={accountMenuRef}>
+          {accountMenuOpen && (
+            <div className="account-menu" role="menu">
+              <button onClick={() => { viewProfile(); router.push("/social"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
+              <button className="danger-menu-item" onClick={signOut} role="menuitem" type="button">Sign out</button>
+            </div>
+          )}
+          <button
+            aria-expanded={accountMenuOpen}
+            aria-haspopup="menu"
+            className="account-trigger"
+            onClick={() => setAccountMenuOpen((current) => !current)}
+            title={currentUser?.displayName ?? "Account"}
+            type="button"
+          >
+            <span className="account-avatar">{initials(currentUser?.displayName ?? "AbhiAI")}</span>
+            <span className="account-copy sidebar-label"><strong>{currentUser?.displayName ?? "Your account"}</strong><small>{currentUser ? `@${currentUser.username}` : "Profile and sign out"}</small></span>
+            <AppIcon className="sidebar-label" name="more" />
+          </button>
+        </div>
       </aside>
 
       {socialWorkspace && activeView === "feed" ? (
@@ -956,14 +1095,14 @@ export default function Home() {
                 </select>
               </label>
               <div className="conversation-actions">
-                <button onClick={renameConversation} type="button">Rename</button>
-                <button className="danger-button" onClick={deleteConversation} type="button">Delete</button>
+                <button onClick={() => { setRenameDraft(selectedConversation.title); setConversationDialog("rename"); }} type="button">Rename</button>
+                <button className="danger-button" onClick={() => setConversationDialog("delete")} type="button">Delete</button>
               </div>
             </header>
 
-            <div className="messages" aria-live="polite">
+            <div className="messages" aria-live="polite" onScroll={handleMessageScroll} ref={messagesRef}>
               {isLoadingHistory ? (
-                <p className="muted-text">Loading messages…</p>
+                <div aria-label="Loading messages" className="message-skeletons" role="status"><i/><i/><i/></div>
               ) : sortedMessages.length === 0 ? (
                 <div className="empty-conversation">
                   <span className="brand-mark">
@@ -986,6 +1125,8 @@ export default function Home() {
               {isSending && !hasStartedResponding && <ThinkingIndicator />}
               <div aria-hidden="true" ref={latestMessageRef} />
             </div>
+
+            {showLatest && <button className="latest-message-button" onClick={scrollToLatest} type="button">↓ Latest</button>}
 
             {chatError && <p className="chat-error">{chatError}</p>}
             <form className="composer" onSubmit={sendMessage}>
@@ -1042,13 +1183,9 @@ export default function Home() {
                 aria-label="Message AbhiAI"
                 disabled={isSending}
                 onChange={(event) => setMessageDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    event.currentTarget.form?.requestSubmit();
-                  }
-                }}
+                onKeyDown={handleComposerKeyDown}
                 placeholder={composerMode === "image" ? "Describe the image you want to create…" : "Message AbhiAI…"}
+                ref={composerTextareaRef}
                 rows={1}
                 value={messageDraft}
               />
@@ -1060,7 +1197,7 @@ export default function Home() {
                   disabled={!messageDraft.trim() || isUploadingAttachment}
                   type="submit"
                 >
-                  ↑
+                  <AppIcon name="send" />
                 </button>
               )}
             </form>
@@ -1088,18 +1225,50 @@ export default function Home() {
             <p className="composer-note">AbhiAI can make mistakes. Verify important information.</p>
           </>
         ) : (
-          <div className="no-conversation">
-            <span className="brand-mark">
-              <Image alt="AbhiAI" height={56} src="/abhiai-logo.png" width={56} />
-            </span>
-            <h1>Ready when you are.</h1>
-            <p>Create a new conversation to start chatting with AbhiAI.</p>
-            <button className="primary-button" disabled={isCreatingConversation} onClick={createConversation} type="button">
-              New chat
-            </button>
+          <div className="ai-home">
+            <div className="ai-home-intro">
+              <span className="brand-mark ai-home-logo"><Image alt="AbhiAI" height={64} src="/abhiai-logo.png" width={64} /></span>
+              <p className="eyebrow">AbhiAI</p>
+              <h1>What can I help you with?</h1>
+              <p>Ask a question, explore an idea, work with a document, or create something new.</p>
+            </div>
+            <form className="home-composer" onSubmit={(event) => { event.preventDefault(); if (messageDraft.trim()) void startQuickAction("chat", messageDraft); }}>
+              <textarea
+                aria-label="Start a conversation with AbhiAI"
+                onChange={(event) => setMessageDraft(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder="Ask AbhiAI anything…"
+                rows={2}
+                value={messageDraft}
+              />
+              <div><span>Start a new conversation</span><button aria-label="Start chat" disabled={isCreatingConversation || !messageDraft.trim()} type="submit"><AppIcon name="send" /></button></div>
+            </form>
+            <div aria-label="Quick actions" className="quick-actions">
+              <button disabled={isCreatingConversation} onClick={() => void startQuickAction("image", "Create an image of ")} type="button"><AppIcon name="image"/><span><strong>Create image</strong><small>Generate from a prompt</small></span></button>
+              <button disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Summarize and analyze this PDF: ")} type="button"><AppIcon name="article"/><span><strong>Analyze PDF</strong><small>Upload after opening chat</small></span></button>
+              <button disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Research the latest information about ", true)} type="button"><AppIcon name="search"/><span><strong>Research</strong><small>Use supported web search</small></span></button>
+            </div>
           </div>
         )}
       </section>
+      )}
+      {toast && <div className={toast.tone === "error" ? "app-toast error" : "app-toast"} key={toast.id} role="status">{toast.message}</div>}
+      {conversationDialog && selectedConversation && (
+        <div aria-labelledby="conversation-dialog-title" aria-modal="true" className="app-dialog-backdrop" role="dialog">
+          <form className="app-dialog" onSubmit={(event) => { event.preventDefault(); if (conversationDialog === "rename") void renameConversation(); }}>
+            <p className="eyebrow">Conversation</p>
+            <h2 id="conversation-dialog-title">{conversationDialog === "rename" ? "Rename conversation" : "Delete conversation?"}</h2>
+            {conversationDialog === "rename" ? (
+              <label>Title<input autoFocus maxLength={120} onChange={(event) => setRenameDraft(event.target.value)} value={renameDraft}/></label>
+            ) : <p>This permanently removes “{selectedConversation.title}” and its messages.</p>}
+            <div className="app-dialog-actions">
+              <button className="secondary-button" onClick={() => setConversationDialog(null)} type="button">Cancel</button>
+              {conversationDialog === "rename"
+                ? <button className="primary-button" disabled={!renameDraft.trim() || renameDraft.trim() === selectedConversation.title} type="submit">Save name</button>
+                : <button className="dialog-danger-button" onClick={() => void deleteConversation()} type="button">Delete</button>}
+            </div>
+          </form>
+        </div>
       )}
     </main>
     </>
@@ -1135,7 +1304,7 @@ function MessageBubble({
             {copied ? "Copied" : "Copy"}
           </button>
         </div>
-        <p className="message-content">{message.content}</p>
+        {isUser ? <p className="message-content">{message.content}</p> : <MessageContent content={message.content} />}
         {!isUser && message.model && (
           <p className="model-attribution">
             Answered using {providerLabel(message.provider)} · {message.model}{message.fallbackUsed ? " · fallback used" : ""}
@@ -1159,6 +1328,74 @@ function MessageBubble({
       </div>
     </article>
   );
+}
+
+function renderInlineMarkdown(value: string, keyPrefix: string): ReactNode[] {
+  const tokens = value.split(/(`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)]+\)|\*\*[^*]+\*\*)/g);
+  return tokens.filter(Boolean).map((token, index) => {
+    const key = `${keyPrefix}-${index}`;
+    if (token.startsWith("`") && token.endsWith("`")) return <code key={key}>{token.slice(1, -1)}</code>;
+    const link = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+    if (link) return <a href={link[2]} key={key} rel="noreferrer" target="_blank">{link[1]}</a>;
+    if (token.startsWith("**") && token.endsWith("**")) return <strong key={key}>{token.slice(2, -2)}</strong>;
+    return token;
+  });
+}
+
+function MessageContent({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (line.startsWith("```")) {
+      const language = line.slice(3).trim();
+      const code: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].startsWith("```")) code.push(lines[index++]);
+      blocks.push(<pre key={`code-${index}`}><span>{language || "code"}</span><code>{code.join("\n")}</code></pre>);
+      index += 1;
+      continue;
+    }
+    if (line.includes("|") && index + 1 < lines.length && /^\s*\|?\s*:?-+/.test(lines[index + 1])) {
+      const tableLines = [line];
+      let tableIndex = index + 2;
+      while (tableIndex < lines.length && lines[tableIndex].includes("|")) tableLines.push(lines[tableIndex++]);
+      const rows: string[][] = tableLines
+        .map((row) => row.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()));
+      blocks.push(<div className="message-table-wrap" key={`table-${index}`}><table><thead><tr>{rows[0].map((cell, cellIndex) => <th key={cellIndex}>{renderInlineMarkdown(cell, `th-${index}-${cellIndex}`)}</th>)}</tr></thead><tbody>{rows.slice(1).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{renderInlineMarkdown(cell, `td-${rowIndex}-${cellIndex}`)}</td>)}</tr>)}</tbody></table></div>);
+      index = tableIndex;
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index])) items.push(lines[index++].replace(/^[-*]\s+/, ""));
+      blocks.push(<ul key={`ul-${index}`}>{items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineMarkdown(item, `li-${itemIndex}`)}</li>)}</ul>);
+      continue;
+    }
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index])) items.push(lines[index++].replace(/^\d+\.\s+/, ""));
+      blocks.push(<ol key={`ol-${index}`}>{items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineMarkdown(item, `oli-${itemIndex}`)}</li>)}</ol>);
+      continue;
+    }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      const Heading = heading[1].length === 1 ? "h2" : heading[1].length === 2 ? "h3" : "h4";
+      blocks.push(<Heading key={`heading-${index}`}>{renderInlineMarkdown(heading[2], `heading-${index}`)}</Heading>);
+      index += 1;
+      continue;
+    }
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+    const paragraph = [line];
+    index += 1;
+    while (index < lines.length && lines[index].trim() && !/^(#{1,3})\s|^```|^[-*]\s+|^\d+\.\s+/.test(lines[index])) paragraph.push(lines[index++]);
+    blocks.push(<p key={`p-${index}`}>{renderInlineMarkdown(paragraph.join("\n"), `p-${index}`)}</p>);
+  }
+  return <div className="message-content rich-message-content">{blocks}</div>;
 }
 
 function providerLabel(provider?: string | null) {

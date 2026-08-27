@@ -166,7 +166,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
         {(["posts", "replies", "media", "likes"] as ProfileTab[]).map((tab) => <button aria-current={activeTab === tab ? "page" : undefined} className={activeTab === tab ? "active" : ""} key={tab} onClick={() => setActiveTab(tab)} type="button">{tab[0].toUpperCase() + tab.slice(1)}</button>)}
       </nav>}
       {!blockedByMe && <div aria-live="polite" className="profile-content">
-        {isLoadingContent && !postPage && !replyPage ? <div className="feed-loading">Loading {activeTab}…</div>
+        {isLoadingContent && !postPage && !replyPage ? <div aria-label={`Loading ${activeTab}`} className="feed-loading" role="status"><span/><span/></div>
           : activeTab === "replies" ? <>
             {replyPage?.content.length ? <div className="profile-content-list">{replyPage.content.map((reply) => <article className="profile-reply-card" key={reply.id}><p className="profile-reply-context">Replied to @{reply.post.author.username}</p><p>{reply.textContent}</p><small>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(reply.createdAt))}</small><div className="profile-parent-post"><strong>{reply.post.author.displayName}</strong><p>{reply.post.textContent}</p></div></article>)}</div> : !isLoadingContent && <p className="profile-empty">No visible replies yet.</p>}
             {replyPage && !replyPage.last && <button className="load-more-button" disabled={isLoadingContent} onClick={() => void loadContent(activeTab, replyPage.page + 1, true)} type="button">{isLoadingContent ? "Loading…" : "Load more"}</button>}
