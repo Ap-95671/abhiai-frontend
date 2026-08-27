@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { CSSProperties, FormEvent, PointerEvent, useRef, useState } from "react";
 
+import { ThemeToggle } from "@/components/theme/theme-toggle";
+
 import styles from "./auth-screen.module.css";
 
 export type AuthScreenMode = "login" | "register";
@@ -45,6 +47,7 @@ export function AuthScreen(props: AuthScreenProps) {
   return (
     <main className={styles.page} onPointerMove={trackPointer}>
       <button className={styles.back} onClick={props.onBack} type="button">← Back to AbhiAI</button>
+      <div className={styles.themeToggle}><ThemeToggle compact /></div>
       <section className={styles.stage}>
         <div aria-hidden="true" className={`${styles.mascot} ${styles.mascotOne} ${passwordFocused ? styles.private : ""} ${activeField ? styles.attentive : ""}`} style={mascotStyle}>
           <span className={styles.antenna} /><div className={styles.face}><i /><i /><b /></div><span className={styles.hands}><i /><i /></span>

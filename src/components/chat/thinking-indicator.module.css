@@ -16,3 +16,4 @@
   50% { box-shadow: 0 0 24px rgba(111,124,255,.3); opacity: 1; transform: scale(1.08); }
 }
 @media (prefers-reduced-motion: reduce) { .logo { animation: none; opacity: 1; transform: none; } }
+:global([data-theme="light"]) .logo { background: #fff; border-color: #d3d3da; }

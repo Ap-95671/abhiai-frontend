@@ -15,3 +15,13 @@
 .dialog footer button { background: #242428; border: 0; border-radius: 9px; color: #ddd; font-weight: 750; padding: 10px 15px; }
 .submit { background: #df425c !important; color: #fff !important; }
 @media (max-width: 600px) { .backdrop { align-items: flex-end; padding: 0; } .dialog { border-radius: 20px 20px 0 0; padding: 22px 18px 28px; } }
+:global([data-theme="light"]) .backdrop { background: rgba(20,20,24,.42); }
+:global([data-theme="light"]) .dialog { background: #fff; border-color: #d3d3da; box-shadow: 0 28px 90px rgba(20,20,26,.2); }
+:global([data-theme="light"]) .dialog header button { background: #eeeef1; color: #44444b; }
+:global([data-theme="light"]) .help,
+:global([data-theme="light"]) .dialog label,
+:global([data-theme="light"]) .dialog label small,
+:global([data-theme="light"]) .count { color: #62626a; }
+:global([data-theme="light"]) .dialog select,
+:global([data-theme="light"]) .dialog textarea { background: #f6f6f8; border-color: #ceced5; color: #18181b; }
+:global([data-theme="light"]) .dialog footer button { background: #eeeef1; color: #3d3d44; }

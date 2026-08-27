@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { FormEvent, useState } from "react";
 
+import { ThemeToggle } from "@/components/theme/theme-toggle";
+
 import styles from "./landing-page.module.css";
 
 type LandingPageProps = {
@@ -40,11 +42,13 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
         <nav className={menuOpen ? styles.navOpen : ""} aria-label="Public navigation">
           <a href="#product">Product</a><a href="#ai">AI</a><a href="#social">Social</a><a href="#explore">Explore</a><a href="#about">About</a>
           <div className={styles.mobileNavActions}>
+            <ThemeToggle />
             <button onClick={onLogin} type="button">Log in</button>
             <button onClick={() => onStart()} type="button">Get started</button>
           </div>
         </nav>
         <div className={styles.navActions}>
+          <ThemeToggle compact />
           <button className={styles.ghostButton} onClick={onLogin} type="button">Log in</button>
           <button className={styles.lightButton} onClick={() => onStart()} type="button">Get started</button>
         </div>

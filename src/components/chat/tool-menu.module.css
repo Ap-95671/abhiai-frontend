@@ -49,3 +49,14 @@
 @media (max-width: 520px) {
   .menu { bottom: calc(100% + 10px); left: -6px; min-width: min(245px, calc(100vw - 34px)); }
 }
+
+:global([data-theme="light"]) .trigger { background: #eeeef2; border-color: #d1d1d8; color: #4e5bcf; }
+:global([data-theme="light"]) .trigger:hover:not(:disabled),
+:global([data-theme="light"]) .trigger[aria-expanded="true"] { background: #e3e3e8; border-color: #b3b3bc; }
+:global([data-theme="light"]) .menu { background: rgba(255,255,255,.98); border-color: #d2d2d8; box-shadow: 0 22px 65px rgba(25,25,32,.16); }
+:global([data-theme="light"]) .item { color: #333338; }
+:global([data-theme="light"]) .item:hover:not(:disabled),
+:global([data-theme="light"]) .item:focus-visible { background: #eeeef1; }
+:global([data-theme="light"]) .item:disabled,
+:global([data-theme="light"]) .copy small { color: #77777f; }
+:global([data-theme="light"]) .icon { background: #e8eaff; color: #4f5cca; }

@@ -467,3 +467,55 @@
 .postContent { color: #d0d0d4; }
 .communityPill, .publicPill { background: #1a1a1d; color: #9c9ca3; }
 .morePosts { color: #9da5ff; }
+
+:global([data-theme="light"]) .reportButton,
+:global([data-theme="light"]) .morePosts { background: #fff; border-color: #d7d7de; color: #515ecb; }
+:global([data-theme="light"]) .createPanel { background: linear-gradient(135deg,#fff,#f7f8ff); border-color: #dce2f2; box-shadow: 0 18px 50px rgba(21,35,72,.08); }
+:global([data-theme="light"]) .createIntro p:not(:global(.eyebrow)),
+:global([data-theme="light"]) .createFooter > span { color: #667085; }
+:global([data-theme="light"]) .createPanel label { color: #344054; }
+:global([data-theme="light"]) .createPanel label small { color: #8b94a5; }
+:global([data-theme="light"]) .createPanel input,
+:global([data-theme="light"]) .createPanel textarea,
+:global([data-theme="light"]) .slugField { background: #fff; border-color: #d6ddeb; color: #20242c; }
+:global([data-theme="light"]) .slugField span { background: #f1f3f8; color: #6c7890; }
+:global([data-theme="light"]) .createFooter,
+:global([data-theme="light"]) .directoryHeading,
+:global([data-theme="light"]) .aboutRow,
+:global([data-theme="light"]) .composerFooter,
+:global([data-theme="light"]) .post footer { border-color: #e2e4e9; }
+:global([data-theme="light"]) .directory,
+:global([data-theme="light"]) .communityMain { background: #fff; border-color: #e0e4ed; box-shadow: 0 6px 24px rgba(21,35,72,.045); }
+:global([data-theme="light"]) .directoryHeading strong,
+:global([data-theme="light"]) .cardCopy strong,
+:global([data-theme="light"]) .author strong { color: #273248; }
+:global([data-theme="light"]) .directoryHeading button,
+:global([data-theme="light"]) .filters { background: #eef1f7; color: #64708a; }
+:global([data-theme="light"]) .filters button { color: #6f7b91; }
+:global([data-theme="light"]) .filters button.active { background: #fff; color: #273248; }
+:global([data-theme="light"]) .searchField { background: #f8f9fb; border-color: #e2e6ee; }
+:global([data-theme="light"]) .communityList > button:hover { background: #f6f7fb; }
+:global([data-theme="light"]) .communityList > button.selectedCard { background: #edf1ff; }
+:global([data-theme="light"]) .communityIcon { border-color: #edf0ff; }
+:global([data-theme="light"]) .communityIconLarge { border-color: #fff; box-shadow: 0 8px 22px rgba(29,42,81,.16); }
+:global([data-theme="light"]) .joinedDot { background: #e9f9f2; color: #10875c; }
+:global([data-theme="light"]) .moreCommunities { background: #f7f8fc; border-color: #edf0f5; }
+:global([data-theme="light"]) .welcomeState { background: radial-gradient(circle at 50% 35%,#f0f3ff 0,#fff 45%); }
+:global([data-theme="light"]) .welcomeState > p:not(:global(.eyebrow)),
+:global([data-theme="light"]) .heroCopy p,
+:global([data-theme="light"]) .aboutRow > p,
+:global([data-theme="light"]) .feedMessage,
+:global([data-theme="light"]) .emptyFeed { color: #697386; }
+:global([data-theme="light"]) .heroBody,
+:global([data-theme="light"]) .aboutRow,
+:global([data-theme="light"]) .feed { background: #fff; }
+:global([data-theme="light"]) .joinPrompt,
+:global([data-theme="light"]) .composer,
+:global([data-theme="light"]) .post { background: #fff; border-color: #dfe3ec; box-shadow: none; }
+:global([data-theme="light"]) .composer textarea { background: #fff; color: #20242c; }
+:global([data-theme="light"]) .attachments > div,
+:global([data-theme="light"]) .attachments > span { background: #f4f6fa; border-color: #dfe3ec; }
+:global([data-theme="light"]) .post:hover { background: #f8f8fa; }
+:global([data-theme="light"]) .postContent { color: #344054; }
+:global([data-theme="light"]) .communityPill,
+:global([data-theme="light"]) .publicPill { background: #f2f4f8; color: #697386; }

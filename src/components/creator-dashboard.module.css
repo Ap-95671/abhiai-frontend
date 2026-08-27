@@ -36,3 +36,18 @@
 .empty { color: #7c7c83; padding: 30px; text-align: center; }
 @media (max-width: 850px) { .metrics { grid-template-columns: repeat(2,1fr); } .columns { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .workspace { padding: 20px 14px 100px; } .header { flex-direction: column; } .metrics { grid-template-columns: 1fr 1fr; } .metrics strong { font-size: 1.5rem; } .panel { padding: 18px; } .chart { height: 190px; } .legend { font-size: .68rem; } }
+:global([data-theme="light"]) .workspace { background: #f7f7f8; }
+:global([data-theme="light"]) .header p,
+:global([data-theme="light"]) .header label,
+:global([data-theme="light"]) .metrics span,
+:global([data-theme="light"]) .metrics small,
+:global([data-theme="light"]) .list small,
+:global([data-theme="light"]) .locations small,
+:global([data-theme="light"]) .empty { color: #66666e; }
+:global([data-theme="light"]) .header select { background: #fff; border-color: #cfcfd6; color: #202025; }
+:global([data-theme="light"]) .metrics article,
+:global([data-theme="light"]) .panel { background: #fff; border-color: #d9d9df; box-shadow: 0 8px 28px rgba(25,25,32,.05); }
+:global([data-theme="light"]) .chart,
+:global([data-theme="light"]) .list > div { border-color: #dddde2; }
+:global([data-theme="light"]) .list b { background: #e9eaff; color: #4c59c8; }
+:global([data-theme="light"]) .locations i { background: #e1e1e6; }

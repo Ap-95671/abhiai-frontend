@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -23,6 +24,7 @@ import { HashtagPanel } from "@/components/hashtag-panel";
 import { ArticlesPanel } from "@/components/articles-panel";
 import { CreatorDashboard } from "@/components/creator-dashboard";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 import {
   api,
@@ -38,6 +40,7 @@ import {
 const TOKEN_STORAGE_KEY = "abhiai.access-token";
 const SESSION_TOKEN_STORAGE_KEY = "abhiai.session-access-token";
 const SIDEBAR_STORAGE_KEY = "abhiai.sidebar-collapsed";
+const ACTIVE_CONVERSATION_STORAGE_KEY = "abhiai.active-conversation-id";
 
 type AuthMode = "login" | "register";
 type GuestView = "landing" | "auth";
@@ -144,6 +147,7 @@ export default function Home() {
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [conversationStateResolved, setConversationStateResolved] = useState(false);
   const [chatError, setChatError] = useState("");
   const [models, setModels] = useState<ModelOption[]>([]);
   const [isChangingModel, setIsChangingModel] = useState(false);
@@ -160,11 +164,15 @@ export default function Home() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showLatest, setShowLatest] = useState(false);
   const streamAbortController = useRef<AbortController | null>(null);
+  const createConversationLockRef = useRef(false);
   const activeConversationIdRef = useRef<string | undefined>(undefined);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const accountControlRef = useRef<HTMLDivElement | null>(null);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [accountMenuStyle, setAccountMenuStyle] = useState<CSSProperties>();
   const shouldFollowStreamRef = useRef(true);
 
   const conversationId = selectedConversation?.id;
@@ -195,7 +203,8 @@ export default function Home() {
 
   useEffect(() => {
     const closeAccountMenu = (event: MouseEvent) => {
-      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!accountControlRef.current?.contains(target) && !accountMenuRef.current?.contains(target)) {
         setAccountMenuOpen(false);
       }
       if (!(event.target as Element).closest?.(".conversation-row")) setConversationMenuId(null);
@@ -207,6 +216,7 @@ export default function Home() {
   useEffect(() => {
     const closeOverlays = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (accountMenuRef.current) accountTriggerRef.current?.focus();
       setAccountMenuOpen(false);
       setMobileSidebarOpen(false);
       setConversationDialog(null);
@@ -215,6 +225,33 @@ export default function Home() {
     document.addEventListener("keydown", closeOverlays);
     return () => document.removeEventListener("keydown", closeOverlays);
   }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+
+    const positionAccountMenu = () => {
+      const trigger = accountTriggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const menuWidth = sidebarCollapsed ? 220 : Math.max(210, rect.width);
+      const preferredLeft = sidebarCollapsed ? rect.right + 10 : rect.left;
+      setAccountMenuStyle({
+        bottom: Math.max(12, window.innerHeight - rect.top + 8),
+        left: Math.min(Math.max(12, preferredLeft), window.innerWidth - menuWidth - 12),
+        width: menuWidth,
+      });
+    };
+
+    positionAccountMenu();
+    const focusTimer = window.setTimeout(() => accountMenuRef.current?.querySelector<HTMLButtonElement>("button")?.focus(), 0);
+    window.addEventListener("resize", positionAccountMenu);
+    window.addEventListener("scroll", positionAccountMenu, true);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("resize", positionAccountMenu);
+      window.removeEventListener("scroll", positionAccountMenu, true);
+    };
+  }, [accountMenuOpen, sidebarCollapsed]);
 
   useEffect(() => {
     const textarea = composerTextareaRef.current;
@@ -226,11 +263,13 @@ export default function Home() {
   const expireSession = useCallback((message = "") => {
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
     window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+    window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
     setAccessToken(null);
     setEmail("");
     setPassword("");
     setConversations([]);
     setSelectedConversation(null);
+    setConversationStateResolved(false);
     setChatError("");
     setMessageDraft("");
     setComposerMode("chat");
@@ -324,6 +363,7 @@ export default function Home() {
     queueMicrotask(() => {
       if (isCurrent) {
         setIsLoadingConversations(true);
+        setConversationStateResolved(false);
         setChatError("");
       }
     });
@@ -334,13 +374,19 @@ export default function Home() {
         if (!isCurrent) return;
         setConversations(items);
 
-        if (!items[0]) {
+        const storedConversationId = window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+        const storedConversation = storedConversationId
+          ? items.find((item) => item.id === storedConversationId)
+          : undefined;
+
+        if (!storedConversation) {
+          if (storedConversationId) window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
           setSelectedConversation(null);
           return;
         }
 
         setIsLoadingHistory(true);
-        const conversation = await api.getConversation(accessToken, items[0].id);
+        const conversation = await api.getConversation(accessToken, storedConversation.id);
         if (isCurrent) setSelectedConversation(conversation);
       })
       .catch((error: unknown) => {
@@ -355,6 +401,7 @@ export default function Home() {
         if (isCurrent) {
           setIsLoadingConversations(false);
           setIsLoadingHistory(false);
+          setConversationStateResolved(true);
         }
       });
 
@@ -434,6 +481,13 @@ export default function Home() {
   function navigateWorkspace(view: ActiveView, workspace: "chat" | "social" = "social") {
     setActiveView(view);
     setMobileSidebarOpen(false);
+    if (workspace === "chat") {
+      activeConversationIdRef.current = undefined;
+      window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+      setSelectedConversation(null);
+      setConversationStateResolved(true);
+      setChatError("");
+    }
     router.push(workspace === "chat" ? "/chat" : "/social");
   }
 
@@ -450,6 +504,8 @@ export default function Home() {
     try {
       const conversation = await api.getConversation(token, id);
       setSelectedConversation(conversation);
+      window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, id);
+      setConversationStateResolved(true);
       return conversation;
     } catch (error) {
       handleAuthenticatedError(error);
@@ -504,8 +560,9 @@ export default function Home() {
   }
 
   async function createConversation() {
-    if (!accessToken) return;
+    if (!accessToken || createConversationLockRef.current) return;
 
+    createConversationLockRef.current = true;
     setIsCreatingConversation(true);
     setChatError("");
     try {
@@ -517,6 +574,7 @@ export default function Home() {
     } catch (error) {
       handleAuthenticatedError(error);
     } finally {
+      createConversationLockRef.current = false;
       setIsCreatingConversation(false);
     }
   }
@@ -832,7 +890,8 @@ export default function Home() {
       const remaining = conversations.filter((item) => item.id !== selectedConversation.id);
       setConversations(remaining);
       setSelectedConversation(null);
-      if (remaining[0]) await selectConversation(accessToken, remaining[0].id);
+      activeConversationIdRef.current = undefined;
+      window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
       setConversationDialog(null);
       showToast("Conversation deleted");
     } catch (error) {
@@ -933,8 +992,8 @@ export default function Home() {
           </button>
           </div>
           {!socialWorkspace && (
-            <button className="new-chat-button" disabled={isCreatingConversation} onClick={createConversation} type="button">
-              <AppIcon name="plus" /> <span className="sidebar-label">New chat</span>
+            <button aria-label="New conversation" className="new-chat-button" disabled={isCreatingConversation} onClick={createConversation} title="New conversation" type="button">
+              <AppIcon name="plus" /> <span className="sidebar-label">New conversation</span>
             </button>
           )}
         </div>
@@ -1012,19 +1071,15 @@ export default function Home() {
           </div>)}
         </nav>
 
-        <div className="account-control" ref={accountMenuRef}>
-          {accountMenuOpen && (
-            <div className="account-menu" role="menu">
-              <button onClick={() => { viewProfile(); router.push("/social"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
-              <button className="danger-menu-item" onClick={signOut} role="menuitem" type="button">Sign out</button>
-            </div>
-          )}
+        <div className="account-control" ref={accountControlRef}>
           <button
+            aria-label="Open account menu"
             aria-expanded={accountMenuOpen}
             aria-haspopup="menu"
             className="account-trigger"
             onClick={() => setAccountMenuOpen((current) => !current)}
-            title={currentUser?.displayName ?? "Account"}
+            ref={accountTriggerRef}
+            title={sidebarCollapsed ? "Account menu" : currentUser?.displayName ?? "Account menu"}
             type="button"
           >
             <span className="account-avatar">{initials(currentUser?.displayName ?? "AbhiAI")}</span>
@@ -1067,7 +1122,12 @@ export default function Home() {
         <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : (
       <section className="chat-panel">
-        {selectedConversation ? (
+        {!conversationStateResolved ? (
+          <div aria-label="Loading your AI workspace" className="ai-home ai-home-loading" role="status">
+            <span className="brand-mark ai-home-logo"><Image alt="" height={64} src="/abhiai-logo.png" width={64} /></span>
+            <p>Restoring your workspace…</p>
+          </div>
+        ) : selectedConversation ? (
           <>
             <header className="chat-header">
               <div>
@@ -1271,6 +1331,14 @@ export default function Home() {
         </div>
       )}
     </main>
+    {accountMenuOpen && accountMenuStyle && createPortal(
+      <div className="account-menu account-menu-portal" ref={accountMenuRef} role="menu" style={accountMenuStyle}>
+        <button onClick={() => { viewProfile(); router.push("/social"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
+        <ThemeToggle menuItem />
+        <button className="danger-menu-item" onClick={signOut} role="menuitem" type="button">Sign out</button>
+      </div>,
+      document.body,
+    )}
     </>
   );
 }
