@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Reveal } from "@/components/motion/reveal";
+import { ScrollMotion } from "@/components/motion/scroll-motion";
 
 import styles from "./landing-page.module.css";
 
@@ -32,7 +33,8 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
 
   return (
     <main className={styles.page}>
-      <header className={styles.navbar}>
+      <ScrollMotion />
+      <header className={styles.navbar} data-scroll-navbar>
         <a aria-label="AbhiAI home" className={styles.brand} href="#top">
           <span><Image alt="" height={38} priority src="/abhiai-logo.png" width={38} /></span>
           AbhiAI
@@ -57,33 +59,33 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
 
       <section className={styles.hero} id="top">
         <div className={styles.heroCopy}>
-          <p className={styles.kicker}><span /> Intelligence, in conversation</p>
-          <h1>Think deeper.<br /><em>Connect differently.</em></h1>
-          <p className={styles.heroIntro}>AbhiAI brings intelligent assistance, creative tools, and a living network into one focused place.</p>
-          <form className={styles.prompt} onSubmit={submitPrompt}>
+          <p className={`${styles.kicker} ${styles.heroRevealOne}`}><span /> Intelligence, in conversation</p>
+          <h1 className={styles.heroRevealTwo}>Think deeper.<br /><em>Connect differently.</em></h1>
+          <p className={`${styles.heroIntro} ${styles.heroRevealThree}`}>AbhiAI brings intelligent assistance, creative tools, and a living network into one focused place.</p>
+          <form className={`${styles.prompt} ${styles.heroRevealFour}`} onSubmit={submitPrompt}>
             <span className={styles.promptMark}>A</span>
             <input aria-label="Ask AbhiAI" onChange={(event) => setPrompt(event.target.value)} placeholder="Ask AbhiAI anything…" value={prompt} />
             <button aria-label="Start with this prompt" type="submit">↑</button>
           </form>
-          <div className={styles.heroActions}>
+          <div className={`${styles.heroActions} ${styles.heroRevealFive}`}>
             <button className={styles.lightButton} onClick={() => onStart()} type="button">Start with AbhiAI <span>↗</span></button>
             <a href="#social">Explore the network <span>↓</span></a>
           </div>
         </div>
 
-        <div aria-label="AbhiAI product preview" className={styles.heroVisual}>
-          <div className={styles.orbitGlow} />
-          <article className={`${styles.floatCard} ${styles.aiCard}`}>
+        <div aria-label="AbhiAI product preview" className={`${styles.heroVisual} ${styles.heroVisualReveal}`}>
+          <div className={styles.orbitGlow} data-parallax="12" />
+          <article className={`${styles.floatCard} ${styles.aiCard}`} data-parallax="18">
             <div className={styles.cardTop}><span className={styles.miniLogo}>A</span><b>AbhiAI</b><small>Analyzing</small></div>
             <p>Here’s the signal behind today’s conversation.</p>
             <div className={styles.summaryLines}><i /><i /><i /></div>
           </article>
-          <article className={`${styles.floatCard} ${styles.socialCard}`}>
+          <article className={`${styles.floatCard} ${styles.socialCard}`} data-parallax="-14">
             <div className={styles.person}><span>NP</span><div><b>Nia Patel</b><small>@niabuilds · 12m</small></div></div>
             <p>The most useful AI won’t live beside our communities. It will understand them.</p>
             <footer><span>♡ 482</span><span>◌ 76</span><b>✦ Ask AbhiAI</b></footer>
           </article>
-          <article className={`${styles.floatCard} ${styles.trendCard}`}>
+          <article className={`${styles.floatCard} ${styles.trendCard}`} data-parallax="22">
             <small>LIVE PULSE</small><b>#HumanCenteredAI</b><span>18.4K perspectives</span>
           </article>
         </div>
@@ -97,19 +99,19 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
       </section>
 
       <section className={styles.integration} id="social">
-        <Reveal className={styles.sectionCopy}>
+        <Reveal className={styles.sectionCopy} variant="left">
           <p className={styles.kicker}><span /> AI inside the conversation</p>
           <h2>Context is one action away.</h2>
           <p>AbhiAI does more than show what people are saying. It helps you understand why it matters.</p>
           <ul><li>Explain a post in plain language</li><li>Summarize the discussion</li><li>Compare viewpoints and find related ideas</li></ul>
         </Reveal>
-        <Reveal className={styles.demoWindow} delay={90} variant="scale">
+        <Reveal className={styles.demoWindow} data-depth-card delay={90} variant="scale">
           <div className={styles.demoPost}>
             <div className={styles.person}><span>YK</span><div><b>Yara Kim</b><small>@yara · Today</small></div></div>
             <p>Small models running on-device may reshape how we think about private, personal AI.</p>
             <div className={styles.postActions}><span>♡ 1.2K</span><span>◌ 214</span><span>↗ Share</span></div>
           </div>
-          <div className={styles.aiAnswer}>
+          <div className={styles.aiAnswer} data-parallax="8">
             <header><span className={styles.miniLogo}>A</span><b>Ask AbhiAI</b><small>Discussion insight</small></header>
             <p><strong>Why this matters</strong> — The discussion centers on latency, privacy, and where personal context should live.</p>
             <div><button type="button">Explain</button><button type="button">Key arguments</button><button type="button">Related posts</button></div>
@@ -118,11 +120,11 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
       </section>
 
       <section className={styles.aiSection} id="ai">
-        <Reveal className={styles.sectionHeading}><p className={styles.kicker}><span /> A complete AI workspace</p><h2>From first thought to finished work.</h2></Reveal>
+        <Reveal className={styles.sectionHeading} variant="mask"><p className={styles.kicker}><span /> A complete AI workspace</p><h2>From first thought to finished work.</h2></Reveal>
         <Reveal aria-label="AI capabilities" className={styles.capabilityTabs} delay={70} role="tablist" variant="fade">
           {(Object.keys(capabilityCopy) as Array<keyof typeof capabilityCopy>).map((item) => <button aria-selected={capability === item} className={capability === item ? styles.activeTab : ""} key={item} onClick={() => setCapability(item)} role="tab" type="button">{item}</button>)}
         </Reveal>
-        <Reveal className={styles.workspacePreview} delay={120} variant="scale">
+        <Reveal className={styles.workspacePreview} data-depth-card delay={120} variant="scale">
           <aside><div className={styles.previewBrand}><span className={styles.miniLogo}>A</span> AbhiAI</div><button type="button">＋ New thread</button><small>RECENT</small><p>Designing a better onboarding</p><p>Research synthesis</p><p>Launch narrative</p></aside>
           <div className={styles.previewConversation}>
             <header><b>{capability} with AbhiAI</b><span>Private workspace</span></header>
@@ -133,14 +135,14 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
       </section>
 
       <section className={styles.searchSection} id="explore">
-        <Reveal className={styles.searchVisual} variant="scale">
+        <Reveal className={styles.searchVisual} data-depth-card variant="scale">
           <div className={styles.searchBar}>⌕ <span>Why is everyone discussing private AI today?</span><b>Search</b></div>
           <div className={styles.searchAnswer}><small>ABHIAI SYNTHESIS</small><h3>On-device models are moving from theory to daily use.</h3><p>Across 2,418 posts, the strongest themes are privacy, speed, and personal context.</p><div><span>Privacy <i style={{width:"88%"}} /></span><span>Latency <i style={{width:"71%"}} /></span><span>Ownership <i style={{width:"58%"}} /></span></div></div>
         </Reveal>
-        <Reveal className={styles.sectionCopy} delay={90}><p className={styles.kicker}><span /> Intelligent discovery</p><h2>Search what people mean, not only what they type.</h2><p>Discover people, posts, topics, conversations, and a clear AI synthesis in one search.</p></Reveal>
+        <Reveal className={styles.sectionCopy} delay={90} variant="right"><p className={styles.kicker}><span /> Intelligent discovery</p><h2>Search what people mean, not only what they type.</h2><p>Discover people, posts, topics, conversations, and a clear AI synthesis in one search.</p></Reveal>
       </section>
 
-      <Reveal as="section" className={styles.finalCta} id="about" threshold={0.16} variant="scale">
+      <Reveal as="section" className={styles.finalCta} data-depth-card id="about" threshold={0.16} variant="scale">
         <Image alt="" height={80} src="/abhiai-logo.png" width={80} />
         <p className={styles.kicker}>THE ABHIAI NETWORK</p>
         <h2>One place to think,<br />create, and connect.</h2>

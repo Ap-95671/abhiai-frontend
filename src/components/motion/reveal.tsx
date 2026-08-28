@@ -14,7 +14,7 @@ import styles from "./reveal.module.css";
 
 type RevealPhase = "idle" | "pending" | "visible";
 type RevealTag = "article" | "div" | "footer" | "li" | "nav" | "p" | "section" | "small";
-type RevealVariant = "fade" | "scale" | "up";
+type RevealVariant = "fade" | "left" | "mask" | "right" | "scale" | "up";
 
 type RevealProps = HTMLAttributes<HTMLElement> & {
   as?: RevealTag;
