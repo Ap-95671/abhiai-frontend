@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { Reveal } from "@/components/motion/reveal";
 
 import styles from "./landing-page.module.css";
 
@@ -89,20 +90,20 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
       </section>
 
       <section className={styles.manifesto} id="product">
-        <p>One product. Three essential modes.</p>
-        <div><span>01</span><h2>Think</h2><p>Work with an assistant that helps you reason, understand, and move ideas forward.</p></div>
-        <div><span>02</span><h2>Create</h2><p>Turn prompts, files, and inspiration into useful work and original media.</p></div>
-        <div><span>03</span><h2>Connect</h2><p>Join a network where ideas, creators, and intelligent context meet.</p></div>
+        <Reveal as="p" variant="fade">One product. Three essential modes.</Reveal>
+        <Reveal delay={60} variant="scale"><span>01</span><h2>Think</h2><p>Work with an assistant that helps you reason, understand, and move ideas forward.</p></Reveal>
+        <Reveal delay={140} variant="scale"><span>02</span><h2>Create</h2><p>Turn prompts, files, and inspiration into useful work and original media.</p></Reveal>
+        <Reveal delay={220} variant="scale"><span>03</span><h2>Connect</h2><p>Join a network where ideas, creators, and intelligent context meet.</p></Reveal>
       </section>
 
       <section className={styles.integration} id="social">
-        <div className={styles.sectionCopy}>
+        <Reveal className={styles.sectionCopy}>
           <p className={styles.kicker}><span /> AI inside the conversation</p>
           <h2>Context is one action away.</h2>
           <p>AbhiAI does more than show what people are saying. It helps you understand why it matters.</p>
           <ul><li>Explain a post in plain language</li><li>Summarize the discussion</li><li>Compare viewpoints and find related ideas</li></ul>
-        </div>
-        <div className={styles.demoWindow}>
+        </Reveal>
+        <Reveal className={styles.demoWindow} delay={90} variant="scale">
           <div className={styles.demoPost}>
             <div className={styles.person}><span>YK</span><div><b>Yara Kim</b><small>@yara · Today</small></div></div>
             <p>Small models running on-device may reshape how we think about private, personal AI.</p>
@@ -113,43 +114,48 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
             <p><strong>Why this matters</strong> — The discussion centers on latency, privacy, and where personal context should live.</p>
             <div><button type="button">Explain</button><button type="button">Key arguments</button><button type="button">Related posts</button></div>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <section className={styles.aiSection} id="ai">
-        <div className={styles.sectionHeading}><p className={styles.kicker}><span /> A complete AI workspace</p><h2>From first thought to finished work.</h2></div>
-        <div className={styles.capabilityTabs} role="tablist" aria-label="AI capabilities">
+        <Reveal className={styles.sectionHeading}><p className={styles.kicker}><span /> A complete AI workspace</p><h2>From first thought to finished work.</h2></Reveal>
+        <Reveal aria-label="AI capabilities" className={styles.capabilityTabs} delay={70} role="tablist" variant="fade">
           {(Object.keys(capabilityCopy) as Array<keyof typeof capabilityCopy>).map((item) => <button aria-selected={capability === item} className={capability === item ? styles.activeTab : ""} key={item} onClick={() => setCapability(item)} role="tab" type="button">{item}</button>)}
-        </div>
-        <div className={styles.workspacePreview}>
+        </Reveal>
+        <Reveal className={styles.workspacePreview} delay={120} variant="scale">
           <aside><div className={styles.previewBrand}><span className={styles.miniLogo}>A</span> AbhiAI</div><button type="button">＋ New thread</button><small>RECENT</small><p>Designing a better onboarding</p><p>Research synthesis</p><p>Launch narrative</p></aside>
           <div className={styles.previewConversation}>
             <header><b>{capability} with AbhiAI</b><span>Private workspace</span></header>
             <div className={styles.previewMessage}><span className={styles.miniLogo}>A</span><div><b>{capabilityCopy[capability][0]}</b><p>{capabilityCopy[capability][1]}. Bring your files, questions, and context—the workspace adapts around the task.</p></div></div>
             <div className={styles.previewComposer}><span>Message AbhiAI…</span><div><i>＋</i><i>⌕</i><b>↑</b></div></div>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <section className={styles.searchSection} id="explore">
-        <div className={styles.searchVisual}>
+        <Reveal className={styles.searchVisual} variant="scale">
           <div className={styles.searchBar}>⌕ <span>Why is everyone discussing private AI today?</span><b>Search</b></div>
           <div className={styles.searchAnswer}><small>ABHIAI SYNTHESIS</small><h3>On-device models are moving from theory to daily use.</h3><p>Across 2,418 posts, the strongest themes are privacy, speed, and personal context.</p><div><span>Privacy <i style={{width:"88%"}} /></span><span>Latency <i style={{width:"71%"}} /></span><span>Ownership <i style={{width:"58%"}} /></span></div></div>
-        </div>
-        <div className={styles.sectionCopy}><p className={styles.kicker}><span /> Intelligent discovery</p><h2>Search what people mean, not only what they type.</h2><p>Discover people, posts, topics, conversations, and a clear AI synthesis in one search.</p></div>
+        </Reveal>
+        <Reveal className={styles.sectionCopy} delay={90}><p className={styles.kicker}><span /> Intelligent discovery</p><h2>Search what people mean, not only what they type.</h2><p>Discover people, posts, topics, conversations, and a clear AI synthesis in one search.</p></Reveal>
       </section>
 
-      <section className={styles.finalCta} id="about">
+      <Reveal as="section" className={styles.finalCta} id="about" threshold={0.16} variant="scale">
         <Image alt="" height={80} src="/abhiai-logo.png" width={80} />
         <p className={styles.kicker}>THE ABHIAI NETWORK</p>
         <h2>One place to think,<br />create, and connect.</h2>
         <div><button className={styles.lightButton} onClick={() => onStart()} type="button">Start with AbhiAI</button><a href="#product">Explore the product</a></div>
-      </section>
+      </Reveal>
 
       <footer className={styles.footer}>
-        <div><a className={styles.brand} href="#top"><span><Image alt="" height={38} src="/abhiai-logo.png" width={38} /></span>AbhiAI</a><p>Intelligence for the way we think, create, and connect.</p></div>
-        <nav><div><b>Product</b><a href="#ai">AbhiAI</a><a href="#social">Social</a><a href="#explore">Explore</a></div><div><b>Company</b><a href="#about">About</a><span>Contact</span></div><div><b>Resources</b><span>Help</span><span>Documentation</span></div><div><b>Legal</b><span>Privacy</span><span>Terms</span></div></nav>
-        <small>© {new Date().getFullYear()} AbhiAI. Built for thoughtful connection.</small>
+        <Reveal><a className={styles.brand} href="#top"><span><Image alt="" height={38} src="/abhiai-logo.png" width={38} /></span>AbhiAI</a><p>Intelligence for the way we think, create, and connect.</p></Reveal>
+        <nav>
+          <Reveal delay={60} variant="fade"><b>Product</b><a href="#ai">AbhiAI</a><a href="#social">Social</a><a href="#explore">Explore</a></Reveal>
+          <Reveal delay={120} variant="fade"><b>Company</b><a href="#about">About</a><span>Contact</span></Reveal>
+          <Reveal delay={180} variant="fade"><b>Resources</b><span>Help</span><span>Documentation</span></Reveal>
+          <Reveal delay={240} variant="fade"><b>Legal</b><span>Privacy</span><span>Terms</span></Reveal>
+        </nav>
+        <Reveal as="small" variant="fade">© {new Date().getFullYear()} AbhiAI. Built for thoughtful connection.</Reveal>
       </footer>
     </main>
   );

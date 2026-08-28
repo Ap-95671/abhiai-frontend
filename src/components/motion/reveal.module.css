@@ -1,0 +1,47 @@
+.reveal {
+  --reveal-delay: 0ms;
+  --reveal-distance: 28px;
+  --reveal-duration: 580ms;
+  --reveal-scale: 1;
+  backface-visibility: hidden;
+}
+
+.pending {
+  opacity: 0;
+  transform: translate3d(0, var(--reveal-distance), 0) scale(var(--reveal-scale));
+}
+
+.visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition-delay: var(--reveal-delay);
+  transition-duration: var(--reveal-duration);
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fade {
+  --reveal-distance: 0px;
+  --reveal-duration: 460ms;
+}
+
+.up {
+  --reveal-distance: 28px;
+  --reveal-duration: 580ms;
+}
+
+.scale {
+  --reveal-distance: 22px;
+  --reveal-duration: 660ms;
+  --reveal-scale: 0.975;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .pending,
+  .visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
