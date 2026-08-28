@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { CSSProperties, FormEvent, PointerEvent, useRef, useState } from "react";
+import { FormEvent, PointerEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
+import { AuthCharacters, AuthFocusTarget, CharacterAnimationState } from "./auth-characters";
+import { PasswordField } from "./password-field";
 import styles from "./auth-screen.module.css";
 
 export type AuthScreenMode = "login" | "register";
@@ -26,65 +28,279 @@ type AuthScreenProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
+function subscribeToCharacterBreakpoint(onStoreChange: () => void) {
+  const query = window.matchMedia("(min-width: 601px)");
+  query.addEventListener("change", onStoreChange);
+  return () => query.removeEventListener("change", onStoreChange);
+}
+
+function characterBreakpointSnapshot() {
+  return window.matchMedia("(min-width: 601px)").matches;
+}
+
+function characterBreakpointServerSnapshot() {
+  return false;
+}
+
 export function AuthScreen(props: AuthScreenProps) {
-  const [showPassword, setShowPassword] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const [activeField, setActiveField] = useState<"name" | "email" | null>(null);
-  const [gaze, setGaze] = useState({ x: 0, y: 0 });
+  const [introActive, setIntroActive] = useState(true);
+  const [characterEntranceComplete, setCharacterEntranceComplete] = useState(false);
+  const [errorReaction, setErrorReaction] = useState(false);
+  const [focusTarget, setFocusTarget] = useState<AuthFocusTarget>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [eyeHover, setEyeHover] = useState(false);
+  const [pointerTracking, setPointerTracking] = useState(false);
   const animationFrame = useRef<number | null>(null);
+  const characterScene = useRef<HTMLDivElement | null>(null);
+  const charactersEnabled = useSyncExternalStore(
+    subscribeToCharacterBreakpoint,
+    characterBreakpointSnapshot,
+    characterBreakpointServerSnapshot,
+  );
+
+  useEffect(() => {
+    const introTimer = window.setTimeout(() => setIntroActive(false), 1150);
+    const entranceTimer = window.setTimeout(() => setCharacterEntranceComplete(true), 2750);
+
+    return () => {
+      window.clearTimeout(introTimer);
+      window.clearTimeout(entranceTimer);
+      if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const startTimer = window.setTimeout(() => setErrorReaction(Boolean(props.authError)), 0);
+    const finishTimer = props.authError
+      ? window.setTimeout(() => setErrorReaction(false), 1550)
+      : undefined;
+
+    return () => {
+      window.clearTimeout(startTimer);
+      if (finishTimer !== undefined) window.clearTimeout(finishTimer);
+    };
+  }, [props.authError]);
 
   function trackPointer(event: PointerEvent<HTMLElement>) {
-    if (passwordFocused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (
+      focusTarget
+      || passwordVisible
+      || props.isAuthenticating
+      || !charactersEnabled
+      || !characterEntranceComplete
+      || window.matchMedia("(pointer: coarse)").matches
+      || window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) return;
+
     const bounds = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1));
-    const y = Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1));
-    if (animationFrame.current) window.cancelAnimationFrame(animationFrame.current);
-    animationFrame.current = window.requestAnimationFrame(() => setGaze({ x, y }));
+    const x = Math.max(-1, Math.min(1, ((event.clientX - bounds.left) / bounds.width) * 2 - 1));
+    const y = Math.max(-1, Math.min(1, ((event.clientY - bounds.top) / bounds.height) * 2 - 1));
+
+    if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
+    animationFrame.current = window.requestAnimationFrame(() => {
+      const scene = characterScene.current;
+      if (!scene) return;
+
+      scene.style.setProperty("--purple-gaze-x", `${x * 4.8}px`);
+      scene.style.setProperty("--purple-gaze-y", `${y * 3.5}px`);
+      scene.style.setProperty("--dark-gaze-x", `${x * 5.4}px`);
+      scene.style.setProperty("--dark-gaze-y", `${y * 3.9}px`);
+      scene.style.setProperty("--orange-gaze-x", `${x * 3.2}px`);
+      scene.style.setProperty("--orange-gaze-y", `${y * 2.4}px`);
+      scene.style.setProperty("--yellow-eye-x", `${x * 3.3}px`);
+      scene.style.setProperty("--yellow-eye-y", `${y * 2.2}px`);
+      scene.style.setProperty("--body-tilt", `${x * 1.2}deg`);
+      const upward = Math.max(0, -y);
+      const downward = Math.max(0, y);
+      const sideways = Math.abs(x);
+
+      scene.style.setProperty("--purple-shift-x", `${x * 30}px`);
+      scene.style.setProperty("--purple-shift-y", `${y * (y < 0 ? 20 : 9)}px`);
+      scene.style.setProperty("--purple-scale-x", `${1 + sideways * 0.08 - upward * 0.035}`);
+      scene.style.setProperty("--purple-scale-y", `${1 + upward * 0.24 - downward * 0.1}`);
+      scene.style.setProperty("--dark-shift-x", `${x * 22}px`);
+      scene.style.setProperty("--dark-shift-y", `${y * (y < 0 ? 16 : 8)}px`);
+      scene.style.setProperty("--dark-scale-x", `${1 + sideways * 0.06}`);
+      scene.style.setProperty("--dark-scale-y", `${1 + upward * 0.17 - downward * 0.07}`);
+      scene.style.setProperty("--orange-shift-x", `${x * 20}px`);
+      scene.style.setProperty("--orange-shift-y", `${y * 7}px`);
+      scene.style.setProperty("--orange-scale-x", `${1 + sideways * 0.13 + downward * 0.05}`);
+      scene.style.setProperty("--orange-scale-y", `${1 + upward * 0.1 - downward * 0.12}`);
+      scene.style.setProperty("--yellow-shift-x", `${x * 17}px`);
+      scene.style.setProperty("--yellow-shift-y", `${y * (y < 0 ? 13 : 7)}px`);
+      scene.style.setProperty("--yellow-scale-y", `${1 + upward * 0.13 - downward * 0.06}`);
+    });
   }
 
-  const mascotStyle = { "--gaze-x": `${gaze.x * 5}px`, "--gaze-y": `${gaze.y * 4}px` } as CSSProperties;
+  function startPointerTracking() {
+    if (
+      !focusTarget
+      && !passwordVisible
+      && !props.isAuthenticating
+      && charactersEnabled
+      && characterEntranceComplete
+      && window.matchMedia("(pointer: fine)").matches
+      && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) setPointerTracking(true);
+  }
+
+  function stopPointerTracking() {
+    setPointerTracking(false);
+    const scene = characterScene.current;
+    if (!scene) return;
+
+    for (const property of [
+      "--purple-gaze-x", "--purple-gaze-y", "--dark-gaze-x", "--dark-gaze-y",
+      "--orange-gaze-x", "--orange-gaze-y", "--yellow-eye-x", "--yellow-eye-y",
+      "--body-tilt", "--purple-shift-x", "--purple-shift-y", "--purple-scale-x",
+      "--purple-scale-y", "--dark-shift-x", "--dark-shift-y", "--dark-scale-x",
+      "--dark-scale-y", "--orange-shift-x", "--orange-shift-y", "--orange-scale-x",
+      "--orange-scale-y", "--yellow-shift-x", "--yellow-shift-y", "--yellow-scale-y",
+    ]) scene.style.removeProperty(property);
+  }
+
+  function focusField(field: Exclude<AuthFocusTarget, null>) {
+    setPointerTracking(false);
+    setFocusTarget(field);
+  }
+
+  function blurField() {
+    setFocusTarget(null);
+  }
+
+  const isLogin = props.mode === "login";
+  const characterState: CharacterAnimationState = !characterEntranceComplete
+    ? "entrance"
+    : passwordVisible
+      ? "password-visible"
+      : errorReaction
+        ? "error"
+        : props.isAuthenticating
+          ? "submitting"
+        : eyeHover
+          ? "eye-hover"
+          : focusTarget === "password"
+            ? "password-masked"
+            : focusTarget === "email" || focusTarget === "name"
+              ? props.email.trim().length > 0
+                ? "email-typing"
+                : "email"
+              : pointerTracking
+                ? "cursor"
+                : "idle";
 
   return (
-    <main className={styles.page} onPointerMove={trackPointer}>
-      <button className={styles.back} onClick={props.onBack} type="button">← Back to AbhiAI</button>
-      <div className={styles.themeToggle}><ThemeToggle compact /></div>
-      <section className={styles.stage}>
-        <div aria-hidden="true" className={`${styles.mascot} ${styles.mascotOne} ${passwordFocused ? styles.private : ""} ${activeField ? styles.attentive : ""}`} style={mascotStyle}>
-          <span className={styles.antenna} /><div className={styles.face}><i /><i /><b /></div><span className={styles.hands}><i /><i /></span>
+    <main className={styles.page}>
+      {introActive && (
+        <div aria-hidden="true" className={styles.introOverlay}>
+          <span className={styles.introSpark} />
+          <span className={styles.introDot} />
+          <span className={styles.introDot} />
         </div>
-        <div aria-hidden="true" className={`${styles.mascot} ${styles.mascotTwo} ${passwordFocused ? styles.private : ""} ${activeField ? styles.attentive : ""}`} style={mascotStyle}>
-          <span className={styles.antenna} /><div className={styles.face}><i /><i /><b /></div><span className={styles.hands}><i /><i /></span>
-        </div>
-        <div aria-hidden="true" className={`${styles.mascot} ${styles.mascotThree} ${passwordFocused ? styles.private : ""}`} style={mascotStyle}>
-          <div className={styles.face}><i /><i /><b /></div><span className={styles.hands}><i /><i /></span>
-        </div>
+      )}
 
-        <section className={styles.panel}>
-          <div className={styles.identity}><span><Image alt="AbhiAI" height={68} priority src="/abhiai-logo.png" width={68} /></span><b>AbhiAI</b></div>
-          <p className={styles.kicker}>{props.mode === "login" ? "WELCOME BACK" : "JOIN THE NETWORK"}</p>
-          <h1>{props.mode === "login" ? "Continue your thinking." : "Create your AbhiAI space."}</h1>
-          <p className={styles.intro}>{props.mode === "login" ? "Your assistant, ideas, and network are ready when you are." : "One account for intelligent assistance, creation, and connection."}</p>
+      <div className={styles.utilityBar}>
+        <button className={styles.back} onClick={props.onBack} type="button">
+          <span aria-hidden="true">←</span> Back to AbhiAI
+        </button>
+        <ThemeToggle compact />
+      </div>
 
-          <div className={styles.tabs} role="tablist" aria-label="Authentication">
-            <button aria-selected={props.mode === "login"} className={props.mode === "login" ? styles.active : ""} onClick={() => props.onModeChange("login")} role="tab" type="button">Sign in</button>
-            <button aria-selected={props.mode === "register"} className={props.mode === "register" ? styles.active : ""} onClick={() => props.onModeChange("register")} role="tab" type="button">Create account</button>
-          </div>
+      <section
+        aria-label={isLogin ? "Sign in to AbhiAI" : "Create an AbhiAI account"}
+        className={styles.authCard}
+        onPointerEnter={startPointerTracking}
+        onPointerLeave={stopPointerTracking}
+        onPointerMove={trackPointer}
+      >
+        <aside className={styles.illustrationPanel}>
+          {charactersEnabled && !introActive && <AuthCharacters ref={characterScene} state={characterState} />}
+        </aside>
 
-          <form className={styles.form} onSubmit={props.onSubmit}>
-            {props.mode === "register" && <label>Full name<input autoComplete="name" onBlur={() => setActiveField(null)} onChange={(event) => props.onDisplayNameChange(event.target.value)} onFocus={() => setActiveField("name")} required value={props.displayName} /></label>}
-            <label>Email<input autoComplete="email" onBlur={() => setActiveField(null)} onChange={(event) => props.onEmailChange(event.target.value)} onFocus={() => setActiveField("email")} required type="email" value={props.email} /></label>
-            <label>Password<div className={styles.passwordField}><input autoComplete={props.mode === "login" ? "current-password" : "new-password"} minLength={8} onBlur={() => setPasswordFocused(false)} onChange={(event) => props.onPasswordChange(event.target.value)} onFocus={() => {setPasswordFocused(true);setActiveField(null);}} required type={showPassword ? "text" : "password"} value={props.password} /><button aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} type="button">{showPassword ? "Hide" : "Show"}</button></div></label>
-            <div className={styles.formMeta}>
-              <label className={styles.remember}><input checked={props.rememberMe} onChange={(event) => props.onRememberMeChange(event.target.checked)} type="checkbox" /> Remember me</label>
-              <span title="Password recovery will be available soon">Forgot password?</span>
+        <section className={styles.formPanel}>
+          <div className={styles.formContent}>
+            <div className={styles.formLogo}>
+              <Image alt="AbhiAI" height={46} priority src="/abhiai-logo.png" width={46} />
             </div>
-            {passwordFocused && <p className={styles.privacyNote}>The mascots look away while you enter your password.</p>}
-            {props.authError && <p className={styles.error} role="alert">{props.authError}</p>}
-            <button className={styles.submit} disabled={props.isAuthenticating} type="submit"><span>{props.isAuthenticating ? "Connecting…" : props.mode === "login" ? "Sign in" : "Create account"}</span><b>{props.isAuthenticating ? "· · ·" : "→"}</b></button>
-          </form>
+            <h1>{isLogin ? "Welcome back!" : "Create your account"}</h1>
+            <p className={styles.intro}>
+              {isLogin
+                ? "Please enter your details to continue your work."
+                : "Set up one account for AI assistance, creation, and connection."}
+            </p>
 
-          <button aria-disabled="true" className={styles.google} disabled type="button"><span>G</span> Continue with Google <small>Coming soon</small></button>
-          <p className={styles.switchMode}>{props.mode === "login" ? "New to AbhiAI?" : "Already have an account?"} <button onClick={() => props.onModeChange(props.mode === "login" ? "register" : "login")} type="button">{props.mode === "login" ? "Create an account" : "Sign in"}</button></p>
+            <form className={styles.form} onSubmit={props.onSubmit}>
+              {props.mode === "register" && (
+                <label className={styles.fieldLabel} htmlFor="auth-name">
+                  <span>Full name</span>
+                  <input
+                    autoComplete="name"
+                    id="auth-name"
+                    onBlur={blurField}
+                    onChange={(event) => props.onDisplayNameChange(event.target.value)}
+                    onFocus={() => focusField("name")}
+                    required
+                    value={props.displayName}
+                  />
+                </label>
+              )}
+
+              <label className={styles.fieldLabel} htmlFor="auth-email">
+                <span>Email address</span>
+                <input
+                  autoComplete="email"
+                  id="auth-email"
+                  onBlur={blurField}
+                  onChange={(event) => props.onEmailChange(event.target.value)}
+                  onFocus={() => focusField("email")}
+                  required
+                  type="email"
+                  value={props.email}
+                />
+              </label>
+
+              <PasswordField
+                autoComplete={isLogin ? "current-password" : "new-password"}
+                onChange={props.onPasswordChange}
+                onFocusChange={(active) => active ? focusField("password") : blurField()}
+                onVisibilityChange={setPasswordVisible}
+                onVisibilityHoverChange={setEyeHover}
+                value={props.password}
+              />
+
+              <div className={styles.formMeta}>
+                <label className={styles.remember}>
+                  <input
+                    checked={props.rememberMe}
+                    onChange={(event) => props.onRememberMeChange(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>Remember me</span>
+                </label>
+                <button disabled title="Password recovery will be available soon" type="button">
+                  Forgot password?
+                </button>
+              </div>
+
+              <p aria-live="polite" className={styles.privacyNote} hidden={!passwordVisible}>
+                Your password stays private while the characters look away.
+              </p>
+
+              {props.authError && <p className={styles.error} role="alert">{props.authError}</p>}
+
+              <button className={styles.submit} disabled={props.isAuthenticating} type="submit">
+                <span>{props.isAuthenticating ? "Connecting…" : isLogin ? "Log in" : "Create account"}</span>
+                <b aria-hidden="true">{props.isAuthenticating ? "· · ·" : "→"}</b>
+              </button>
+            </form>
+
+            <p className={styles.switchMode}>
+              {isLogin ? "Don’t have an account?" : "Already have an account?"}
+              <button onClick={() => props.onModeChange(isLogin ? "register" : "login")} type="button">
+                {isLogin ? "Sign up" : "Log in"}
+              </button>
+            </p>
+          </div>
         </section>
       </section>
     </main>
