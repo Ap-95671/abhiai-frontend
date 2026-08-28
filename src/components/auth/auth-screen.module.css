@@ -35,27 +35,14 @@
   z-index: 100;
 }
 
-.introSpark {
-  animation: introSpark 850ms ease-in-out both;
-  background: #fff;
-  clip-path: polygon(50% 0, 61% 37%, 100% 50%, 61% 63%, 50% 100%, 39% 63%, 0 50%, 39% 37%);
-  height: 46px;
-  width: 46px;
+.introLogo {
+  animation: introLogo 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  border-radius: 22px;
+  box-shadow: 0 22px 52px rgba(23, 5, 63, 0.32);
+  height: 84px;
+  object-fit: cover;
+  width: 84px;
 }
-
-.introDot {
-  animation: introDots 850ms ease-in-out both;
-  background: #fff;
-  border-radius: 50%;
-  height: 13px;
-  left: calc(50% - 6px);
-  position: absolute;
-  top: calc(50% - 7px);
-  width: 13px;
-}
-
-.introDot:nth-of-type(2) { animation-delay: 80ms; transform: translateY(-27px); }
-.introDot:nth-of-type(3) { animation-delay: 150ms; transform: translateY(27px); }
 
 .utilityBar {
   align-items: center;
@@ -90,11 +77,11 @@
   border-radius: 25px;
   box-shadow: 0 32px 90px rgba(0, 0, 0, 0.55);
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(420px, 0.88fr);
-  min-height: min(660px, calc(100dvh - 104px));
+  grid-template-columns: minmax(0, 1.12fr) minmax(440px, 0.88fr);
+  min-height: min(760px, calc(100dvh - 104px));
   overflow: hidden;
   position: relative;
-  width: min(1160px, calc(100vw - 80px));
+  width: min(1480px, calc(100vw - 72px));
   z-index: 1;
 }
 
@@ -488,16 +475,11 @@
   100% { opacity: 0; transform: translateY(-100%); }
 }
 
-@keyframes introSpark {
-  0% { opacity: 0; transform: rotate(-30deg) scale(0.15); }
-  45% { opacity: 1; transform: rotate(0) scale(1); }
-  100% { opacity: 0; transform: rotate(38deg) scale(0.4); }
-}
-
-@keyframes introDots {
-  0%, 30% { opacity: 0; }
-  55% { opacity: 1; }
-  100% { opacity: 0; }
+@keyframes introLogo {
+  0% { opacity: 0; transform: rotate(-10deg) scale(0.35); }
+  52% { opacity: 1; transform: rotate(2deg) scale(1.08); }
+  78% { opacity: 1; transform: rotate(0) scale(1); }
+  100% { opacity: 0; transform: rotate(3deg) scale(0.88); }
 }
 
 @keyframes characterFloat {

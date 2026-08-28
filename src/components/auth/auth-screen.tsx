@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, PointerEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
@@ -52,6 +52,7 @@ export function AuthScreen(props: AuthScreenProps) {
   const [pointerTracking, setPointerTracking] = useState(false);
   const animationFrame = useRef<number | null>(null);
   const characterScene = useRef<HTMLDivElement | null>(null);
+  const pointerTrackingActive = useRef(false);
   const charactersEnabled = useSyncExternalStore(
     subscribeToCharacterBreakpoint,
     characterBreakpointSnapshot,
@@ -81,85 +82,85 @@ export function AuthScreen(props: AuthScreenProps) {
     };
   }, [props.authError]);
 
-  function trackPointer(event: PointerEvent<HTMLElement>) {
+  useEffect(() => {
     if (
-      focusTarget
-      || passwordVisible
-      || props.isAuthenticating
-      || !charactersEnabled
+      !charactersEnabled
       || !characterEntranceComplete
       || window.matchMedia("(pointer: coarse)").matches
       || window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) return;
 
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(-1, Math.min(1, ((event.clientX - bounds.left) / bounds.width) * 2 - 1));
-    const y = Math.max(-1, Math.min(1, ((event.clientY - bounds.top) / bounds.height) * 2 - 1));
+    function handlePointerMove(event: globalThis.PointerEvent) {
+      if (focusTarget || passwordVisible || props.isAuthenticating) return;
 
-    if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
-    animationFrame.current = window.requestAnimationFrame(() => {
       const scene = characterScene.current;
       if (!scene) return;
 
-      scene.style.setProperty("--purple-gaze-x", `${x * 4.8}px`);
-      scene.style.setProperty("--purple-gaze-y", `${y * 3.5}px`);
-      scene.style.setProperty("--dark-gaze-x", `${x * 5.4}px`);
-      scene.style.setProperty("--dark-gaze-y", `${y * 3.9}px`);
-      scene.style.setProperty("--orange-gaze-x", `${x * 3.2}px`);
-      scene.style.setProperty("--orange-gaze-y", `${y * 2.4}px`);
-      scene.style.setProperty("--yellow-eye-x", `${x * 3.3}px`);
-      scene.style.setProperty("--yellow-eye-y", `${y * 2.2}px`);
-      scene.style.setProperty("--body-tilt", `${x * 1.2}deg`);
-      const upward = Math.max(0, -y);
-      const downward = Math.max(0, y);
-      const sideways = Math.abs(x);
+      if (!pointerTrackingActive.current) {
+        pointerTrackingActive.current = true;
+        setPointerTracking(true);
+      }
 
-      scene.style.setProperty("--purple-shift-x", `${x * 30}px`);
-      scene.style.setProperty("--purple-shift-y", `${y * (y < 0 ? 20 : 9)}px`);
-      scene.style.setProperty("--purple-scale-x", `${1 + sideways * 0.08 - upward * 0.035}`);
-      scene.style.setProperty("--purple-scale-y", `${1 + upward * 0.24 - downward * 0.1}`);
-      scene.style.setProperty("--dark-shift-x", `${x * 22}px`);
-      scene.style.setProperty("--dark-shift-y", `${y * (y < 0 ? 16 : 8)}px`);
-      scene.style.setProperty("--dark-scale-x", `${1 + sideways * 0.06}`);
-      scene.style.setProperty("--dark-scale-y", `${1 + upward * 0.17 - downward * 0.07}`);
-      scene.style.setProperty("--orange-shift-x", `${x * 20}px`);
-      scene.style.setProperty("--orange-shift-y", `${y * 7}px`);
-      scene.style.setProperty("--orange-scale-x", `${1 + sideways * 0.13 + downward * 0.05}`);
-      scene.style.setProperty("--orange-scale-y", `${1 + upward * 0.1 - downward * 0.12}`);
-      scene.style.setProperty("--yellow-shift-x", `${x * 17}px`);
-      scene.style.setProperty("--yellow-shift-y", `${y * (y < 0 ? 13 : 7)}px`);
-      scene.style.setProperty("--yellow-scale-y", `${1 + upward * 0.13 - downward * 0.06}`);
-    });
-  }
+      const bounds = scene.getBoundingClientRect();
+      const centerX = bounds.left + bounds.width / 2;
+      const centerY = bounds.top + bounds.height * 0.42;
+      const horizontalRange = event.clientX >= centerX
+        ? Math.max(window.innerWidth - centerX, 1)
+        : Math.max(centerX, 1);
+      const verticalRange = event.clientY >= centerY
+        ? Math.max(window.innerHeight - centerY, 1)
+        : Math.max(centerY, 1);
+      const x = (event.clientX - centerX) / horizontalRange;
+      const y = (event.clientY - centerY) / verticalRange;
 
-  function startPointerTracking() {
-    if (
-      !focusTarget
-      && !passwordVisible
-      && !props.isAuthenticating
-      && charactersEnabled
-      && characterEntranceComplete
-      && window.matchMedia("(pointer: fine)").matches
-      && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) setPointerTracking(true);
-  }
+      if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = window.requestAnimationFrame(() => {
+        scene.style.setProperty("--purple-gaze-x", `${x * 4.8}px`);
+        scene.style.setProperty("--purple-gaze-y", `${y * 3.5}px`);
+        scene.style.setProperty("--dark-gaze-x", `${x * 5.4}px`);
+        scene.style.setProperty("--dark-gaze-y", `${y * 3.9}px`);
+        scene.style.setProperty("--orange-gaze-x", `${x * 3.2}px`);
+        scene.style.setProperty("--orange-gaze-y", `${y * 2.4}px`);
+        scene.style.setProperty("--yellow-eye-x", `${x * 3.3}px`);
+        scene.style.setProperty("--yellow-eye-y", `${y * 2.2}px`);
+        scene.style.setProperty("--body-tilt", `${x * 1.2}deg`);
+        const upward = Math.max(0, -y);
+        const downward = Math.max(0, y);
+        const sideways = Math.abs(x);
 
-  function stopPointerTracking() {
-    setPointerTracking(false);
-    const scene = characterScene.current;
-    if (!scene) return;
+        scene.style.setProperty("--purple-shift-x", `${x * 30}px`);
+        scene.style.setProperty("--purple-shift-y", `${y * (y < 0 ? 20 : 9)}px`);
+        scene.style.setProperty("--purple-scale-x", `${1 + sideways * 0.08 - upward * 0.035}`);
+        scene.style.setProperty("--purple-scale-y", `${1 + upward * 0.24 - downward * 0.1}`);
+        scene.style.setProperty("--dark-shift-x", `${x * 22}px`);
+        scene.style.setProperty("--dark-shift-y", `${y * (y < 0 ? 16 : 8)}px`);
+        scene.style.setProperty("--dark-scale-x", `${1 + sideways * 0.06}`);
+        scene.style.setProperty("--dark-scale-y", `${1 + upward * 0.17 - downward * 0.07}`);
+        scene.style.setProperty("--orange-shift-x", `${x * 20}px`);
+        scene.style.setProperty("--orange-shift-y", `${y * 7}px`);
+        scene.style.setProperty("--orange-scale-x", `${1 + sideways * 0.13 + downward * 0.05}`);
+        scene.style.setProperty("--orange-scale-y", `${1 + upward * 0.1 - downward * 0.12}`);
+        scene.style.setProperty("--yellow-shift-x", `${x * 17}px`);
+        scene.style.setProperty("--yellow-shift-y", `${y * (y < 0 ? 13 : 7)}px`);
+        scene.style.setProperty("--yellow-scale-y", `${1 + upward * 0.13 - downward * 0.06}`);
+      });
+    }
 
-    for (const property of [
-      "--purple-gaze-x", "--purple-gaze-y", "--dark-gaze-x", "--dark-gaze-y",
-      "--orange-gaze-x", "--orange-gaze-y", "--yellow-eye-x", "--yellow-eye-y",
-      "--body-tilt", "--purple-shift-x", "--purple-shift-y", "--purple-scale-x",
-      "--purple-scale-y", "--dark-shift-x", "--dark-shift-y", "--dark-scale-x",
-      "--dark-scale-y", "--orange-shift-x", "--orange-shift-y", "--orange-scale-x",
-      "--orange-scale-y", "--yellow-shift-x", "--yellow-shift-y", "--yellow-scale-y",
-    ]) scene.style.removeProperty(property);
-  }
+    function handleWindowBlur() {
+      pointerTrackingActive.current = false;
+      setPointerTracking(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("blur", handleWindowBlur);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [characterEntranceComplete, charactersEnabled, focusTarget, passwordVisible, props.isAuthenticating]);
 
   function focusField(field: Exclude<AuthFocusTarget, null>) {
+    pointerTrackingActive.current = false;
     setPointerTracking(false);
     setFocusTarget(field);
   }
@@ -193,9 +194,7 @@ export function AuthScreen(props: AuthScreenProps) {
     <main className={styles.page}>
       {introActive && (
         <div aria-hidden="true" className={styles.introOverlay}>
-          <span className={styles.introSpark} />
-          <span className={styles.introDot} />
-          <span className={styles.introDot} />
+          <Image alt="" className={styles.introLogo} height={84} priority src="/abhiai-logo.png" width={84} />
         </div>
       )}
 
@@ -209,9 +208,6 @@ export function AuthScreen(props: AuthScreenProps) {
       <section
         aria-label={isLogin ? "Sign in to AbhiAI" : "Create an AbhiAI account"}
         className={styles.authCard}
-        onPointerEnter={startPointerTracking}
-        onPointerLeave={stopPointerTracking}
-        onPointerMove={trackPointer}
       >
         <aside className={styles.illustrationPanel}>
           {charactersEnabled && !introActive && <AuthCharacters ref={characterScene} state={characterState} />}
