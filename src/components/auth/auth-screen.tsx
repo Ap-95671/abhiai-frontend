@@ -50,6 +50,7 @@ export function AuthScreen(props: AuthScreenProps) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [eyeHover, setEyeHover] = useState(false);
   const [pointerTracking, setPointerTracking] = useState(false);
+  const [typingPulse, setTypingPulse] = useState(0);
   const animationFrame = useRef<number | null>(null);
   const characterScene = useRef<HTMLDivElement | null>(null);
   const pointerTrackingActive = useRef(false);
@@ -124,6 +125,18 @@ export function AuthScreen(props: AuthScreenProps) {
         scene.style.setProperty("--yellow-eye-x", `${x * 3.3}px`);
         scene.style.setProperty("--yellow-eye-y", `${y * 2.2}px`);
         scene.style.setProperty("--body-tilt", `${x * 1.2}deg`);
+        scene.style.setProperty("--purple-head-yaw", `${x * 89}deg`);
+        scene.style.setProperty("--purple-head-pitch", `${y * -18}deg`);
+        scene.style.setProperty("--purple-head-roll", `${x * 7 + y * 3}deg`);
+        scene.style.setProperty("--dark-head-yaw", `${x * 84}deg`);
+        scene.style.setProperty("--dark-head-pitch", `${y * -15}deg`);
+        scene.style.setProperty("--dark-head-roll", `${x * 5 + y * 2}deg`);
+        scene.style.setProperty("--orange-head-yaw", `${x * 50}deg`);
+        scene.style.setProperty("--orange-head-pitch", `${y * -12}deg`);
+        scene.style.setProperty("--orange-head-roll", `${x * 3}deg`);
+        scene.style.setProperty("--yellow-head-yaw", `${x * 88}deg`);
+        scene.style.setProperty("--yellow-head-pitch", `${y * -16}deg`);
+        scene.style.setProperty("--yellow-head-roll", `${x * 8 + y * 2}deg`);
         const upward = Math.max(0, -y);
         const downward = Math.max(0, y);
         const sideways = Math.abs(x);
@@ -169,6 +182,25 @@ export function AuthScreen(props: AuthScreenProps) {
     setFocusTarget(null);
   }
 
+  function registerTypingPulse() {
+    setTypingPulse((current) => current + 1);
+  }
+
+  function changeDisplayName(value: string) {
+    registerTypingPulse();
+    props.onDisplayNameChange(value);
+  }
+
+  function changeEmail(value: string) {
+    registerTypingPulse();
+    props.onEmailChange(value);
+  }
+
+  function changePassword(value: string) {
+    registerTypingPulse();
+    props.onPasswordChange(value);
+  }
+
   const isLogin = props.mode === "login";
   const characterState: CharacterAnimationState = !characterEntranceComplete
     ? "entrance"
@@ -210,7 +242,9 @@ export function AuthScreen(props: AuthScreenProps) {
         className={styles.authCard}
       >
         <aside className={styles.illustrationPanel}>
-          {charactersEnabled && !introActive && <AuthCharacters ref={characterScene} state={characterState} />}
+          {charactersEnabled && !introActive && (
+            <AuthCharacters ref={characterScene} state={characterState} typingPulse={typingPulse} />
+          )}
         </aside>
 
         <section className={styles.formPanel}>
@@ -233,7 +267,7 @@ export function AuthScreen(props: AuthScreenProps) {
                     autoComplete="name"
                     id="auth-name"
                     onBlur={blurField}
-                    onChange={(event) => props.onDisplayNameChange(event.target.value)}
+                    onChange={(event) => changeDisplayName(event.target.value)}
                     onFocus={() => focusField("name")}
                     required
                     value={props.displayName}
@@ -247,7 +281,7 @@ export function AuthScreen(props: AuthScreenProps) {
                   autoComplete="email"
                   id="auth-email"
                   onBlur={blurField}
-                  onChange={(event) => props.onEmailChange(event.target.value)}
+                  onChange={(event) => changeEmail(event.target.value)}
                   onFocus={() => focusField("email")}
                   required
                   type="email"
@@ -257,7 +291,7 @@ export function AuthScreen(props: AuthScreenProps) {
 
               <PasswordField
                 autoComplete={isLogin ? "current-password" : "new-password"}
-                onChange={props.onPasswordChange}
+                onChange={changePassword}
                 onFocusChange={(active) => active ? focusField("password") : blurField()}
                 onVisibilityChange={setPasswordVisible}
                 onVisibilityHoverChange={setEyeHover}

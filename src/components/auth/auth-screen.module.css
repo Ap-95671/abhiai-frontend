@@ -264,14 +264,23 @@
   --body-tilt: 0deg;
   --dark-gaze-x: 0px;
   --dark-gaze-y: 0px;
+  --dark-head-pitch: 0deg;
+  --dark-head-roll: 0deg;
+  --dark-head-yaw: 0deg;
   --orange-gaze-x: 0px;
   --orange-gaze-y: 0px;
+  --orange-head-pitch: 0deg;
+  --orange-head-roll: 0deg;
+  --orange-head-yaw: 0deg;
   --orange-scale-x: 1;
   --orange-scale-y: 1;
   --orange-shift-x: 0px;
   --orange-shift-y: 0px;
   --purple-gaze-x: 0px;
   --purple-gaze-y: 0px;
+  --purple-head-pitch: 0deg;
+  --purple-head-roll: 0deg;
+  --purple-head-yaw: 0deg;
   --purple-scale-x: 1;
   --purple-scale-y: 1;
   --purple-shift-x: 0px;
@@ -282,6 +291,9 @@
   --dark-shift-y: 0px;
   --yellow-eye-x: 0px;
   --yellow-eye-y: 0px;
+  --yellow-head-pitch: 0deg;
+  --yellow-head-roll: 0deg;
+  --yellow-head-yaw: 0deg;
   --yellow-scale-y: 1;
   --yellow-shift-x: 0px;
   --yellow-shift-y: 0px;
@@ -301,22 +313,64 @@
 .characterSlot { bottom: 0; position: absolute; transform-origin: center bottom; }
 .character {
   height: 100%;
+  perspective: 720px;
   position: relative;
   transform-origin: center bottom;
   transition: clip-path 420ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .purpleSlot { animation: characterFloat 6s ease-in-out infinite; height: 285px; left: 19%; width: 150px; }
-.purpleCharacter { --pupil-x: var(--purple-gaze-x); --pupil-y: var(--purple-gaze-y); background: #742cff; }
+.purpleCharacter { --character-fill: #742cff; --pupil-x: var(--purple-gaze-x); --pupil-y: var(--purple-gaze-y); }
 .darkSlot { animation: characterFloat 6.8s 0.8s ease-in-out infinite; height: 225px; left: 43%; width: 108px; z-index: 3; }
-.darkCharacter { --pupil-x: var(--dark-gaze-x); --pupil-y: var(--dark-gaze-y); background: #23252b; }
+.darkCharacter { --character-fill: #23252b; --pupil-x: var(--dark-gaze-x); --pupil-y: var(--dark-gaze-y); }
 .orangeSlot { animation: characterFloat 7.2s 1.1s ease-in-out infinite; height: 150px; left: 7%; width: 274px; z-index: 4; }
-.orangeCharacter { --pupil-x: var(--orange-gaze-x); --pupil-y: var(--orange-gaze-y); background: #ff8a3c; border-radius: 170px 170px 0 0; }
+.orangeCharacter { --character-fill: #ff8a3c; --pupil-x: var(--orange-gaze-x); --pupil-y: var(--orange-gaze-y); }
 .yellowSlot { animation: characterFloat 6.2s 0.4s ease-in-out infinite; height: 205px; left: 62%; width: 120px; z-index: 4; }
-.yellowCharacter { background: #f5d815; border-radius: 62px 62px 0 0; }
+.yellowCharacter { --character-fill: #f5d815; }
 .darkCharacter { transition-duration: 360ms; }
 .orangeCharacter { transition-duration: 590ms; }
 .yellowCharacter { transition-duration: 470ms; }
+
+.characterTorso {
+  background: var(--character-fill);
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 47%;
+}
+
+.characterHeadPivot {
+  height: 56%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  transform-origin: 50% 100%;
+  width: 100%;
+}
+
+.characterHead {
+  backface-visibility: visible;
+  background: var(--character-fill);
+  display: block;
+  height: 100%;
+  position: relative;
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
+  transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+}
+
+.orangeCharacter .characterTorso {
+  border-radius: 170px 170px 0 0;
+  inset: 0;
+}
+.orangeCharacter .characterHeadPivot { height: 72%; }
+.orangeCharacter .characterHead { background: transparent; }
+.yellowCharacter .characterTorso { top: 50%; }
+.yellowCharacter .characterHead {
+  border-radius: 62px 62px 16px 16px;
+}
 
 .characterFace {
   inset: 0;
@@ -393,11 +447,27 @@
   transform: translate3d(var(--yellow-shift-x), var(--yellow-shift-y), 0) rotate(var(--body-tilt)) scaleY(var(--yellow-scale-y));
 }
 .stateCursor .yellowCharacter .characterEye { transform: translate3d(var(--yellow-eye-x), var(--yellow-eye-y), 0); }
+.stateCursor .purpleCharacter .characterHead {
+  transform: rotateX(var(--purple-head-pitch)) rotateY(var(--purple-head-yaw)) rotateZ(var(--purple-head-roll));
+}
+.stateCursor .darkCharacter .characterHead {
+  transform: rotateX(var(--dark-head-pitch)) rotateY(var(--dark-head-yaw)) rotateZ(var(--dark-head-roll));
+}
+.stateCursor .orangeCharacter .characterHead {
+  transform: rotateX(var(--orange-head-pitch)) rotateY(var(--orange-head-yaw)) rotateZ(var(--orange-head-roll));
+}
+.stateCursor .yellowCharacter .characterHead {
+  transform: rotateX(var(--yellow-head-pitch)) rotateY(var(--yellow-head-yaw)) rotateZ(var(--yellow-head-roll));
+}
 
 .stateEmail .purpleCharacter { transform: rotate(5deg) skewX(-2deg); }
 .stateEmail .darkCharacter { transform: rotate(3deg) translateX(5px); }
 .stateEmail .orangeCharacter { transform: rotate(1.5deg) translateX(5px); }
 .stateEmail .yellowCharacter { transform: rotate(5deg); }
+.stateEmail .purpleCharacter .characterHead { transform: rotateX(-8deg) rotateY(34deg) rotateZ(9deg); }
+.stateEmail .darkCharacter .characterHead { transform: rotateX(-6deg) rotateY(42deg) rotateZ(7deg); }
+.stateEmail .orangeCharacter .characterHead { transform: rotateX(-5deg) rotateY(18deg) rotateZ(3deg); }
+.stateEmail .yellowCharacter .characterHead { transform: rotateX(-6deg) rotateY(38deg) rotateZ(8deg); }
 .stateEmail .purpleCharacter .characterEye i { transform: translate3d(5px, -1px, 0); }
 .stateEmail .darkCharacter .characterEye i { transform: translate3d(5px, 0, 0); }
 .stateEmail .orangeCharacter .characterEye i { transform: translate3d(3px, -1px, 0); }
@@ -408,6 +478,10 @@
 .stateEmailTyping .darkCharacter { transform: translate3d(30px, -8px, 0) rotate(6deg) scale(0.96, 1.13); }
 .stateEmailTyping .orangeCharacter { transform: translate3d(17px, -6px, 0) rotate(3deg) scale(1.11, 1.06); }
 .stateEmailTyping .yellowCharacter { transform: translate3d(27px, -9px, 0) rotate(8deg) scale(0.96, 1.14); }
+.stateEmailTyping .purpleCharacter .characterHead { transform: rotateX(-13deg) rotateY(62deg) rotateZ(16deg) translateX(10px); }
+.stateEmailTyping .darkCharacter .characterHead { transform: rotateX(-10deg) rotateY(70deg) rotateZ(13deg) translateX(8px); }
+.stateEmailTyping .orangeCharacter .characterHead { transform: rotateX(-8deg) rotateY(28deg) rotateZ(5deg); }
+.stateEmailTyping .yellowCharacter .characterHead { transform: rotateX(-9deg) rotateY(58deg) rotateZ(13deg) translateX(5px); }
 .stateEmailTyping .purpleCharacter .characterEye i { transform: translate3d(5px, -2px, 0); }
 .stateEmailTyping .darkCharacter .characterEye i { transform: translate3d(5px, -1px, 0); }
 .stateEmailTyping .orangeCharacter .characterEye i { transform: translate3d(3px, -1px, 0); }
@@ -419,6 +493,10 @@
 .statePasswordMasked .darkCharacter { transform: rotate(2deg) translateX(3px); }
 .statePasswordMasked .orangeCharacter { transform: translateX(3px); }
 .statePasswordMasked .yellowCharacter { transform: rotate(3deg); }
+.statePasswordMasked .purpleCharacter .characterHead { transform: rotateX(-7deg) rotateY(48deg) rotateZ(7deg); }
+.statePasswordMasked .darkCharacter .characterHead { transform: rotateX(-6deg) rotateY(56deg) rotateZ(8deg); }
+.statePasswordMasked .orangeCharacter .characterHead { transform: rotateX(-5deg) rotateY(22deg) rotateZ(2deg); }
+.statePasswordMasked .yellowCharacter .characterHead { transform: rotateX(-6deg) rotateY(52deg) rotateZ(8deg); }
 .statePasswordMasked .purpleCharacter .characterEye i { transform: translate3d(5px, 1px, 0); }
 .statePasswordMasked .darkCharacter .characterEye i { transform: translate3d(5px, 2px, 0); }
 .statePasswordMasked .orangeCharacter .characterEye i { transform: translate3d(3px, 1px, 0); }
@@ -430,12 +508,20 @@
 .stateEyeHover .yellowCharacter .characterEye { transform: translate3d(3px, -2px, 0); }
 .stateEyeHover .purpleCharacter { transform: rotate(3deg); }
 .stateEyeHover .darkCharacter { transform: rotate(2deg); }
+.stateEyeHover .purpleCharacter .characterHead { transform: rotateY(66deg) rotateZ(10deg); }
+.stateEyeHover .darkCharacter .characterHead { transform: rotateY(72deg) rotateZ(9deg); }
+.stateEyeHover .orangeCharacter .characterHead { transform: rotateY(30deg); }
+.stateEyeHover .yellowCharacter .characterHead { transform: rotateY(64deg) rotateZ(10deg); }
 
 /* Visible passwords override every other state. Eyes stay open and deliberately look away. */
 .statePasswordVisible .purpleCharacter { clip-path: polygon(0 0, 100% 4%, 88% 38%, 100% 59%, 90% 100%, 0 100%); transform: rotate(-6deg) translateX(-7px); }
 .statePasswordVisible .darkCharacter { transform: rotate(5deg) translateX(4px); }
 .statePasswordVisible .orangeCharacter { transform: rotate(-2deg) translateX(-6px); }
 .statePasswordVisible .yellowCharacter { transform: rotate(9deg) translateX(9px); }
+.statePasswordVisible .purpleCharacter .characterHead { transform: rotateX(5deg) rotateY(-88deg) rotateZ(-10deg); }
+.statePasswordVisible .darkCharacter .characterHead { transform: rotateX(4deg) rotateY(86deg) rotateZ(8deg); }
+.statePasswordVisible .orangeCharacter .characterHead { transform: rotateY(-58deg) rotateZ(-4deg); }
+.statePasswordVisible .yellowCharacter .characterHead { transform: rotateX(4deg) rotateY(-86deg) rotateZ(-10deg); }
 .statePasswordVisible .purpleCharacter .characterEye i { animation: none; transform: translate3d(-5px, 1px, 0); }
 .statePasswordVisible .darkCharacter .characterEye i { animation: none; transform: translate3d(5px, 1px, 0); }
 .statePasswordVisible .orangeCharacter .characterEye i { animation: none; transform: translate3d(3px, -3px, 0); }
@@ -453,6 +539,9 @@
 .stateSubmitting .darkCharacter .characterEye i { transform: translate3d(5px, 4px, 0); }
 .stateSubmitting .orangeCharacter .characterEye i { transform: translate3d(3px, 3px, 0); }
 .stateSubmitting .yellowCharacter .characterEye { transform: translate3d(3px, 3px, 0); }
+.stateSubmitting .purpleCharacter .characterHead { transform: rotateX(-9deg) rotateY(38deg) rotateZ(6deg); }
+.stateSubmitting .darkCharacter .characterHead { transform: rotateX(-8deg) rotateY(44deg) rotateZ(6deg); }
+.stateSubmitting .yellowCharacter .characterHead { transform: rotateX(-8deg) rotateY(40deg) rotateZ(6deg); }
 
 .stateError .purpleCharacter { transform: rotate(-3deg); }
 .stateError .darkCharacter { transform: rotate(4deg); }
@@ -470,6 +559,16 @@
 .stateError .yellowSlot { animation: yellowError 820ms 100ms ease-out both; }
 .stateError .characterEye { animation: errorEyes 850ms ease-out both; }
 
+/* Each keystroke restarts a staggered group nod: they notice the input, then agree with one another. */
+.typingPulseEven .purpleCharacter .characterHeadPivot { animation: agreementNodEven 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.typingPulseEven .darkCharacter .characterHeadPivot { animation: agreementNodEven 620ms 55ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.typingPulseEven .orangeCharacter .characterHeadPivot { animation: agreementNodEven 620ms 110ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.typingPulseEven .yellowCharacter .characterHeadPivot { animation: agreementNodEven 620ms 165ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.typingPulseOdd .purpleCharacter .characterHeadPivot { animation: agreementNodOdd 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.typingPulseOdd .darkCharacter .characterHeadPivot { animation: agreementNodOdd 620ms 55ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.typingPulseOdd .orangeCharacter .characterHeadPivot { animation: agreementNodOdd 620ms 110ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.typingPulseOdd .yellowCharacter .characterHeadPivot { animation: agreementNodOdd 620ms 165ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
 @keyframes introReveal {
   0%, 62% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(-100%); }
@@ -485,6 +584,20 @@
 @keyframes characterFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
+}
+
+@keyframes agreementNodEven {
+  0%, 100% { transform: translateY(0) rotateX(0) rotateZ(0); }
+  28% { transform: translateY(8px) rotateX(18deg) rotateZ(3deg); }
+  52% { transform: translateY(-3px) rotateX(-8deg) rotateZ(-2deg); }
+  75% { transform: translateY(5px) rotateX(11deg) rotateZ(1deg); }
+}
+
+@keyframes agreementNodOdd {
+  0%, 100% { transform: translateY(0) rotateX(0) rotateZ(0); }
+  28% { transform: translateY(8px) rotateX(18deg) rotateZ(3deg); }
+  52% { transform: translateY(-3px) rotateX(-8deg) rotateZ(-2deg); }
+  75% { transform: translateY(5px) rotateX(11deg) rotateZ(1deg); }
 }
 
 @keyframes characterBlink {
@@ -661,10 +774,14 @@
   .stateEntrance .characterSlot,
   .stateError .characterSlot,
   .stateSubmitting .characterSlot { animation: none; }
+  .typingPulseEven .characterHeadPivot,
+  .typingPulseOdd .characterHeadPivot { animation: none; }
   .characterEye i { animation: none !important; }
   .stateCursor .character { transform: none; }
   .stateCursor .yellowCharacter .characterEye { transform: none; }
   .character,
+  .characterHead,
+  .characterHeadPivot,
   .characterFace,
   .characterEye,
   .characterEye i,

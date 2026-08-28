@@ -20,6 +20,7 @@ export type CharacterAnimationState =
 
 type AuthCharactersProps = {
   state: CharacterAnimationState;
+  typingPulse: number;
 };
 
 const stateClass: Record<CharacterAnimationState, string> = {
@@ -36,14 +37,21 @@ const stateClass: Record<CharacterAnimationState, string> = {
 };
 
 export const AuthCharacters = forwardRef<HTMLDivElement, AuthCharactersProps>(function AuthCharacters(
-  { state },
+  { state, typingPulse },
   ref,
 ) {
+  const typingClass = typingPulse === 0
+    ? ""
+    : typingPulse % 2 === 0
+      ? styles.typingPulseEven
+      : styles.typingPulseOdd;
+
   return (
     <div
       aria-hidden="true"
-      className={`${styles.characterScene} ${stateClass[state]}`}
+      className={`${styles.characterScene} ${stateClass[state]} ${typingClass}`}
       data-character-state={state}
+      data-typing-pulse={typingPulse}
       ref={ref}
     >
       <span className={`${styles.sceneShape} ${styles.sceneShapeOne}`} />
@@ -51,31 +59,44 @@ export const AuthCharacters = forwardRef<HTMLDivElement, AuthCharactersProps>(fu
 
       <div className={`${styles.characterSlot} ${styles.purpleSlot}`}>
         <div className={`${styles.character} ${styles.purpleCharacter}`}>
-          <Face />
+          <CharacterBody />
         </div>
       </div>
 
       <div className={`${styles.characterSlot} ${styles.darkSlot}`}>
         <div className={`${styles.character} ${styles.darkCharacter}`}>
-          <Face />
+          <CharacterBody />
         </div>
       </div>
 
       <div className={`${styles.characterSlot} ${styles.orangeSlot}`}>
         <div className={`${styles.character} ${styles.orangeCharacter}`}>
-          <Face />
+          <CharacterBody />
         </div>
       </div>
 
       <div className={`${styles.characterSlot} ${styles.yellowSlot}`}>
         <div className={`${styles.character} ${styles.yellowCharacter}`}>
-          <Face />
-          <span className={styles.yellowNose} />
+          <CharacterBody yellow />
         </div>
       </div>
     </div>
   );
 });
+
+function CharacterBody({ yellow = false }: { yellow?: boolean }) {
+  return (
+    <>
+      <span className={styles.characterTorso} />
+      <span className={styles.characterHeadPivot}>
+        <span className={styles.characterHead}>
+          <Face />
+          {yellow && <span className={styles.yellowNose} />}
+        </span>
+      </span>
+    </>
+  );
+}
 
 function Face() {
   return (
