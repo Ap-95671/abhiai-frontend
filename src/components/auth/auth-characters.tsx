@@ -58,25 +58,25 @@ export const AuthCharacters = forwardRef<HTMLDivElement, AuthCharactersProps>(fu
       <span className={`${styles.sceneShape} ${styles.sceneShapeTwo}`} />
 
       <div className={`${styles.characterSlot} ${styles.purpleSlot}`}>
-        <div className={`${styles.character} ${styles.purpleCharacter}`}>
+        <div className={`${styles.character} ${styles.purpleCharacter}`} data-character="purple">
           <CharacterBody />
         </div>
       </div>
 
       <div className={`${styles.characterSlot} ${styles.darkSlot}`}>
-        <div className={`${styles.character} ${styles.darkCharacter}`}>
+        <div className={`${styles.character} ${styles.darkCharacter}`} data-character="dark">
           <CharacterBody />
         </div>
       </div>
 
       <div className={`${styles.characterSlot} ${styles.orangeSlot}`}>
-        <div className={`${styles.character} ${styles.orangeCharacter}`}>
+        <div className={`${styles.character} ${styles.orangeCharacter}`} data-character="orange">
           <CharacterBody />
         </div>
       </div>
 
       <div className={`${styles.characterSlot} ${styles.yellowSlot}`}>
-        <div className={`${styles.character} ${styles.yellowCharacter}`}>
+        <div className={`${styles.character} ${styles.yellowCharacter}`} data-character="yellow">
           <CharacterBody yellow />
         </div>
       </div>
@@ -87,9 +87,10 @@ export const AuthCharacters = forwardRef<HTMLDivElement, AuthCharactersProps>(fu
 function CharacterBody({ yellow = false }: { yellow?: boolean }) {
   return (
     <>
-      <span className={styles.characterTorso} />
-      <span className={styles.characterHeadPivot}>
-        <span className={styles.characterHead}>
+      <span className={styles.characterBody} />
+      <span className={styles.characterUpperBody}>
+        <span className={styles.characterUpperSurface}>
+          <span className={styles.characterTurnShade} />
           <Face />
           {yellow && <span className={styles.yellowNose} />}
         </span>

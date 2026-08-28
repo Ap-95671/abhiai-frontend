@@ -53,6 +53,8 @@ export function AuthScreen(props: AuthScreenProps) {
   const [typingPulse, setTypingPulse] = useState(0);
   const animationFrame = useRef<number | null>(null);
   const characterScene = useRef<HTMLDivElement | null>(null);
+  const pointerCurrent = useRef({ x: 0, y: 0 });
+  const pointerTarget = useRef({ x: 0, y: 0 });
   const pointerTrackingActive = useRef(false);
   const charactersEnabled = useSyncExternalStore(
     subscribeToCharacterBreakpoint,
@@ -91,6 +93,55 @@ export function AuthScreen(props: AuthScreenProps) {
       || window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) return;
 
+    const movementProfiles = {
+      dark: { body: 0.11, gazeX: 4.6, gazeY: 3.1, reach: 18, stretch: 0.18 },
+      orange: { body: 0.055, gazeX: 2.7, gazeY: 2.1, reach: 8, stretch: 0.08 },
+      purple: { body: 0.15, gazeX: 4.8, gazeY: 3.2, reach: 28, stretch: 0.26 },
+      yellow: { body: 0.09, gazeX: 3.1, gazeY: 2.2, reach: 14, stretch: 0.13 },
+    } as const;
+
+    function applyPointerFrame() {
+      const scene = characterScene.current;
+      if (!scene) return;
+
+      const current = pointerCurrent.current;
+      const target = pointerTarget.current;
+      current.x += (target.x - current.x) * 0.14;
+      current.y += (target.y - current.y) * 0.14;
+
+      scene.querySelectorAll<HTMLElement>("[data-character]").forEach((character) => {
+        const characterName = character.dataset.character as keyof typeof movementProfiles;
+        const profile = movementProfiles[characterName];
+        const slotBounds = character.parentElement?.getBoundingClientRect();
+        if (!profile || !slotBounds) return;
+
+        const eyeCenterX = slotBounds.left + slotBounds.width * 0.5;
+        const eyeCenterY = slotBounds.top + Math.min(slotBounds.height * 0.25, 58);
+        const deltaX = current.x - eyeCenterX;
+        const deltaY = current.y - eyeCenterY;
+        const distance = Math.max(Math.hypot(deltaX, deltaY), 1);
+        const gazeX = Math.max(-1, Math.min(1, deltaX / distance));
+        const gazeY = Math.max(-1, Math.min(1, deltaY / distance));
+        const horizontal = Math.max(-1, Math.min(1, deltaX / Math.max(window.innerWidth * 0.46, 1)));
+        const upwardReach = Math.max(0, Math.min(1, -deltaY / Math.max(window.innerHeight * 0.52, 1)));
+        const proximity = Math.max(0, Math.min(1, distance / Math.max(window.innerWidth * 0.58, 1)));
+        const reachStrength = Math.max(upwardReach, proximity * 0.45);
+
+        character.style.setProperty("--pupil-x", `${gazeX * profile.gazeX}px`);
+        character.style.setProperty("--pupil-y", `${gazeY * profile.gazeY}px`);
+        character.style.setProperty("--cursor-lean", `${horizontal * profile.body * 42}deg`);
+        character.style.setProperty("--cursor-stretch", `${1 + reachStrength * profile.stretch}`);
+        character.style.setProperty("--cursor-compress", `${1 - reachStrength * profile.body * 0.24}`);
+        character.style.setProperty("--cursor-upper-x", `${horizontal * reachStrength * profile.reach}px`);
+        character.style.setProperty("--cursor-upper-turn", `${horizontal * reachStrength * profile.body * 38}deg`);
+      });
+
+      const remaining = Math.hypot(target.x - current.x, target.y - current.y);
+      animationFrame.current = remaining > 0.25
+        ? window.requestAnimationFrame(applyPointerFrame)
+        : null;
+    }
+
     function handlePointerMove(event: globalThis.PointerEvent) {
       if (focusTarget || passwordVisible || props.isAuthenticating) return;
 
@@ -102,61 +153,13 @@ export function AuthScreen(props: AuthScreenProps) {
         setPointerTracking(true);
       }
 
-      const bounds = scene.getBoundingClientRect();
-      const centerX = bounds.left + bounds.width / 2;
-      const centerY = bounds.top + bounds.height * 0.42;
-      const horizontalRange = event.clientX >= centerX
-        ? Math.max(window.innerWidth - centerX, 1)
-        : Math.max(centerX, 1);
-      const verticalRange = event.clientY >= centerY
-        ? Math.max(window.innerHeight - centerY, 1)
-        : Math.max(centerY, 1);
-      const x = (event.clientX - centerX) / horizontalRange;
-      const y = (event.clientY - centerY) / verticalRange;
-
-      if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
-      animationFrame.current = window.requestAnimationFrame(() => {
-        scene.style.setProperty("--purple-gaze-x", `${x * 4.8}px`);
-        scene.style.setProperty("--purple-gaze-y", `${y * 3.5}px`);
-        scene.style.setProperty("--dark-gaze-x", `${x * 5.4}px`);
-        scene.style.setProperty("--dark-gaze-y", `${y * 3.9}px`);
-        scene.style.setProperty("--orange-gaze-x", `${x * 3.2}px`);
-        scene.style.setProperty("--orange-gaze-y", `${y * 2.4}px`);
-        scene.style.setProperty("--yellow-eye-x", `${x * 3.3}px`);
-        scene.style.setProperty("--yellow-eye-y", `${y * 2.2}px`);
-        scene.style.setProperty("--body-tilt", `${x * 1.2}deg`);
-        scene.style.setProperty("--purple-head-yaw", `${x * 89}deg`);
-        scene.style.setProperty("--purple-head-pitch", `${y * -18}deg`);
-        scene.style.setProperty("--purple-head-roll", `${x * 7 + y * 3}deg`);
-        scene.style.setProperty("--dark-head-yaw", `${x * 84}deg`);
-        scene.style.setProperty("--dark-head-pitch", `${y * -15}deg`);
-        scene.style.setProperty("--dark-head-roll", `${x * 5 + y * 2}deg`);
-        scene.style.setProperty("--orange-head-yaw", `${x * 50}deg`);
-        scene.style.setProperty("--orange-head-pitch", `${y * -12}deg`);
-        scene.style.setProperty("--orange-head-roll", `${x * 3}deg`);
-        scene.style.setProperty("--yellow-head-yaw", `${x * 88}deg`);
-        scene.style.setProperty("--yellow-head-pitch", `${y * -16}deg`);
-        scene.style.setProperty("--yellow-head-roll", `${x * 8 + y * 2}deg`);
-        const upward = Math.max(0, -y);
-        const downward = Math.max(0, y);
-        const sideways = Math.abs(x);
-
-        scene.style.setProperty("--purple-shift-x", `${x * 30}px`);
-        scene.style.setProperty("--purple-shift-y", `${y * (y < 0 ? 20 : 9)}px`);
-        scene.style.setProperty("--purple-scale-x", `${1 + sideways * 0.08 - upward * 0.035}`);
-        scene.style.setProperty("--purple-scale-y", `${1 + upward * 0.24 - downward * 0.1}`);
-        scene.style.setProperty("--dark-shift-x", `${x * 22}px`);
-        scene.style.setProperty("--dark-shift-y", `${y * (y < 0 ? 16 : 8)}px`);
-        scene.style.setProperty("--dark-scale-x", `${1 + sideways * 0.06}`);
-        scene.style.setProperty("--dark-scale-y", `${1 + upward * 0.17 - downward * 0.07}`);
-        scene.style.setProperty("--orange-shift-x", `${x * 20}px`);
-        scene.style.setProperty("--orange-shift-y", `${y * 7}px`);
-        scene.style.setProperty("--orange-scale-x", `${1 + sideways * 0.13 + downward * 0.05}`);
-        scene.style.setProperty("--orange-scale-y", `${1 + upward * 0.1 - downward * 0.12}`);
-        scene.style.setProperty("--yellow-shift-x", `${x * 17}px`);
-        scene.style.setProperty("--yellow-shift-y", `${y * (y < 0 ? 13 : 7)}px`);
-        scene.style.setProperty("--yellow-scale-y", `${1 + upward * 0.13 - downward * 0.06}`);
-      });
+      pointerTarget.current = { x: event.clientX, y: event.clientY };
+      if (animationFrame.current === null) {
+        if (pointerCurrent.current.x === 0 && pointerCurrent.current.y === 0) {
+          pointerCurrent.current = { x: event.clientX, y: event.clientY };
+        }
+        animationFrame.current = window.requestAnimationFrame(applyPointerFrame);
+      }
     }
 
     function handleWindowBlur() {
@@ -169,6 +172,10 @@ export function AuthScreen(props: AuthScreenProps) {
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("blur", handleWindowBlur);
+      if (animationFrame.current !== null) {
+        window.cancelAnimationFrame(animationFrame.current);
+        animationFrame.current = null;
+      }
     };
   }, [characterEntranceComplete, charactersEnabled, focusTarget, passwordVisible, props.isAuthenticating]);
 
