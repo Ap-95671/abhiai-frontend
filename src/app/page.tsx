@@ -340,7 +340,7 @@ export default function Home() {
   }, [accessToken, pathname, router, sessionResolved]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || socialWorkspace) return;
 
     let active = true;
     api.getModels(accessToken)
@@ -348,6 +348,12 @@ export default function Home() {
       .catch((error: unknown) => {
         if (active && error instanceof ApiError && error.status === 401) handleSessionExpired();
       });
+    return () => { active = false; };
+  }, [accessToken, handleSessionExpired, socialWorkspace]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let active = true;
     api.getCurrentProfile(accessToken)
       .then((profile) => { if (active) setCurrentUser(profile); })
       .catch((error: unknown) => {
@@ -357,7 +363,7 @@ export default function Home() {
   }, [accessToken, handleSessionExpired]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || socialWorkspace) return;
 
     let isCurrent = true;
     queueMicrotask(() => {
@@ -408,7 +414,7 @@ export default function Home() {
     return () => {
       isCurrent = false;
     };
-  }, [accessToken, handleSessionExpired]);
+  }, [accessToken, handleSessionExpired, socialWorkspace]);
 
   async function changeConversationModel(value: string) {
     if (!accessToken || !selectedConversation || isChangingModel) return;
@@ -428,7 +434,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || !socialWorkspace) return;
 
     let isCurrent = true;
     const refreshUnreadCount = () => {
@@ -449,7 +455,7 @@ export default function Home() {
       isCurrent = false;
       window.clearInterval(refreshTimer);
     };
-  }, [accessToken, handleSessionExpired]);
+  }, [accessToken, handleSessionExpired, socialWorkspace]);
 
   useEffect(() => {
     if (!shouldFollowStreamRef.current) return;
@@ -559,8 +565,8 @@ export default function Home() {
     router.replace("/login");
   }
 
-  async function createConversation() {
-    if (!accessToken || createConversationLockRef.current) return;
+  async function createConversation(): Promise<ConversationDetail | null> {
+    if (!accessToken || createConversationLockRef.current) return null;
 
     createConversationLockRef.current = true;
     setIsCreatingConversation(true);
@@ -569,10 +575,12 @@ export default function Home() {
       const conversation = await api.createConversation(accessToken);
       setActiveView("chat");
       setConversations((current) => [conversation, ...current]);
-      await selectConversation(accessToken, conversation.id);
+      const selected = await selectConversation(accessToken, conversation.id);
       setMobileSidebarOpen(false);
+      return selected;
     } catch (error) {
       handleAuthenticatedError(error);
+      return null;
     } finally {
       createConversationLockRef.current = false;
       setIsCreatingConversation(false);
@@ -587,12 +595,23 @@ export default function Home() {
     setConversationDialog(action);
   }
 
-  async function startQuickAction(mode: ComposerMode, draft: string, allowWebSearch = false) {
+  async function startQuickAction(
+    mode: ComposerMode,
+    draft: string,
+    allowWebSearch = false,
+    sendImmediately = false,
+  ) {
+    const content = draft.trim();
     setComposerMode(mode);
     setMessageDraft(draft);
     setWebSearchAllowed(allowWebSearch);
-    await createConversation();
-    window.setTimeout(() => composerTextareaRef.current?.focus(), 80);
+    const conversation = await createConversation();
+    if (!conversation) return;
+    if (sendImmediately && mode === "chat" && content) {
+      await sendTextMessage(conversation, content, allowWebSearch);
+      return;
+    }
+    composerTextareaRef.current?.focus();
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -602,14 +621,13 @@ export default function Home() {
     }
   }
 
-  async function sendMessage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const content = messageDraft.trim();
-    if (!accessToken || !conversationId || !content || isSending || isUploadingAttachment) return;
-    if (composerMode === "image") {
-      await generateImage(content);
-      return;
-    }
+  async function sendTextMessage(
+    targetConversation: ConversationDetail,
+    content: string,
+    allowWebSearch = webSearchAllowed,
+  ) {
+    const targetConversationId = targetConversation.id;
+    if (!accessToken || !content || isSending || isUploadingAttachment) return;
     if (chatAttachments.some((attachment) => attachment.processingStatus !== "READY")) {
       setChatError("Remove failed attachments or wait until processing completes.");
       return;
@@ -619,6 +637,14 @@ export default function Home() {
       return;
     }
 
+    const existingPendingUserMessage = targetConversation.messages.at(-1);
+    const shouldReusePendingUser = Boolean(
+      existingPendingUserMessage
+      && existingPendingUserMessage.role === "USER"
+      && existingPendingUserMessage.id.startsWith("pending-user-")
+      && existingPendingUserMessage.content === content,
+    );
+
     setChatError("");
     setIsSending(true);
     setHasStartedResponding(false);
@@ -627,12 +653,14 @@ export default function Home() {
     streamAbortController.current = abortController;
 
     const pendingTimestamp = new Date().toISOString();
-    const pendingUserMessage: ChatMessage = {
-      id: `pending-user-${pendingTimestamp}`,
-      role: "USER",
-      content,
-      createdAt: pendingTimestamp,
-    };
+    const pendingUserMessage: ChatMessage = shouldReusePendingUser && existingPendingUserMessage
+      ? existingPendingUserMessage
+      : {
+          id: `pending-user-${pendingTimestamp}`,
+          role: "USER",
+          content,
+          createdAt: pendingTimestamp,
+        };
     const pendingAssistantMessage: ChatMessage = {
       id: `pending-assistant-${pendingTimestamp}`,
       role: "ASSISTANT",
@@ -641,14 +669,12 @@ export default function Home() {
     };
 
     setSelectedConversation((current) =>
-      current && current.id === conversationId
+      current && current.id === targetConversationId
         ? {
             ...current,
-            messages: [
-              ...current.messages,
-              pendingUserMessage,
-              pendingAssistantMessage,
-            ],
+            messages: shouldReusePendingUser
+              ? [...current.messages, pendingAssistantMessage]
+              : [...current.messages, pendingUserMessage, pendingAssistantMessage],
           }
         : current,
     );
@@ -656,12 +682,12 @@ export default function Home() {
     try {
       const exchange = await api.sendMessageStream(
         accessToken,
-        conversationId,
+        targetConversationId,
         content,
         (chunk) => {
           setHasStartedResponding(true);
           setSelectedConversation((current) =>
-            current && current.id === conversationId
+            current && current.id === targetConversationId
               ? {
                   ...current,
                   messages: current.messages.map((item) =>
@@ -677,16 +703,16 @@ export default function Home() {
         {
           attachmentIds: chatAttachments.map((attachment) => attachment.id),
           externalProcessingAllowed,
-          webSearchAllowed,
-          selectionMode: selectedConversation.modelSelectionMode,
-          selectedModelId: selectedConversation.preferredModelId,
-          fallbackAllowed: selectedConversation.modelSelectionMode === "AUTO",
+          webSearchAllowed: allowWebSearch,
+          selectionMode: targetConversation.modelSelectionMode,
+          selectedModelId: targetConversation.preferredModelId,
+          fallbackAllowed: targetConversation.modelSelectionMode === "AUTO",
         },
       );
       setChatAttachments([]);
       setExternalProcessingAllowed(false);
       setSelectedConversation((current) =>
-        current && current.id === conversationId
+        current && current.id === targetConversationId
           ? {
               ...current,
               title: exchange.conversation.title,
@@ -701,29 +727,21 @@ export default function Home() {
       );
       setConversations((current) =>
         current
-          .map((item) =>
-            item.id === conversationId
-              ? exchange.conversation
-              : item,
-          )
+          .map((item) => item.id === targetConversationId ? exchange.conversation : item)
           .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)),
       );
     } catch (error) {
       setMessageDraft(content);
       setSelectedConversation((current) =>
-        current && current.id === conversationId
+        current && current.id === targetConversationId
           ? {
               ...current,
-              messages: current.messages.filter(
-                (item) =>
-                  item.id !== pendingUserMessage.id &&
-                  item.id !== pendingAssistantMessage.id,
-              ),
+              messages: current.messages.filter((item) => item.id !== pendingAssistantMessage.id),
             }
           : current,
       );
       if (error instanceof DOMException && error.name === "AbortError") {
-        setChatError("Generation stopped.");
+        setChatError("Generation stopped. Your message is ready to retry.");
       } else {
         handleAuthenticatedError(error);
         void api.getModels(accessToken)
@@ -739,6 +757,17 @@ export default function Home() {
       setHasStartedResponding(false);
       setIsSending(false);
     }
+  }
+
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const content = messageDraft.trim();
+    if (!accessToken || !selectedConversation || !content || isSending || isUploadingAttachment) return;
+    if (composerMode === "image") {
+      await generateImage(content);
+      return;
+    }
+    await sendTextMessage(selectedConversation, content);
   }
 
   async function generateImage(prompt: string) {
@@ -1292,7 +1321,7 @@ export default function Home() {
               <h1>What can I help you with?</h1>
               <p>Ask a question, explore an idea, work with a document, or create something new.</p>
             </div>
-            <form className="home-composer" onSubmit={(event) => { event.preventDefault(); if (messageDraft.trim()) void startQuickAction("chat", messageDraft); }}>
+            <form className="home-composer" onSubmit={(event) => { event.preventDefault(); if (messageDraft.trim()) void startQuickAction("chat", messageDraft, false, true); }}>
               <textarea
                 aria-label="Start a conversation with AbhiAI"
                 onChange={(event) => setMessageDraft(event.target.value)}

@@ -1,0 +1,11 @@
+.backdrop { align-items: center; backdrop-filter: blur(14px); background: rgba(0, 0, 0, .82); display: flex; inset: 0; justify-content: center; padding: 28px; position: fixed; z-index: 1000; }
+.content { display: grid; gap: 12px; justify-items: center; max-height: 100%; max-width: min(1120px, 100%); position: relative; width: 100%; }
+.image { align-items: center; display: flex; justify-content: center; max-height: calc(100vh - 130px); width: 100%; }
+.image :global(img) { border-radius: 14px; box-shadow: 0 24px 80px rgba(0, 0, 0, .55); display: block; max-height: calc(100vh - 130px); max-width: 100%; object-fit: contain; width: auto; }
+.close { align-items: center; background: rgba(20, 20, 22, .9); border: 1px solid rgba(255, 255, 255, .25); border-radius: 50%; color: #fff; cursor: pointer; display: flex; font-size: 1.65rem; height: 42px; justify-content: center; line-height: 1; position: absolute; right: 2px; top: 2px; width: 42px; z-index: 2; }
+.close:focus-visible { outline: 3px solid #8993ff; outline-offset: 3px; }
+.content p { color: rgba(255, 255, 255, .75); font-size: .82rem; margin: 0; }
+@media (max-width: 600px) { .backdrop { padding: 14px; } .close { right: 8px; top: 8px; } }
+@media (prefers-reduced-motion: no-preference) { .backdrop { animation: lightboxIn 180ms ease-out both; } .content { animation: imageIn 220ms cubic-bezier(.2,.8,.2,1) both; } }
+@keyframes lightboxIn { from { opacity: 0; } }
+@keyframes imageIn { from { opacity: 0; transform: scale(.98); } }

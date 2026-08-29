@@ -325,9 +325,9 @@ export function AuthScreen(props: AuthScreenProps) {
 
               {props.authError && <p className={styles.error} role="alert">{props.authError}</p>}
 
-              <button className={styles.submit} disabled={props.isAuthenticating} type="submit">
+              <button aria-busy={props.isAuthenticating} className={styles.submit} disabled={props.isAuthenticating} type="submit">
                 <span>{props.isAuthenticating ? "Connecting…" : isLogin ? "Log in" : "Create account"}</span>
-                <b aria-hidden="true">{props.isAuthenticating ? "· · ·" : "→"}</b>
+                {props.isAuthenticating ? <i aria-hidden="true" className={styles.submitSpinner}/> : <b aria-hidden="true">→</b>}
               </button>
             </form>
 

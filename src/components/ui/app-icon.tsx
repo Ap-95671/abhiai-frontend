@@ -24,6 +24,7 @@ export type AppIconName =
   | "reply"
   | "repost"
   | "search"
+  | "share"
   | "send"
   | "social"
   | "story"
@@ -55,6 +56,7 @@ const paths: Record<AppIconName, ReactNode> = {
   reply: <path d="m9 8-5 4 5 4v-3h4.5c3 0 5 1.5 6.5 4.5-.5-5-2.7-7.5-6.5-7.5H9V8Z"/>,
   repost: <><path d="m17 3 4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3"/></>,
   search: <><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></>,
+  share: <><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></>,
   send: <><path d="m4 12 16-8-5 16-3-6-8-2Z"/><path d="m12 14 8-10"/></>,
   social: <><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></>,
   story: <><circle cx="12" cy="12" r="8"/><path d="M9 9.5 15.5 12 9 14.5v-5Z"/></>,

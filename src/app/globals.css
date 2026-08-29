@@ -441,6 +441,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .no-replies { color: #98a2b3; font-size: .76rem; margin: 14px 2px 0; }
 
 .profile-cover { background: linear-gradient(125deg, #dce4ff, #99acf7 55%, #546fd8); height: 220px; overflow:hidden;position:relative}.profile-cover-image{height:100%;object-fit:cover;width:100%}
+.profile-cover-button, .profile-avatar-button { background: transparent; border: 0; cursor: zoom-in; display: block; height: 100%; padding: 0; width: 100%; }
+.profile-cover-button:focus-visible, .profile-avatar-button:focus-visible { outline: 3px solid var(--blue); outline-offset: -4px; }
+.profile-avatar-button { border-radius: 50%; overflow: hidden; }
 .profile-page { margin: -57px auto 0; max-width: 850px; padding: 0 35px 60px; position: relative; width: 100%; }
 .profile-hero { align-items: flex-end; display: flex; justify-content: space-between; }
 .profile-large-avatar { align-items: center; background: #e3e8ff center/cover; border: 5px solid #f7f8fc; border-radius: 50%; color: #3650b5; display: flex; font-size: 1.55rem; font-weight: 850; height: 114px; justify-content: center; width: 114px; }
@@ -496,11 +499,16 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .story-composer-preview { align-items: center; border-radius: 13px; color: #fff; display: flex; justify-content: center; min-height: 190px; overflow: hidden; padding: 14px; text-align: center; }
 .story-composer-preview p { font-size: .92rem; font-weight: 750; line-height: 1.45; margin: 0; overflow-wrap: anywhere; }
 .story-composer-preview span { font-size: .78rem; font-weight: 750; }
+.story-composer-preview img, .story-composer-preview video { height: 100%; inset: 0; object-fit: cover; position: absolute; width: 100%; }
+.story-composer-preview { position: relative; }
 .story-composer-fields { display: flex; flex-direction: column; gap: 12px; }
 .story-composer-fields textarea { border: 1px solid #d8deeb; border-radius: 10px; color: var(--ink); line-height: 1.5; padding: 12px; resize: vertical; }
 .story-color-picker { display: flex; gap: 8px; }
 .story-color-picker button { border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #d4d9e5; height: 25px; width: 25px; }
 .story-color-picker button.selected { box-shadow: 0 0 0 2px var(--blue); }
+.story-type-picker { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 3px; grid-template-columns: repeat(3, 1fr); padding: 3px; }
+.story-type-picker button { background: transparent; border: 0; border-radius: 7px; color: var(--muted); font-size: .72rem; font-weight: 750; padding: 8px; text-transform: capitalize; }
+.story-type-picker button[aria-pressed="true"] { background: var(--ink); color: var(--canvas); }
 .story-composer-actions { align-items: center; border-top: 1px solid #edf0f5; display: flex; gap: 11px; margin-top: auto; padding-top: 12px; }
 .story-composer-actions > span { color: #98a2b3; font-size: .7rem; margin-left: auto; }
 .story-remove-media { background: transparent; border: 0; color: var(--danger); font-size: .7rem; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1434,7 +1442,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
 .post-options-menu button:hover { background: var(--surface-hover); color: var(--ink); }
 .post-options-menu .danger-menu-item { color: var(--danger); }
 .social-post-content { color: var(--ink); line-height: 1.65; margin: 15px 0; }
-.social-actions { border-color: var(--line); gap: 8px; padding-top: 10px; }
+.social-actions { border-color: var(--line); gap: 6px; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-top: 10px; }
 .social-actions button {
   align-items: center;
   border-radius: 9px;
@@ -1446,6 +1454,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
 }
 .social-actions button svg { height: 18px; width: 18px; }
 .social-actions button span { font-size: .72rem; margin: 0; }
+.social-actions button small { color: inherit; font-size: .66rem; margin-left: 2px; opacity: .72; }
 .social-actions button:hover,
 .social-actions button.selected { background: var(--surface-hover); color: var(--blue); }
 
@@ -1486,5 +1495,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
   .poll-composer,
   .composer-image-list { grid-column: 1 / -1; }
   .social-post { border-left: 0; border-radius: 0; border-right: 0; padding: 15px 14px 10px; }
+  .social-actions button span { font-size: 0; }
+  .social-actions button span small { font-size: .66rem; }
   .visibility-pill { display: none; }
 }

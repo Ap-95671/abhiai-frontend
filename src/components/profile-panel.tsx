@@ -7,6 +7,7 @@ import { api, ApiError, PageResponse, PostSearchResult, ProfileReply, ProfileUpd
 import { AuthenticatedImage } from "@/components/authenticated-image";
 import { PostAttachment } from "@/components/post-attachment";
 import { ReportButton } from "@/components/report-button";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 
 type ProfilePanelProps = { accessToken: string; username?: string; onUnauthorized: () => void };
 type ProfileTab = "posts" | "replies" | "media" | "likes";
@@ -33,6 +34,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
   const [postPage, setPostPage] = useState<PageResponse<PostSearchResult> | null>(null);
   const [replyPage, setReplyPage] = useState<PageResponse<ProfileReply> | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [lightbox, setLightbox] = useState<"profile" | "cover" | null>(null);
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true); setError("");
@@ -136,11 +138,18 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
   if (!profile) return <section className="workspace-view"><div className="workspace-content">{error && <p className="inline-error">{error}</p>}</div></section>;
   const ownProfile = profile.id === currentUserId;
 
+  const coverImage = profile.coverMediaId
+    ? <AuthenticatedImage accessToken={accessToken} alt={`${profile.displayName} cover`} className="profile-cover-image" mediaId={profile.coverMediaId}/>
+    : profile.coverPicture ? <img alt={`${profile.displayName} cover`} className="profile-cover-image" src={profile.coverPicture}/> : null;
+  const profileImage = profile.profileMediaId
+    ? <AuthenticatedImage accessToken={accessToken} alt={profile.displayName} className="profile-avatar-image" mediaId={profile.profileMediaId}/>
+    : profile.profilePicture ? <img alt={profile.displayName} className="profile-avatar-image" src={profile.profilePicture}/> : null;
+
   return <section className="workspace-view" aria-labelledby="profile-title">
-    <div className="profile-cover">{profile.coverMediaId ? <AuthenticatedImage accessToken={accessToken} alt={`${profile.displayName} cover`} className="profile-cover-image" mediaId={profile.coverMediaId}/> : profile.coverPicture ? <img alt={`${profile.displayName} cover`} className="profile-cover-image" src={profile.coverPicture}/> : null}</div>
+    <div className="profile-cover">{coverImage && <button aria-label={`View ${profile.displayName}'s cover photo`} className="profile-cover-button" onClick={() => setLightbox("cover")} type="button">{coverImage}</button>}</div>
     <div className="profile-page">
       <div className="profile-hero">
-        <div className="profile-large-avatar">{profile.profileMediaId ? <AuthenticatedImage accessToken={accessToken} alt={profile.displayName} className="profile-avatar-image" mediaId={profile.profileMediaId}/> : profile.profilePicture ? <img alt={profile.displayName} className="profile-avatar-image" src={profile.profilePicture}/> : initials(profile.displayName)}</div>
+        <div className="profile-large-avatar">{profileImage ? <button aria-label={`View ${profile.displayName}'s profile photo`} className="profile-avatar-button" onClick={() => setLightbox("profile")} type="button">{profileImage}</button> : initials(profile.displayName)}</div>
         {ownProfile ? <div className="profile-actions"><button className="secondary-button" onClick={() => setEditing(!editing)} type="button">{editing ? "Cancel" : "Edit profile"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void togglePrivacy()} type="button">{profile.accountPrivacy === "PRIVATE" ? "Make public" : "Make private"}</button></div> : <div className="profile-actions"><button className={following ? "secondary-button" : "primary-button"} disabled={isSaving || blockedByMe} onClick={() => void toggleFollow()} type="button">{following ? "Following" : "Follow"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void toggleMute()} type="button">{muteId ? "Unmute" : "Mute"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void toggleBlock()} type="button">{blockedByMe ? "Unblock" : "Block"}</button><ReportButton accessToken={accessToken} className="secondary-button" onUnauthorized={onUnauthorized} targetId={profile.id} targetType="USER"/></div>}
       </div>
       <h1 id="profile-title">{profile.displayName}{profile.verifiedStatus !== "NONE" && <span className="verified-badge">✓</span>}</h1>
@@ -176,5 +185,11 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
           </>}
       </div>}
     </div>
+    <ImageLightbox onClose={() => setLightbox(null)} open={lightbox === "cover"} title={`${profile.displayName}'s cover photo`}>
+      {profile.coverMediaId ? <AuthenticatedImage accessToken={accessToken} alt={`${profile.displayName} cover`} mediaId={profile.coverMediaId}/> : profile.coverPicture ? <img alt={`${profile.displayName} cover`} src={profile.coverPicture}/> : null}
+    </ImageLightbox>
+    <ImageLightbox onClose={() => setLightbox(null)} open={lightbox === "profile"} title={`${profile.displayName}'s profile photo`}>
+      {profile.profileMediaId ? <AuthenticatedImage accessToken={accessToken} alt={profile.displayName} mediaId={profile.profileMediaId}/> : profile.profilePicture ? <img alt={profile.displayName} src={profile.profilePicture}/> : null}
+    </ImageLightbox>
   </section>;
 }

@@ -154,6 +154,7 @@ function FeedPost({ accessToken, currentUserId, onDelete, onError, onUnauthorize
   const [replies, setReplies] = useState<PostReply[]>([]); const [replyDraft, setReplyDraft] = useState(""); const [showReplies, setShowReplies] = useState(false); const [busy, setBusy] = useState("");
   const [poll, setPoll] = useState<Poll | null>(post.poll);
   const [postMenuOpen, setPostMenuOpen] = useState(false);
+  const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
   const postMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -202,12 +203,33 @@ function FeedPost({ accessToken, currentUserId, onDelete, onError, onUnauthorize
 
   async function toggle(kind: "like" | "repost" | "bookmark") {
     setBusy(kind); onError("");
+    const previousLiked = liked; const previousReposted = reposted; const previousBookmarked = bookmarked;
+    const previousLikeCount = likeCount; const previousRepostCount = repostCount;
+    if (kind === "like") { setLiked(!liked); setLikeCount((count) => Math.max(0, count + (liked ? -1 : 1))); }
+    if (kind === "repost") { setReposted(!reposted); setRepostCount((count) => Math.max(0, count + (reposted ? -1 : 1))); }
+    if (kind === "bookmark") setBookmarked(!bookmarked);
     try {
-      if (kind === "like") { await api.setLike(accessToken, post.id, !liked); setLiked(!liked); setLikeCount((n) => n + (liked ? -1 : 1)); }
-      if (kind === "repost") { await api.setRepost(accessToken, post.id, !reposted); setReposted(!reposted); setRepostCount((n) => n + (reposted ? -1 : 1)); }
-      if (kind === "bookmark") { await api.setBookmark(accessToken, post.id, !bookmarked); setBookmarked(!bookmarked); }
-    } catch (actionError) { if (actionError instanceof ApiError && actionError.status === 401) return onUnauthorized(); onError(actionError instanceof Error ? actionError.message : "The action could not be completed."); }
+      if (kind === "like") await api.setLike(accessToken, post.id, !previousLiked);
+      if (kind === "repost") await api.setRepost(accessToken, post.id, !previousReposted);
+      if (kind === "bookmark") await api.setBookmark(accessToken, post.id, !previousBookmarked);
+    } catch (actionError) {
+      setLiked(previousLiked); setReposted(previousReposted); setBookmarked(previousBookmarked);
+      setLikeCount(previousLikeCount); setRepostCount(previousRepostCount);
+      if (actionError instanceof ApiError && actionError.status === 401) return onUnauthorized();
+      onError(actionError instanceof Error ? actionError.message : "The action could not be completed.");
+    }
     finally { setBusy(""); }
+  }
+
+  async function sharePost() {
+    const url = `${window.location.origin}/social#post-${post.id}`;
+    try {
+      if (navigator.share) await navigator.share({ title: `${post.author.displayName} on AbhiAI`, text: post.textContent, url });
+      else { await navigator.clipboard.writeText(url); setShareStatus("copied"); window.setTimeout(() => setShareStatus("idle"), 1800); }
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+      onError("This post link could not be shared. Please try again.");
+    }
   }
 
   async function openReplies() {
@@ -223,7 +245,7 @@ function FeedPost({ accessToken, currentUserId, onDelete, onError, onUnauthorize
     finally { setBusy(""); }
   }
 
-  return <article className="social-post">
+  return <article className="social-post" id={`post-${post.id}`}>
     <div className="social-post-head">
       <button aria-label={`View ${post.author.displayName}'s profile`} className="avatar-button" onClick={() => onViewProfile(post.author.username)} type="button"><span className="profile-avatar small-avatar">{initials(post.author.displayName)}</span></button>
       <button className="author-button" onClick={() => onViewProfile(post.author.username)} type="button"><strong>{post.author.displayName}</strong><span>@{post.author.username} · {relativeDate(post.createdAt)}</span></button>
@@ -241,10 +263,11 @@ function FeedPost({ accessToken, currentUserId, onDelete, onError, onUnauthorize
     {post.media?.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((media)=><PostAttachment accessToken={accessToken} asset={media} key={media.id}/>)}</div>}
     {poll && <div className="post-poll" aria-label="Poll">{poll.choices.map((choice) => { const percent = poll.totalVotes ? Math.round(choice.voteCount * 100 / poll.totalVotes) : 0; return <button className={poll.selectedChoiceId === choice.id ? "selected" : ""} disabled={busy === "poll" || poll.expired || Boolean(poll.selectedChoiceId)} key={choice.id} onClick={() => void vote(choice.id)} type="button"><span className="poll-fill" style={{ width: `${percent}%` }}/><strong>{choice.text}</strong><small>{poll.selectedChoiceId || poll.expired ? `${percent}%` : "Vote"}</small></button>; })}<p>{poll.totalVotes} {poll.totalVotes === 1 ? "vote" : "votes"} · {poll.expired ? "Ended" : `Ends ${pollTimeLeft(poll.expiresAt)}`}</p></div>}
     <div className="social-actions">
-      <button aria-label={`${liked ? "Unlike" : "Like"} post`} className={liked ? "selected like" : ""} disabled={busy === "like"} onClick={() => void toggle("like")} title="Like" type="button"><AppIcon name="heart"/><span>{likeCount}</span></button>
-      <button aria-label="View replies" className={showReplies ? "selected" : ""} onClick={() => void openReplies()} title="Reply" type="button"><AppIcon name="reply"/><span>{replyCount}</span></button>
-      <button aria-label={`${reposted ? "Undo repost" : "Repost"}`} className={reposted ? "selected repost" : ""} disabled={busy === "repost"} onClick={() => void toggle("repost")} title="Repost" type="button"><AppIcon name="repost"/><span>{repostCount}</span></button>
-      <button aria-label={`${bookmarked ? "Remove bookmark" : "Bookmark post"}`} className={bookmarked ? "selected bookmark" : ""} disabled={busy === "bookmark"} onClick={() => void toggle("bookmark")} title="Bookmark" type="button"><AppIcon name="bookmark"/></button>
+      <button aria-label={`${liked ? "Unlike" : "Like"} post`} className={liked ? "selected like" : ""} disabled={busy === "like"} onClick={() => void toggle("like")} title="Like" type="button"><AppIcon name="heart"/><span>Like <small>{likeCount}</small></span></button>
+      <button aria-label="View comments" className={showReplies ? "selected" : ""} onClick={() => void openReplies()} title="Comment" type="button"><AppIcon name="reply"/><span>Comment <small>{replyCount}</small></span></button>
+      <button aria-label={`${reposted ? "Undo repost" : "Repost"}`} className={reposted ? "selected repost" : ""} disabled={busy === "repost"} onClick={() => void toggle("repost")} title="Repost" type="button"><AppIcon name="repost"/><span>Repost <small>{repostCount}</small></span></button>
+      <button aria-label="Share post" onClick={() => void sharePost()} title="Share" type="button"><AppIcon name="share"/><span>{shareStatus === "copied" ? "Copied" : "Share"}</span></button>
+      <button aria-label={`${bookmarked ? "Remove bookmark" : "Bookmark post"}`} className={bookmarked ? "selected bookmark" : ""} disabled={busy === "bookmark"} onClick={() => void toggle("bookmark")} title="Bookmark" type="button"><AppIcon name="bookmark"/><span>Save</span></button>
     </div>
     {showReplies && <div className="replies-panel"><form className="reply-form" onSubmit={reply}><input aria-label="Write a reply" maxLength={1000} onChange={(event) => setReplyDraft(event.target.value)} placeholder="Write a reply…" value={replyDraft}/><button disabled={!replyDraft.trim() || busy === "reply"} type="submit">Reply</button></form>{replies.length === 0 ? <p className="no-replies">No replies yet.</p> : replies.map((item) => <div className="reply-item" key={item.id}><strong>{item.author.displayName}</strong><span>@{item.author.username} · {relativeDate(item.createdAt)}</span>{currentUserId!==item.author.id&&<ReportButton accessToken={accessToken} onUnauthorized={onUnauthorized} targetContext="POST_REPLY" targetId={item.id} targetType="COMMENT"/>}<p>{item.textContent}</p></div>)}</div>}
   </article>;

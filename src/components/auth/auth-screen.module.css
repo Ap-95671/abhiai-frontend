@@ -248,6 +248,8 @@
 .submit:hover:not(:disabled) { box-shadow: 0 10px 25px rgba(121, 56, 255, 0.2); transform: translateY(-1px); }
 .submit:disabled { cursor: wait; opacity: 0.62; }
 .submit b { font-size: 1rem; position: absolute; right: 17px; }
+.submitSpinner { animation: submitSpin 720ms linear infinite; border: 2px solid color-mix(in srgb, var(--auth-bg) 28%, transparent); border-radius: 50%; border-top-color: var(--auth-bg); height: 16px; position: absolute; right: 17px; width: 16px; }
+@keyframes submitSpin { to { transform: rotate(360deg); } }
 
 .switchMode { color: var(--auth-muted); font-size: 0.66rem; margin: 36px 0 0; text-align: center; }
 .switchMode button { background: transparent; border: 0; color: var(--auth-accent-soft); font-size: inherit; font-weight: 800; margin-left: 5px; padding: 3px; }
@@ -803,6 +805,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .submitSpinner { animation-duration: 1.6s; }
   .introOverlay { display: none; }
   .characterSlot,
   .characterEye { animation: none; }

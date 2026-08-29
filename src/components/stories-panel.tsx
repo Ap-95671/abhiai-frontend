@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- blob-backed local previews cannot use next/image */
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -31,6 +32,8 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
   const [draft, setDraft] = useState("");
   const [background, setBackground] = useState(BACKGROUNDS[0]);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [storyMode, setStoryMode] = useState<"text" | "image" | "video">("text");
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState("");
@@ -60,6 +63,24 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
   }, [load]);
 
   useEffect(() => {
+    if (!mediaFile) { queueMicrotask(() => setMediaPreviewUrl("")); return; }
+    const url = URL.createObjectURL(mediaFile);
+    queueMicrotask(() => setMediaPreviewUrl(url));
+    return () => URL.revokeObjectURL(url);
+  }, [mediaFile]);
+
+  useEffect(() => {
+    if (selectedIndex === null) return;
+    const navigate = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedIndex(null);
+      if (event.key === "ArrowLeft") setSelectedIndex((index) => index === null ? null : Math.max(0, index - 1));
+      if (event.key === "ArrowRight") setSelectedIndex((index) => index === null ? null : Math.min(stories.length - 1, index + 1));
+    };
+    document.addEventListener("keydown", navigate);
+    return () => document.removeEventListener("keydown", navigate);
+  }, [selectedIndex, stories.length]);
+
+  useEffect(() => {
     if (!selected || selected.viewedByCurrentUser) return;
     let active = true;
     void api.recordStoryView(accessToken, selected.id).then((result) => {
@@ -75,7 +96,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
 
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if ((!draft.trim() && !mediaFile) || isPublishing) return;
+    if ((storyMode === "text" ? !draft.trim() : !mediaFile) || isPublishing) return;
     setIsPublishing(true);
     setError("");
     let uploadedId = "";
@@ -85,6 +106,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
       setStories((current) => [story, ...current]);
       setDraft("");
       setMediaFile(null);
+      setStoryMode("text");
     } catch (publishError) {
       if (uploadedId) await api.deleteMedia(accessToken, uploadedId).catch(() => undefined);
       if (publishError instanceof ApiError && publishError.status === 401) return onUnauthorized();
@@ -128,18 +150,21 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
       <div className="workspace-content stories-workspace">
         <form className="story-composer" onSubmit={publish}>
           <div className="story-composer-preview" style={{ background }}>
-            {mediaFile ? <span>{mediaFile.type.startsWith("video/") ? "▶ Video ready" : "▧ Image ready"}</span> : <p>{draft || "Your story preview"}</p>}
+            {mediaPreviewUrl && storyMode === "image" ? <img alt="Story preview" src={mediaPreviewUrl}/> : mediaPreviewUrl && storyMode === "video" ? <video aria-label="Story video preview" muted playsInline src={mediaPreviewUrl}/> : <p>{draft || "Your story preview"}</p>}
           </div>
           <div className="story-composer-fields">
-            <textarea maxLength={500} onChange={(event) => setDraft(event.target.value)} placeholder="Add text or a caption…" rows={3} value={draft} />
-            <div className="story-color-picker" aria-label="Story background color">
-              {BACKGROUNDS.map((color) => <button aria-label={`Use ${color}`} className={background === color ? "selected" : ""} key={color} onClick={() => setBackground(color)} style={{ background: color }} type="button" />)}
+            <div aria-label="Story type" className="story-type-picker" role="group">
+              {(["text", "image", "video"] as const).map((mode) => <button aria-pressed={storyMode === mode} key={mode} onClick={() => { setStoryMode(mode); setMediaFile(null); }} type="button">{mode}</button>)}
             </div>
+            <textarea maxLength={500} onChange={(event) => setDraft(event.target.value)} placeholder="Add text or a caption…" rows={3} value={draft} />
+            {storyMode === "text" && <div className="story-color-picker" aria-label="Story background color">
+              {BACKGROUNDS.map((color) => <button aria-label={`Use ${color}`} className={background === color ? "selected" : ""} key={color} onClick={() => setBackground(color)} style={{ background: color }} type="button" />)}
+            </div>}
             <div className="story-composer-actions">
-              <label className="image-picker">＋ Image or video<input accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm" disabled={isPublishing} onChange={(event) => { setMediaFile(event.target.files?.[0] ?? null); event.target.value = ""; }} type="file" /></label>
+              {storyMode !== "text" && <label className="image-picker">＋ Choose {storyMode}<input accept={storyMode === "image" ? "image/jpeg,image/png,image/gif,image/webp" : "video/mp4,video/webm"} disabled={isPublishing} onChange={(event) => { setMediaFile(event.target.files?.[0] ?? null); event.target.value = ""; }} type="file" /></label>}
               {mediaFile && <button className="story-remove-media" onClick={() => setMediaFile(null)} type="button">Remove {mediaFile.name}</button>}
               <span>{draft.length}/500</span>
-              <button className="story-publish" disabled={(!draft.trim() && !mediaFile) || isPublishing} type="submit">{isPublishing ? "Sharing…" : "Share story"}</button>
+              <button className="story-publish" disabled={(storyMode === "text" ? !draft.trim() : !mediaFile) || isPublishing} type="submit">{isPublishing ? "Sharing…" : "Share story"}</button>
             </div>
           </div>
         </form>
@@ -155,7 +180,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
         ))}</div>}
       </div>
       {selected && selectedIndex !== null && (
-        <div className="story-viewer-backdrop" role="dialog" aria-modal="true" aria-label={`${selected.author.displayName}'s story`}>
+        <div className="story-viewer-backdrop" role="dialog" aria-modal="true" aria-label={`${selected.author.displayName}'s story`} onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedIndex(null); }}>
           <div className="story-viewer" style={{ background: selected.backgroundColor }}>
             <div className="story-progress"><span /></div>
             <header><button className="story-viewer-author" onClick={() => onViewProfile(selected.author.username)} type="button"><span className="profile-avatar small-avatar">{initials(selected.author.displayName)}</span><span><strong>{selected.author.displayName}</strong><small>@{selected.author.username} · {timeLeft(selected.expiresAt)}</small></span></button>{profile?.id === selected.author.id && <button className="story-delete" onClick={() => void removeSelectedStory()} type="button">Delete</button>}<button className="story-close" onClick={() => setSelectedIndex(null)} type="button" aria-label="Close story">×</button></header>
