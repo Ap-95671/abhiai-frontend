@@ -14,7 +14,9 @@ export const creator = {
   highlights: ["Developer", "Computer Science", "AI & Software", "Building AbhiAI"],
   links: {
     github: "https://github.com/Ap-95671",
-    linkedin: "",
+    linkedin: "https://www.linkedin.com/in/abhishek-prajapati-tech",
+    youtube: "https://www.youtube.com/@abhishek-prajapati-tech",
+    x: "https://x.com/AbhishekPr8010",
     portfolio: "",
     email: "",
   },
@@ -30,6 +32,8 @@ type CreatorLink = {
 const creatorLinks = ([
   { external: true, href: creator.links.github, icon: "github", label: "GitHub" },
   { external: true, href: creator.links.linkedin, icon: "linkedin", label: "LinkedIn" },
+  { external: true, href: creator.links.youtube, icon: "youtube", label: "YouTube" },
+  { external: true, href: creator.links.x, icon: "x", label: "X" },
   { external: true, href: creator.links.portfolio, icon: "globe", label: "Portfolio" },
   { external: false, href: creator.links.email ? `mailto:${creator.links.email}` : "", icon: "message", label: "Email" },
 ] satisfies CreatorLink[]).filter(({ href }) => Boolean(href));

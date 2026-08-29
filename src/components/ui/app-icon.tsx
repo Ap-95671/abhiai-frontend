@@ -32,7 +32,9 @@ export type AppIconName =
   | "story"
   | "sun"
   | "moon"
-  | "video";
+  | "video"
+  | "x"
+  | "youtube";
 
 const paths: Record<AppIconName, ReactNode> = {
   ai: <><path d="M12 2.75 14.1 8l5.15 2.1L14.1 12.2 12 17.25 9.9 12.2 4.75 10.1 9.9 8 12 2.75Z"/><path d="m18.2 16 .8 2 .8-2 2-.8-2-.8-.8-2-.8 2-2 .8 2 .8Z"/></>,
@@ -67,6 +69,8 @@ const paths: Record<AppIconName, ReactNode> = {
   sun: <><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></>,
   moon: <path d="M20.2 15.2A8.2 8.2 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"/>,
   video: <><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-2v8l-4-2"/></>,
+  x: <><path d="M4 4l16 16M20 4 4 20"/></>,
+  youtube: <><path d="M21 12c0 2.2-.2 4.2-.5 5.2a2.7 2.7 0 0 1-1.9 1.9c-1.5.4-6.6.4-6.6.4s-5.1 0-6.6-.4a2.7 2.7 0 0 1-1.9-1.9C3.2 16.2 3 14.2 3 12s.2-4.2.5-5.2a2.7 2.7 0 0 1 1.9-1.9C6.9 4.5 12 4.5 12 4.5s5.1 0 6.6.4a2.7 2.7 0 0 1 1.9 1.9c.3 1 .5 3 .5 5.2Z"/><path d="m10 9 5 3-5 3V9Z"/></>,
 };
 
 export function AppIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name: AppIconName }) {
