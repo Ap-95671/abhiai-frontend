@@ -14,7 +14,9 @@ export type AppIconName =
   | "image"
   | "bookmark"
   | "globe"
+  | "github"
   | "heart"
+  | "linkedin"
   | "menu"
   | "message"
   | "more"
@@ -46,7 +48,9 @@ const paths: Record<AppIconName, ReactNode> = {
   image: <><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 2-2 5 5"/></>,
   bookmark: <path d="M6 4.5h12v16l-6-4-6 4v-16Z"/>,
   globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21M12 3c-2.4 2.5-3.6 5.5-3.6 9S9.6 18.5 12 21"/></>,
+  github: <><path d="M15 22v-3.9c.04-1-.35-1.95-1.1-2.6 3.6-.4 7.4-1.75 7.4-8a6.25 6.25 0 0 0-1.65-4.35A5.8 5.8 0 0 0 19.5 1s-1.3-.4-4.5 1.65a15.4 15.4 0 0 0-8 0C3.8.6 2.5 1 2.5 1a5.8 5.8 0 0 0-.15 2.15A6.25 6.25 0 0 0 .7 7.5c0 6.25 3.8 7.6 7.4 8-.74.64-1.13 1.58-1.1 2.6V22"/><path d="M7 19c-3 .9-3-1.5-4.2-2"/></>,
   heart: <path d="M20.8 5.8a5.2 5.2 0 0 0-7.4 0L12 7.2l-1.4-1.4a5.2 5.2 0 0 0-7.4 7.4L12 22l8.8-8.8a5.2 5.2 0 0 0 0-7.4Z"/>,
+  linkedin: <><rect height="18" rx="2" width="18" x="3" y="3"/><path d="M8 11v6M8 8v.01M12 17v-6M12 13.5c.7-1.65 4-1.8 4 1.2V17"/></>,
   menu: <><path d="M4 7h16M4 12h16M4 17h16"/></>,
   message: <><path d="M4 5h16v12H8l-4 4V5Z"/></>,
   more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,

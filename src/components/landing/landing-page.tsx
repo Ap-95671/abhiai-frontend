@@ -6,6 +6,7 @@ import { FormEvent, useState } from "react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Reveal } from "@/components/motion/reveal";
 import { ScrollMotion } from "@/components/motion/scroll-motion";
+import { CreatorSection } from "@/components/landing/creator-section";
 
 import styles from "./landing-page.module.css";
 
@@ -148,6 +149,8 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
         <h2>One place to think,<br />create, and connect.</h2>
         <div><button className={styles.lightButton} onClick={() => onStart()} type="button">Start with AbhiAI</button><a href="#product">Explore the product</a></div>
       </Reveal>
+
+      <CreatorSection />
 
       <footer className={styles.footer}>
         <Reveal><a className={styles.brand} href="#top"><span><Image alt="" height={38} src="/abhiai-logo.png" width={38} /></span>AbhiAI</a><p>Intelligence for the way we think, create, and connect.</p></Reveal>
