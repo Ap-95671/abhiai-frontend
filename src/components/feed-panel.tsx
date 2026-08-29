@@ -7,6 +7,7 @@ import { PostAttachment } from "@/components/post-attachment";
 import { RichPostText } from "@/components/rich-post-text";
 import { ReportButton } from "@/components/report-button";
 import { AppIcon } from "@/components/ui/app-icon";
+import { NewsBrief } from "@/components/news/news-brief";
 
 type FeedPanelProps = {
   accessToken: string;
@@ -115,7 +116,8 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
       <header className="workspace-header">
         <div><p className="eyebrow">Social</p><h1 id="feed-title">Home feed</h1><p>Share ideas and see what your network is building.</p></div>
       </header>
-      <div className="workspace-content feed-workspace">
+      <div className="workspace-content feed-hub">
+        <div className="feed-workspace">
         <form className="post-composer" onSubmit={publish}>
           <div className="profile-avatar" aria-hidden="true">{profile ? initials(profile.displayName) : "A"}</div>
           <textarea aria-label="Create a social post" maxLength={1000} onChange={(event) => setDraft(event.target.value)} placeholder="Share an idea, update, or question…" rows={3} value={draft} />
@@ -140,6 +142,8 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
           {posts.map((post) => <FeedPost accessToken={accessToken} currentUserId={profile?.id} key={post.id} onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
         </div>
         {page && !page.last && <button className="load-more-button" disabled={isLoading} onClick={() => void loadFeed(page.page + 1, true)} type="button">{isLoading ? "Loading…" : "Load more posts"}</button>}
+        </div>
+        <NewsBrief accessToken={accessToken} onUnauthorized={onUnauthorized} />
       </div>
     </section>
   );

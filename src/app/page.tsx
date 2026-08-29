@@ -23,6 +23,7 @@ import { StoriesPanel } from "@/components/stories-panel";
 import { HashtagPanel } from "@/components/hashtag-panel";
 import { ArticlesPanel } from "@/components/articles-panel";
 import { CreatorDashboard } from "@/components/creator-dashboard";
+import { NewsPanel } from "@/components/news/news-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
@@ -36,6 +37,7 @@ import {
   ModelOption,
   UserProfile,
 } from "@/lib/api";
+import { NEWS_CHAT_PROMPT_STORAGE_KEY } from "@/lib/news";
 
 const TOKEN_STORAGE_KEY = "abhiai.access-token";
 const SESSION_TOKEN_STORAGE_KEY = "abhiai.session-access-token";
@@ -44,7 +46,7 @@ const ACTIVE_CONVERSATION_STORAGE_KEY = "abhiai.active-conversation-id";
 
 type AuthMode = "login" | "register";
 type GuestView = "landing" | "auth";
-type ActiveView = "chat" | "feed" | "explore" | "communities" | "articles" | "creator" | "messages" | "stories" | "videos" | "hashtags" | "search" | "notifications" | "profile";
+type ActiveView = "chat" | "feed" | "news" | "explore" | "communities" | "articles" | "creator" | "messages" | "stories" | "videos" | "hashtags" | "search" | "notifications" | "profile";
 type ComposerMode = "chat" | "image";
 type AttachmentUploadState = {
   filename: string;
@@ -57,6 +59,7 @@ type ConversationGroup = { label: string; items: ConversationSummary[] };
 const socialNavigation: Array<{ view: ActiveView; label: string; icon: AppIconName }> = [
   { view: "feed", label: "Feed", icon: "feed" },
   { view: "explore", label: "Explore", icon: "explore" },
+  { view: "news", label: "News", icon: "globe" },
   { view: "communities", label: "Communities", icon: "community" },
   { view: "articles", label: "Articles", icon: "article" },
   { view: "creator", label: "Creator Studio", icon: "create" },
@@ -174,9 +177,10 @@ export default function Home() {
   const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [accountMenuStyle, setAccountMenuStyle] = useState<CSSProperties>();
   const shouldFollowStreamRef = useRef(true);
+  const pendingNewsPromptStartedRef = useRef(false);
 
   const conversationId = selectedConversation?.id;
-  const socialWorkspace = pathname === "/social";
+  const socialWorkspace = pathname === "/social" || pathname === "/news";
   const sortedMessages = useMemo(
     () => selectedConversation?.messages ?? [],
     [selectedConversation],
@@ -289,7 +293,7 @@ export default function Home() {
   const handleSessionExpired = useCallback(() => {
     setGuestView("auth");
     expireSession("Your session has expired. Please sign in again.");
-    router.replace(`/login?next=${encodeURIComponent(pathname === "/social" ? "/social" : "/chat")}`);
+    router.replace(`/login?next=${encodeURIComponent(pathname === "/news" ? "/news" : pathname === "/social" ? "/social" : "/chat")}`);
   }, [expireSession, pathname, router]);
 
   const viewProfile = useCallback((username?: string) => {
@@ -322,6 +326,8 @@ export default function Home() {
         }
         if (pathname === "/social") {
           setActiveView((current) => current === "chat" ? "feed" : current);
+        } else if (pathname === "/news") {
+          setActiveView("news");
         } else if (pathname === "/chat") {
           setActiveView("chat");
         }
@@ -330,7 +336,7 @@ export default function Home() {
 
       if (pathname === "/login") {
         setGuestView("auth");
-      } else if (pathname === "/chat" || pathname === "/social") {
+      } else if (pathname === "/chat" || pathname === "/social" || pathname === "/news") {
         setGuestView("auth");
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       } else {
@@ -494,7 +500,7 @@ export default function Home() {
       setConversationStateResolved(true);
       setChatError("");
     }
-    router.push(workspace === "chat" ? "/chat" : "/social");
+    router.push(workspace === "chat" ? "/chat" : view === "news" ? "/news" : "/social");
   }
 
   async function selectConversation(token: string, id: string) {
@@ -551,7 +557,7 @@ export default function Home() {
       setAccessToken(session.accessToken);
       setPassword("");
       const requestedPath = new URLSearchParams(window.location.search).get("next");
-      router.replace(requestedPath === "/social" ? "/social" : "/chat");
+      router.replace(requestedPath === "/social" || requestedPath === "/news" ? requestedPath : "/chat");
     } catch (error) {
       setAuthError(errorMessage(error));
     } finally {
@@ -613,6 +619,21 @@ export default function Home() {
     }
     composerTextareaRef.current?.focus();
   }
+
+  useEffect(() => {
+    if (!accessToken || socialWorkspace || !conversationStateResolved || pendingNewsPromptStartedRef.current) return;
+    const prompt = window.sessionStorage.getItem(NEWS_CHAT_PROMPT_STORAGE_KEY);
+    if (!prompt) return;
+    pendingNewsPromptStartedRef.current = true;
+    window.sessionStorage.removeItem(NEWS_CHAT_PROMPT_STORAGE_KEY);
+    queueMicrotask(() => {
+      void startQuickAction("chat", prompt, false, true).finally(() => {
+        pendingNewsPromptStartedRef.current = false;
+      });
+    });
+    // startQuickAction is a function declaration tied to this mounted workspace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, conversationStateResolved, socialWorkspace]);
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -1059,7 +1080,7 @@ export default function Home() {
               aria-current={activeView === item.view ? "page" : undefined}
               className={activeView === item.view ? "active" : ""}
               key={item.view}
-              onClick={() => item.view === "hashtags" ? (viewHashtag(), setMobileSidebarOpen(false)) : item.view === "profile" ? (viewProfile(), setMobileSidebarOpen(false)) : (setActiveView(item.view), setMobileSidebarOpen(false))}
+              onClick={() => item.view === "news" ? navigateWorkspace("news") : item.view === "hashtags" ? (viewHashtag(), setMobileSidebarOpen(false)) : item.view === "profile" ? (viewProfile(), setMobileSidebarOpen(false)) : (setActiveView(item.view), setMobileSidebarOpen(false))}
               title={item.label}
               type="button"
             >
@@ -1122,6 +1143,8 @@ export default function Home() {
         <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : socialWorkspace && activeView === "explore" ? (
         <ExplorePanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
+      ) : socialWorkspace && activeView === "news" ? (
+        <NewsPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} />
       ) : socialWorkspace && activeView === "communities" ? (
         <CommunityPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : socialWorkspace && activeView === "articles" ? (

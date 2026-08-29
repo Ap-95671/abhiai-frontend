@@ -76,6 +76,46 @@ export type PageResponse<T> = {
   last: boolean;
 };
 
+export type NewsSource = { name: string; url: string | null };
+export type NewsArticle = {
+  id: string;
+  title: string;
+  description: string;
+  sourceName: string;
+  sourceUrl: string | null;
+  articleUrl: string;
+  imageUrl: string | null;
+  publishedAt: string;
+  category: string;
+  country: string;
+  region: string;
+  language: string;
+  author: string;
+  provider: string;
+  relatedStoryCount: number;
+  sources: NewsSource[];
+};
+
+export type NewsPage = {
+  content: NewsArticle[];
+  page: number;
+  limit: number;
+  totalResults: number;
+  hasMore: boolean;
+  updatedAt: string;
+  stale: boolean;
+};
+
+export type NewsFilters = {
+  category?: string;
+  region?: string;
+  language?: string;
+  query?: string;
+  page?: number;
+  limit?: number;
+  refresh?: boolean;
+};
+
 export type VerifiedStatus = "NONE" | "VERIFIED" | "ORGANIZATION" | "CREATOR" | "OFFICIAL";
 
 export type SocialActor = {
@@ -720,6 +760,26 @@ export const api = {
 
   getFeed(accessToken: string, page = 0, size = 20): Promise<PageResponse<PostSearchResult>> {
     return request(`/feed?page=${page}&size=${size}`, {}, accessToken);
+  },
+
+  getNews(accessToken: string, filters: NewsFilters = {}): Promise<NewsPage> {
+    const params = new URLSearchParams();
+    if (filters.category) params.set("category", filters.category);
+    if (filters.region) params.set("region", filters.region);
+    if (filters.language) params.set("language", filters.language);
+    if (filters.query) params.set("query", filters.query);
+    params.set("page", String(filters.page ?? 0));
+    params.set("limit", String(filters.limit ?? 10));
+    if (filters.refresh) params.set("refresh", "true");
+    return request(`/news?${params.toString()}`, {}, accessToken);
+  },
+
+  getTopNews(accessToken: string, region = "global", limit = 5): Promise<NewsPage> {
+    return request(`/news/top?region=${encodeURIComponent(region)}&limit=${limit}`, {}, accessToken);
+  },
+
+  getNewsArticle(accessToken: string, articleId: string): Promise<NewsArticle> {
+    return request(`/news/${encodeURIComponent(articleId)}`, {}, accessToken);
   },
 
   getVideoFeed(accessToken: string, page = 0, size = 10): Promise<PageResponse<PostSearchResult>> {
