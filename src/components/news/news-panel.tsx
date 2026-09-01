@@ -51,7 +51,7 @@ function NewsCard({ article, onAsk, onOpen, onSave, saved }: { article: NewsArti
     }
   }
   return (
-    <article className="news-story-card">
+    <article className="news-story-card" onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) onOpen(article); }}>
       <button aria-label={`Preview ${article.title}`} className="news-story-open" onClick={() => onOpen(article)} type="button">
         <NewsImage alt="" className="news-story-image" src={article.imageUrl} />
         <span className="news-story-body">
@@ -219,11 +219,12 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
       <div className="workspace-content news-workspace">
         <label className="news-search"><AppIcon name="search"/><span className="sr-only">Search news</span><input maxLength={100} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search international news…" type="search" value={searchDraft}/>{searchDraft && <button aria-label="Clear search" onClick={() => setSearchDraft("")} type="button">×</button>}</label>
         <span aria-live="polite" className="sr-only">{loading ? "Updating news results" : `${articles.length} stories loaded`}</span>
-        <nav aria-label="News categories" className="news-chip-row">
-          {categories.map(([value, label]) => <button aria-current={category === value ? "page" : undefined} className={category === value ? "active" : ""} key={value} onClick={() => setCategory(value)} type="button">{label}</button>)}
-        </nav>
-        <div aria-label="News region" className="news-region-row" role="group">
-          {regions.map(([value, label]) => <button aria-pressed={region === value} className={region === value ? "active" : ""} key={value} onClick={() => setRegion(value)} type="button">{label}</button>)}
+        <div className="news-filter-bar">
+          <nav aria-label="News categories" className="news-chip-row">
+            {categories.map(([value, label]) => <button aria-current={category === value ? "page" : undefined} className={category === value ? "active" : ""} key={value} onClick={() => setCategory(value)} type="button">{label}</button>)}
+          </nav>
+          <label className="news-filter-select news-category-select"><span>Category</span><select aria-label="News category" onChange={(event) => setCategory(event.target.value)} value={category}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="news-filter-select"><span>Region</span><select aria-label="News region" onChange={(event) => setRegion(event.target.value)} value={region}>{regions.map(([value, label]) => <option key={value} value={value}>{label.replace("🌍 ", "")}</option>)}</select></label>
         </div>
 
         {loading && articles.length === 0 && <div aria-label="Loading global news" className="news-page-skeleton" role="status"><span className="featured"/><span/><span/><span/><span/></div>}
@@ -231,7 +232,7 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
         {!loading && !error && articles.length === 0 && <div className="news-state-card"><AppIcon name="search"/><h2>No stories found for this topic</h2><p>Try another search, category, or region.</p><button onClick={() => { setSearchDraft(""); setCategory("latest"); setRegion("global"); }} type="button">Explore Latest News</button></div>}
 
         {featured && (
-          <article className="news-featured">
+          <article className="news-featured" onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) openStory(featured); }}>
             <NewsImage alt={featured.title} className="news-featured-image" src={featured.imageUrl}/>
             <div className="news-featured-copy"><p>{featured.category.toUpperCase()} · {relativeTime(featured.publishedAt)}</p><h2>{featured.title}</h2>{featured.description && <span>{featured.description}</span>}<small>Source: {featured.sourceName}{featured.relatedStoryCount > 1 ? ` · Reported by ${featured.relatedStoryCount} sources` : ""}</small><div><button onClick={() => openStory(featured)} type="button">Read Story</button><button onClick={() => askAbhiAI(featured)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button></div></div>
           </article>

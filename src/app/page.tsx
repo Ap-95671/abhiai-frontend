@@ -61,6 +61,11 @@ type AttachmentUploadState = {
 type ToastMessage = { id: number; message: string; tone?: "default" | "error" };
 type ConversationGroup = { label: string; items: ConversationSummary[] };
 
+const durableSocialViews = new Set<ActiveView>([
+  "feed", "explore", "communities", "articles", "creator", "messages", "stories",
+  "videos", "hashtags", "search", "notifications", "profile", "memory",
+]);
+
 const socialNavigation: Array<{ view: ActiveView; label: string; icon: AppIconName }> = [
   { view: "feed", label: "Feed", icon: "feed" },
   { view: "explore", label: "Explore", icon: "explore" },
@@ -154,6 +159,7 @@ export default function Home() {
   const [conversationStateResolved, setConversationStateResolved] = useState(false);
   const [chatError, setChatError] = useState("");
   const [models, setModels] = useState<ModelOption[]>([]);
+  const [homeModelId, setHomeModelId] = useState("AUTO");
   const [isChangingModel, setIsChangingModel] = useState(false);
   const [messageDraft, setMessageDraft] = useState("");
   const [composerMode, setComposerMode] = useState<ComposerMode>("chat");
@@ -179,8 +185,16 @@ export default function Home() {
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [accountMenuStyle, setAccountMenuStyle] = useState<CSSProperties>();
+  const [locationSearch, setLocationSearch] = useState("");
   const shouldFollowStreamRef = useRef(true);
   const pendingNewsPromptStartedRef = useRef(false);
+
+  useEffect(() => {
+    const syncLocation = () => setLocationSearch(window.location.search);
+    syncLocation();
+    window.addEventListener("popstate", syncLocation);
+    return () => window.removeEventListener("popstate", syncLocation);
+  }, []);
 
   useEffect(() => {
     if (!mobileSidebarOpen) return;
@@ -193,6 +207,7 @@ export default function Home() {
 
   const conversationId = selectedConversation?.id;
   const socialWorkspace = pathname === "/social" || pathname === "/news";
+  const socialRouteParams = useMemo(() => new URLSearchParams(locationSearch), [locationSearch]);
   const sortedMessages = useMemo(
     () => selectedConversation?.messages ?? [],
     [selectedConversation],
@@ -309,18 +324,33 @@ export default function Home() {
   const handleSessionExpired = useCallback(() => {
     setGuestView("auth");
     expireSession("Your session has expired. Please sign in again.");
-    router.replace(`/login?next=${encodeURIComponent(pathname === "/news" ? "/news" : pathname === "/social" ? "/social" : "/chat")}`);
-  }, [expireSession, pathname, router]);
+    const nextPath = pathname === "/social" ? `/social${locationSearch}` : pathname === "/news" ? `/news${locationSearch}` : "/chat";
+    router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+  }, [expireSession, locationSearch, pathname, router]);
+
+  const pushSocialRoute = useCallback((view: ActiveView, options?: { username?: string; tag?: string; query?: string; kind?: string; hash?: string; replace?: boolean }) => {
+    const params = new URLSearchParams();
+    if (view !== "feed") params.set("view", view);
+    if (options?.username) params.set("username", options.username);
+    if (options?.tag) params.set("tag", options.tag);
+    if (options?.query) params.set("q", options.query);
+    if (options?.kind) params.set("kind", options.kind);
+    const next = `/social${params.size ? `?${params.toString()}` : ""}${options?.hash ? `#${options.hash}` : ""}`;
+    setLocationSearch(params.size ? `?${params.toString()}` : "");
+    if (options?.replace) router.replace(next); else router.push(next);
+  }, [router]);
 
   const viewProfile = useCallback((username?: string) => {
     setProfileUsername(username);
     setActiveView("profile");
-  }, []);
+    pushSocialRoute("profile", { username });
+  }, [pushSocialRoute]);
 
   const viewHashtag = useCallback((tag?: string) => {
     setSelectedHashtag(tag);
     setActiveView("hashtags");
-  }, []);
+    pushSocialRoute("hashtags", { tag });
+  }, [pushSocialRoute]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -341,7 +371,11 @@ export default function Home() {
           return;
         }
         if (pathname === "/social") {
-          setActiveView((current) => current === "chat" ? "feed" : current);
+          const requestedView = socialRouteParams.get("view") as ActiveView | null;
+          const nextView = requestedView && durableSocialViews.has(requestedView) ? requestedView : "feed";
+          setActiveView(nextView);
+          setProfileUsername(socialRouteParams.get("username") ?? undefined);
+          setSelectedHashtag(socialRouteParams.get("tag") ?? undefined);
         } else if (pathname === "/news") {
           setActiveView("news");
         } else if (pathname === "/chat") {
@@ -359,7 +393,7 @@ export default function Home() {
         setGuestView("landing");
       }
     });
-  }, [accessToken, pathname, router, sessionResolved]);
+  }, [accessToken, pathname, router, sessionResolved, socialRouteParams]);
 
   useEffect(() => {
     if (!accessToken || socialWorkspace) return;
@@ -516,7 +550,9 @@ export default function Home() {
       setConversationStateResolved(true);
       setChatError("");
     }
-    router.push(workspace === "chat" ? "/chat" : view === "news" ? "/news" : "/social");
+    if (workspace === "chat") router.push("/chat");
+    else if (view === "news") router.push("/news");
+    else pushSocialRoute(view);
   }
 
   async function selectConversation(token: string, id: string) {
@@ -573,7 +609,10 @@ export default function Home() {
       setAccessToken(session.accessToken);
       setPassword("");
       const requestedPath = new URLSearchParams(window.location.search).get("next");
-      router.replace(requestedPath === "/social" || requestedPath === "/news" ? requestedPath : "/chat");
+      const safeRequestedPath = requestedPath === "/social" || requestedPath?.startsWith("/social?") || requestedPath?.startsWith("/social#") || requestedPath === "/news" || requestedPath?.startsWith("/news?") || requestedPath?.startsWith("/news#") || requestedPath === "/chat"
+        ? requestedPath
+        : "/chat";
+      router.replace(safeRequestedPath);
     } catch (error) {
       setAuthError(errorMessage(error));
     } finally {
@@ -629,8 +668,20 @@ export default function Home() {
     setWebSearchAllowed(allowWebSearch);
     const conversation = await createConversation();
     if (!conversation) return;
+    let targetConversation = conversation;
+    if (homeModelId !== "AUTO" && accessToken) {
+      try {
+        const updated = await api.updateConversationModel(accessToken, conversation.id, "MANUAL", homeModelId);
+        targetConversation = { ...conversation, ...updated };
+        setSelectedConversation(targetConversation);
+        setConversations((current) => current.map((item) => item.id === updated.id ? updated : item));
+      } catch (modelError) {
+        handleAuthenticatedError(modelError);
+        return;
+      }
+    }
     if (sendImmediately && mode === "chat" && content) {
-      await sendTextMessage(conversation, content, allowWebSearch);
+      await sendTextMessage(targetConversation, content, allowWebSearch);
       return;
     }
     composerTextareaRef.current?.focus();
@@ -1098,7 +1149,7 @@ export default function Home() {
               aria-current={activeView === item.view ? "page" : undefined}
               className={activeView === item.view ? "active" : ""}
               key={item.view}
-              onClick={() => item.view === "news" ? navigateWorkspace("news") : item.view === "hashtags" ? (viewHashtag(), setMobileSidebarOpen(false)) : item.view === "profile" ? (viewProfile(), setMobileSidebarOpen(false)) : (setActiveView(item.view), setMobileSidebarOpen(false))}
+              onClick={() => item.view === "news" ? navigateWorkspace("news") : item.view === "hashtags" ? (viewHashtag(), setMobileSidebarOpen(false)) : item.view === "profile" ? (viewProfile(), setMobileSidebarOpen(false)) : navigateWorkspace(item.view)}
               title={item.label}
               type="button"
             >
@@ -1162,7 +1213,7 @@ export default function Home() {
       ) : socialWorkspace && activeView === "feed" ? (
         <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : socialWorkspace && activeView === "explore" ? (
-        <ExplorePanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
+        <ExplorePanel accessToken={accessToken} currentUserId={currentUser?.id} onOpenPost={(postId) => pushSocialRoute("feed", { hash: `post-${encodeURIComponent(postId)}` })} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : socialWorkspace && activeView === "news" ? (
         <NewsPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} />
       ) : socialWorkspace && activeView === "communities" ? (
@@ -1182,12 +1233,17 @@ export default function Home() {
       ) : socialWorkspace && activeView === "search" ? (
         <SearchPanel
           accessToken={accessToken}
+          currentUserId={currentUser?.id}
+          initialKind={socialRouteParams.get("kind") ?? undefined}
+          initialQuery={socialRouteParams.get("q") ?? undefined}
           onOpenConversation={(id) => {
             setActiveView("chat");
             router.push("/chat");
             void selectConversation(accessToken, id);
           }}
           onOpenNews={(id) => router.push(`/news#${encodeURIComponent(id)}`)}
+          onOpenPost={(id) => pushSocialRoute("feed", { hash: `post-${encodeURIComponent(id)}` })}
+          onSearchStateChange={(query, kind) => pushSocialRoute("search", { kind, query, replace: true })}
           onUnauthorized={handleSessionExpired}
           onViewHashtag={viewHashtag}
           onViewProfile={viewProfile}
@@ -1200,7 +1256,7 @@ export default function Home() {
           onViewProfile={viewProfile}
         />
       ) : socialWorkspace && activeView === "profile" ? (
-        <ProfilePanel accessToken={accessToken} onUnauthorized={handleSessionExpired} username={profileUsername} />
+        <ProfilePanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} username={profileUsername} />
       ) : socialWorkspace ? (
         <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : (
@@ -1377,9 +1433,9 @@ export default function Home() {
           <div className="ai-home">
             <div className="ai-home-intro">
               <span className="brand-mark ai-home-logo"><Image alt="AbhiAI" height={64} src="/abhiai-logo.png" width={64} /></span>
-              <p className="eyebrow">AbhiAI</p>
-              <h1>What can I help you with?</h1>
-              <p>Ask a question, explore an idea, work with a document, or create something new.</p>
+              <p className="eyebrow">Your intelligence workspace</p>
+              <h1>Think, create, and continue.</h1>
+              <p>Start with smart routing or choose an available model. Your conversations stay organized in one private workspace.</p>
             </div>
             <form className="home-composer" onSubmit={(event) => { event.preventDefault(); if (messageDraft.trim()) void startQuickAction("chat", messageDraft, false, true); }}>
               <textarea
@@ -1391,7 +1447,7 @@ export default function Home() {
                 value={messageDraft}
               />
               <div>
-                <span>Start a new conversation</span>
+                <label className="home-model-control"><span>Model</span><select aria-label="Model for new conversation" onChange={(event) => setHomeModelId(event.target.value)} value={homeModelId}><option value="AUTO">AbhiAI Auto · smart routing</option>{models.filter((model) => model.configured && model.status !== "UNAVAILABLE" && model.status !== "COMING_SOON").map((model) => <option key={model.id} value={model.id}>{model.displayName} · {providerLabel(model.provider)}</option>)}</select></label>
                 <div className="home-composer-actions">
                   <VoiceInput disabled={isCreatingConversation} onChange={setMessageDraft} value={messageDraft} />
                   <button aria-label="Start chat" disabled={isCreatingConversation || !messageDraft.trim()} type="submit"><AppIcon name="send" /></button>
@@ -1402,6 +1458,13 @@ export default function Home() {
               <button disabled={isCreatingConversation} onClick={() => void startQuickAction("image", "Create an image of ")} type="button"><AppIcon name="image"/><span><strong>Create image</strong><small>Generate from a prompt</small></span></button>
               <button disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Summarize and analyze this PDF: ")} type="button"><AppIcon name="article"/><span><strong>Analyze PDF</strong><small>Upload after opening chat</small></span></button>
               <button disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Research the latest information about ", true)} type="button"><AppIcon name="search"/><span><strong>Research</strong><small>Use supported web search</small></span></button>
+            </div>
+            <div className="ai-home-context-grid">
+              <section aria-labelledby="recent-intelligence-title" className="ai-home-context-card">
+                <div className="ai-home-context-heading"><div><p className="eyebrow">Continue</p><h2 id="recent-intelligence-title">Recent intelligence</h2></div><span>{conversations.length} chats</span></div>
+                {conversations.length > 0 ? <div className="ai-home-recent-list">{conversations.slice(0, 3).map((conversation) => <button key={conversation.id} onClick={() => void selectConversation(accessToken, conversation.id)} type="button"><span><strong>{conversation.title}</strong><small>{formatDate(conversation.updatedAt)}</small></span><AppIcon name="chevron-right" /></button>)}</div> : <p className="ai-home-context-empty">Your recent conversations will appear here after your first chat.</p>}
+              </section>
+              <section aria-labelledby="memory-home-title" className="ai-home-context-card memory-home-card"><span className="memory-home-icon"><AppIcon name="ai" /></span><div><p className="eyebrow">Personalize</p><h2 id="memory-home-title">Memory & privacy</h2><p>Review what AbhiAI can remember and keep personal context under your control.</p><button onClick={() => navigateWorkspace("memory")} type="button">Manage memory <AppIcon name="chevron-right" /></button></div></section>
             </div>
           </div>
         )}
@@ -1428,8 +1491,8 @@ export default function Home() {
     </main>
     {accountMenuOpen && accountMenuStyle && createPortal(
       <div className="account-menu account-menu-portal" ref={accountMenuRef} role="menu" style={accountMenuStyle}>
-        <button onClick={() => { viewProfile(); router.push("/social"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
-        <button onClick={() => { setActiveView("memory"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="ai"/> Memory & privacy</button>
+        <button onClick={() => { viewProfile(); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
+        <button onClick={() => { navigateWorkspace("memory"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="ai"/> Memory & privacy</button>
         <ThemeToggle menuItem />
         <button className="danger-menu-item" onClick={signOut} role="menuitem" type="button">Sign out</button>
       </div>,

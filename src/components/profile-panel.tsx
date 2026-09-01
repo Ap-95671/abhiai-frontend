@@ -2,20 +2,27 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { api, ApiError, PageResponse, PostSearchResult, ProfileReply, ProfileUpdate, UserProfile } from "@/lib/api";
 import { AuthenticatedImage } from "@/components/authenticated-image";
-import { PostAttachment } from "@/components/post-attachment";
 import { ReportButton } from "@/components/report-button";
+import { PostCard } from "@/components/social/post-card";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
-type ProfilePanelProps = { accessToken: string; username?: string; onUnauthorized: () => void };
+type ProfilePanelProps = {
+  accessToken: string;
+  username?: string;
+  onUnauthorized: () => void;
+  onViewHashtag: (tag: string) => void;
+  onViewProfile: (username: string) => void;
+};
 type ProfileTab = "posts" | "replies" | "media" | "likes";
 
 function compact(value: number) { return new Intl.NumberFormat(undefined, { notation: "compact" }).format(value); }
 
-export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfilePanelProps) {
+export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHashtag, onViewProfile }: ProfilePanelProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentUserId, setCurrentUserId] = useState("");
   const [following, setFollowing] = useState(false);
@@ -37,6 +44,10 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
   const [contentError, setContentError] = useState("");
   const contentRequestId = useRef(0);
   const [lightbox, setLightbox] = useState<"profile" | "cover" | null>(null);
+  const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
+  const postDialogRef = useRef<HTMLElement | null>(null);
+  const postCloseRef = useRef<HTMLButtonElement | null>(null);
+  const postReturnFocus = useRef<HTMLElement | null>(null);
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true); setError("");
@@ -91,6 +102,59 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
 
   useEffect(() => { if (profile) queueMicrotask(() => void loadContent(activeTab)); }, [activeTab, loadContent, profile]);
 
+  const closePost = useCallback(() => {
+    setSelectedPost(null);
+    if (window.history.state?.abhiaiPostDetail) window.history.back();
+    else window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    queueMicrotask(() => postReturnFocus.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const sync = async () => {
+      const match = window.location.hash.match(/^#post-(.+)$/);
+      if (!match) { setSelectedPost(null); return; }
+      const id = decodeURIComponent(match[1]);
+      const loaded = postPage?.content.find((post) => post.id === id);
+      if (loaded) setSelectedPost(loaded);
+      else try {
+        const fetched = await api.getPost(accessToken, id);
+        if (active) setSelectedPost(fetched);
+      } catch (postError) {
+        if (postError instanceof ApiError && postError.status === 401) onUnauthorized();
+      }
+    };
+    const handlePopState = () => void sync();
+    queueMicrotask(handlePopState);
+    window.addEventListener("popstate", handlePopState);
+    return () => { active = false; window.removeEventListener("popstate", handlePopState); };
+  }, [accessToken, onUnauthorized, postPage]);
+
+  useEffect(() => {
+    if (!selectedPost) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    queueMicrotask(() => postCloseRef.current?.focus());
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") return closePost();
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(postDialogRef.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])") ?? []);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return event.preventDefault();
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", handleKeyDown); };
+  }, [closePost, selectedPost]);
+
+  function openPost(post: PostSearchResult) {
+    postReturnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelectedPost(post);
+    window.history.pushState({ ...(window.history.state ?? {}), abhiaiPostDetail: true }, "", `${window.location.pathname}${window.location.search}#post-${encodeURIComponent(post.id)}`);
+  }
+
   async function toggleFollow() {
     if (!profile) return; setIsSaving(true); setError("");
     try { await api.setFollowing(accessToken, profile.id, !following); setFollowing(!following); setProfile((item) => item ? { ...item, followerCount: item.followerCount + (following ? -1 : 1) } : item); }
@@ -126,6 +190,22 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
       if (pinError instanceof ApiError && pinError.status === 401) return onUnauthorized();
       setError(pinError instanceof Error ? pinError.message : "Pinned post could not be updated.");
     } finally { setIsSaving(false); }
+  }
+
+  async function deleteProfilePost(postId: string) {
+    if (!window.confirm("Delete this post?")) return;
+    setIsSaving(true);
+    try {
+      await api.deletePost(accessToken, postId);
+      setPostPage((current) => current ? { ...current, content: current.content.filter((post) => post.id !== postId), totalElements: Math.max(0, current.totalElements - 1) } : current);
+      setProfile((current) => current ? { ...current, postCount: Math.max(0, current.postCount - 1) } : current);
+      if (selectedPost?.id === postId) closePost();
+    } catch (deleteError) {
+      if (deleteError instanceof ApiError && deleteError.status === 401) return onUnauthorized();
+      setContentError(deleteError instanceof Error ? deleteError.message : "The post could not be deleted.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -185,11 +265,12 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
             {replyPage?.content.length ? <div className="profile-content-list">{replyPage.content.map((reply) => <article className="profile-reply-card" key={reply.id}><p className="profile-reply-context">Replied to @{reply.post.author.username}</p><p>{reply.textContent}</p><small>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(reply.createdAt))}</small><div className="profile-parent-post"><strong>{reply.post.author.displayName}</strong><p>{reply.post.textContent}</p></div></article>)}</div> : !isLoadingContent && <p className="profile-empty">No visible replies yet.</p>}
             {replyPage && !replyPage.last && <button className="load-more-button" disabled={isLoadingContent} onClick={() => void loadContent(activeTab, replyPage.page + 1, true)} type="button">{isLoadingContent ? "Loading…" : "Load more"}</button>}
           </> : <>
-            {postPage?.content.length ? <div className="profile-content-list">{postPage.content.map((post) => <article className={`social-post${post.pinned ? " pinned-profile-post" : ""}`} key={post.id}>{post.pinned && <p className="pinned-label">◆ Pinned post</p>}<div className="social-post-head"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/><div className="author-button"><strong>{post.author.displayName}</strong><span>@{post.author.username} · {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(post.createdAt))}</span></div><span className="visibility-pill">{post.visibility.toLowerCase()}</span>{ownProfile && activeTab === "posts" && <button className="profile-pin-button" disabled={isSaving} onClick={() => void togglePin(post)} type="button">{post.pinned ? "Unpin" : "Pin"}</button>}</div><p className="social-post-content">{post.textContent}</p>{post.media.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((asset) => <PostAttachment accessToken={accessToken} asset={asset} key={asset.id}/>)}</div>}<div className="post-metrics"><span>{compact(post.likeCount)} likes</span><span>{compact(post.replyCount)} replies</span><span>{compact(post.repostCount)} reposts</span></div></article>)}</div> : !isLoadingContent && <p className="profile-empty">No visible {activeTab} yet.</p>}
+            {postPage?.content.length ? <div className="profile-content-list">{postPage.content.map((post) => <PostCard accessToken={accessToken} currentUserId={currentUserId} key={post.id} onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onOpen={openPost} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={post}/>)}</div> : !isLoadingContent && <p className="profile-empty">No visible {activeTab} yet.</p>}
             {postPage && !postPage.last && <button className="load-more-button" disabled={isLoadingContent} onClick={() => void loadContent(activeTab, postPage.page + 1, true)} type="button">{isLoadingContent ? "Loading…" : "Load more"}</button>}
           </>)}
       </div>}
     </div>
+    {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="profile-post-detail-title" aria-modal="true" className="post-detail-dialog" ref={postDialogRef} role="dialog"><header><h2 id="profile-post-detail-title">Post</h2><button aria-label="Close post detail" onClick={closePost} ref={postCloseRef} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={currentUserId} detail onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={selectedPost}/></section></div>, document.body)}
     <ImageLightbox onClose={() => setLightbox(null)} open={lightbox === "cover"} title={`${profile.displayName}'s cover photo`}>
       {profile.coverMediaId ? <AuthenticatedImage accessToken={accessToken} alt={`${profile.displayName} cover`} mediaId={profile.coverMediaId}/> : profile.coverPicture ? <img alt={`${profile.displayName} cover`} src={profile.coverPicture}/> : null}
     </ImageLightbox>

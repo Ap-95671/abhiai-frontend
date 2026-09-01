@@ -2,18 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { PostAttachment } from "@/components/post-attachment";
-import { RichPostText } from "@/components/rich-post-text";
+import { PostCard } from "@/components/social/post-card";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   api,
   ApiError,
   ExploreResult,
-  PostSearchResult,
 } from "@/lib/api";
 
 type ExplorePanelProps = {
   accessToken: string;
+  currentUserId?: string;
+  onOpenPost: (postId: string) => void;
   onUnauthorized: () => void;
   onViewHashtag: (tag: string) => void;
   onViewProfile: (username: string) => void;
@@ -23,57 +23,10 @@ function formatCount(value: number) {
   return new Intl.NumberFormat(undefined, { notation: "compact" }).format(value);
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(value));
-}
-
-function ExplorePost({
-  accessToken,
-  post,
-  onViewHashtag,
-  onViewProfile,
-  mediaFirst = false,
-}: {
-  accessToken: string;
-  post: PostSearchResult;
-  onViewHashtag: (tag: string) => void;
-  onViewProfile: (username: string) => void;
-  mediaFirst?: boolean;
-}) {
-  const attachments = post.media.length > 0 && (
-    <div className={`post-media-grid count-${post.media.length}`}>
-      {post.media.map((media) => (
-        <PostAttachment accessToken={accessToken} asset={media} key={media.id} />
-      ))}
-    </div>
-  );
-
-  return (
-    <article className="explore-post-card">
-      {mediaFirst && attachments}
-      <div className="post-author-row">
-        <UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/>
-        <div>
-          <button className="inline-author-button" onClick={() => onViewProfile(post.author.username)} type="button">
-            {post.author.displayName}
-          </button>
-          <p>@{post.author.username} · {formatDate(post.createdAt)}</p>
-        </div>
-      </div>
-      <RichPostText className="post-content" onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} text={post.textContent} />
-      {!mediaFirst && attachments}
-      <div className="post-metrics" aria-label="Post activity">
-        <span>♡ {formatCount(post.likeCount)}</span>
-        <span>↩ {formatCount(post.replyCount)}</span>
-        <span>↻ {formatCount(post.repostCount)}</span>
-        <span>◉ {formatCount(post.viewCount)}</span>
-      </div>
-    </article>
-  );
-}
-
 export function ExplorePanel({
   accessToken,
+  currentUserId,
+  onOpenPost,
   onUnauthorized,
   onViewHashtag,
   onViewProfile,
@@ -155,7 +108,7 @@ export function ExplorePanel({
           <section className="explore-section explore-featured" aria-labelledby="trending-posts-title">
             <div className="section-heading"><div><p className="eyebrow">Now</p><h2 id="trending-posts-title">Trending posts</h2></div><span>{explore.trendingPosts.length} stories</span></div>
             <div className="explore-post-grid">
-              {explore.trendingPosts.map((post) => <ExplorePost accessToken={accessToken} key={post.id} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
+              {explore.trendingPosts.map((post) => <PostCard accessToken={accessToken} currentUserId={currentUserId} key={post.id} onError={setError} onOpen={() => onOpenPost(post.id)} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
               {explore.trendingPosts.length === 0 && <p className="explore-empty wide">Create a public post to start the conversation.</p>}
             </div>
           </section>
@@ -164,7 +117,7 @@ export function ExplorePanel({
             <section className="explore-section" aria-labelledby="popular-discussions-title">
               <div className="section-heading"><div><p className="eyebrow">Discussed</p><h2 id="popular-discussions-title">Popular discussions</h2></div></div>
               <div className="explore-stack">
-                {explore.popularDiscussions.map((post) => <ExplorePost accessToken={accessToken} key={post.id} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
+                {explore.popularDiscussions.map((post) => <PostCard accessToken={accessToken} compact currentUserId={currentUserId} key={post.id} onError={setError} onOpen={() => onOpenPost(post.id)} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
                 {explore.popularDiscussions.length === 0 && <p className="explore-empty">Posts with replies will appear here.</p>}
               </div>
             </section>
@@ -172,7 +125,7 @@ export function ExplorePanel({
             <section className="explore-section" aria-labelledby="recommended-media-title">
               <div className="section-heading"><div><p className="eyebrow">Watch & view</p><h2 id="recommended-media-title">Recommended media</h2></div></div>
               <div className="explore-stack">
-                {explore.recommendedMedia.map((post) => <ExplorePost accessToken={accessToken} key={post.id} mediaFirst onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
+                {explore.recommendedMedia.map((post) => <PostCard accessToken={accessToken} compact currentUserId={currentUserId} key={post.id} onError={setError} onOpen={() => onOpenPost(post.id)} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
                 {explore.recommendedMedia.length === 0 && <p className="explore-empty">Popular public images and videos will appear here.</p>}
               </div>
             </section>

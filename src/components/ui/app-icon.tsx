@@ -81,10 +81,10 @@ const paths: Record<AppIconName, ReactNode> = {
   youtube: <><path d="M21 12c0 2.2-.2 4.2-.5 5.2a2.7 2.7 0 0 1-1.9 1.9c-1.5.4-6.6.4-6.6.4s-5.1 0-6.6-.4a2.7 2.7 0 0 1-1.9-1.9C3.2 16.2 3 14.2 3 12s.2-4.2.5-5.2a2.7 2.7 0 0 1 1.9-1.9C6.9 4.5 12 4.5 12 4.5s5.1 0 6.6.4a2.7 2.7 0 0 1 1.9 1.9c.3 1 .5 3 .5 5.2Z"/><path d="m10 9 5 3-5 3V9Z"/></>,
 };
 
-export function AppIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name: AppIconName }) {
+export function AppIcon({ filled = false, name, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean; name: AppIconName }) {
   return (
     <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20" {...props}>
-      <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7">
+      <g fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7">
         {paths[name]}
       </g>
     </svg>

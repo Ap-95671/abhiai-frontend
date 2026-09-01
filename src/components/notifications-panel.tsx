@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api, ApiError, PageResponse, SocialNotification } from "@/lib/api";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AppIcon, type AppIconName } from "@/components/ui/app-icon";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 type NotificationsPanelProps = {
@@ -12,13 +14,13 @@ type NotificationsPanelProps = {
   onViewProfile: (username: string) => void;
 };
 
-const notificationSymbol = {
-  NEW_FOLLOWER: "+",
-  POST_LIKE: "♥",
-  POST_REPLY: "↩",
-  POST_REPOST: "↻",
-  MENTION: "@",
-} as const;
+const notificationIcon: Record<SocialNotification["type"], AppIconName> = {
+  NEW_FOLLOWER: "profile",
+  POST_LIKE: "heart",
+  POST_REPLY: "reply",
+  POST_REPOST: "repost",
+  MENTION: "message",
+};
 
 const notificationVerb = {
   NEW_FOLLOWER: "started following you",
@@ -154,11 +156,7 @@ export function NotificationsPanel({
           </div>
         )}
         {!isLoading && notifications.length === 0 && !error && (
-          <div className="feature-empty-state">
-            <span aria-hidden="true" className="empty-state-icon">♢</span>
-            <h2>{filter === "unread" ? "No unread notifications" : "You’re all caught up"}</h2>
-            <p>{filter === "unread" ? "You have read every notification." : "New follows, likes, replies, reposts, and mentions will appear here."}</p>
-          </div>
+          <EmptyState description={filter === "unread" ? "You have read every notification." : "New follows, likes, replies, reposts, and mentions will appear here."} icon="bell" title={filter === "unread" ? "No unread notifications" : "You’re all caught up"} />
         )}
 
         {notifications.length > 0 && (
@@ -171,7 +169,7 @@ export function NotificationsPanel({
                 <button className="notification-avatar" aria-label={`View ${notification.actor.displayName}'s profile`} onClick={() => onViewProfile(notification.actor.username)} type="button">
                   <UserAvatar accessToken={accessToken} className="notification-avatar-visual" displayName={notification.actor.displayName} profileMediaId={notification.actor.profileMediaId} profilePicture={notification.actor.profilePicture}/>
                   <span className={`notification-type ${notification.type.toLowerCase()}`}>
-                    {notificationSymbol[notification.type]}
+                    <AppIcon filled={notification.type === "POST_LIKE"} name={notificationIcon[notification.type]} />
                   </span>
                 </button>
                 <div className="notification-copy">

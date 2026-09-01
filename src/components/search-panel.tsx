@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { PostAttachment } from "@/components/post-attachment";
-import { RichPostText } from "@/components/rich-post-text";
 import { NewsImage } from "@/components/news/news-image";
+import { PostCard } from "@/components/social/post-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   api,
@@ -24,9 +24,14 @@ type SearchKind = "all" | "conversations" | "users" | "posts" | "news" | "hashta
 
 type SearchPanelProps = {
   accessToken: string;
+  currentUserId?: string;
+  initialKind?: string;
+  initialQuery?: string;
   onUnauthorized: () => void;
   onOpenConversation: (conversationId: string) => void;
   onOpenNews: (articleId: string) => void;
+  onOpenPost: (postId: string) => void;
+  onSearchStateChange?: (query: string, kind: SearchKind) => void;
   onViewHashtag: (tag: string) => void;
   onViewProfile: (username: string) => void;
 };
@@ -47,16 +52,32 @@ function messageFor(error: unknown) {
   return error instanceof Error ? error.message : "Search could not be completed.";
 }
 
+function localDayBoundary(value: string, endOfDay: boolean) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = endOfDay
+    ? new Date(year, month - 1, day + 1, 0, 0, 0, -1)
+    : new Date(year, month - 1, day);
+  return date.toISOString();
+}
+
 export function SearchPanel({
   accessToken,
+  currentUserId,
+  initialKind,
+  initialQuery,
   onUnauthorized,
   onOpenConversation,
   onOpenNews,
+  onOpenPost,
+  onSearchStateChange,
   onViewHashtag,
   onViewProfile,
 }: SearchPanelProps) {
-  const [kind, setKind] = useState<SearchKind>("all");
-  const [draft, setDraft] = useState("");
+  const supportedKinds: SearchKind[] = ["all", "conversations", "users", "posts", "news", "hashtags"];
+  const restoredKind = supportedKinds.includes(initialKind as SearchKind) ? initialKind as SearchKind : "all";
+  const restoredQuery = initialQuery?.trim().slice(0, 100) ?? "";
+  const [kind, setKind] = useState<SearchKind>(restoredKind);
+  const [draft, setDraft] = useState(restoredQuery);
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [users, setUsers] = useState<UserSearchResult[]>([]);
   const [posts, setPosts] = useState<PostSearchResult[]>([]);
@@ -72,12 +93,13 @@ export function SearchPanel({
   const [toDate, setToDate] = useState("");
   const [mediaFilter, setMediaFilter] = useState<"any" | "with" | "without">("any");
   const [sort, setSort] = useState<SearchSort>("RELEVANCE");
+  const initialSearchStarted = useRef(false);
 
   function postFilters(): PostSearchFilters {
     return {
       user: author.trim() || undefined,
-      from: fromDate ? new Date(`${fromDate}T00:00:00.000Z`).toISOString() : undefined,
-      to: toDate ? new Date(`${toDate}T23:59:59.999Z`).toISOString() : undefined,
+      from: fromDate ? localDayBoundary(fromDate, false) : undefined,
+      to: toDate ? localDayBoundary(toDate, true) : undefined,
       hasMedia: mediaFilter === "any" ? undefined : mediaFilter === "with",
       sort,
     };
@@ -97,6 +119,7 @@ export function SearchPanel({
     setIsSearching(true);
     setError("");
     setSubmittedQuery(query);
+    onSearchStateChange?.(query, nextKind);
 
     try {
       if (nextKind === "all") {
@@ -146,6 +169,16 @@ export function SearchPanel({
       setIsSearching(false);
     }
   }
+
+  const runInitialSearch = useEffectEvent((nextKind: SearchKind) => {
+    void runSearch(0, false, nextKind);
+  });
+
+  useEffect(() => {
+    if (initialSearchStarted.current || restoredQuery.length < 2) return;
+    initialSearchStarted.current = true;
+    queueMicrotask(() => runInitialSearch(restoredKind));
+  }, [restoredKind, restoredQuery]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -202,20 +235,20 @@ export function SearchPanel({
         </div>}
 
         {error && <p className="inline-error" role="alert">{error}</p>}
-        {!submittedQuery && !isSearching && <div className="feature-empty-state"><span aria-hidden="true" className="empty-state-icon">⌕</span><h2>Explore the network</h2><p>Search for a person, an idea, or a topic you want to follow.</p></div>}
-        {submittedQuery && !isSearching && resultCount === 0 && !error && <div className="feature-empty-state compact"><h2>No results found</h2><p>Try a different spelling or broader search filters.</p></div>}
+        {!submittedQuery && !isSearching && <EmptyState description="Search for a person, an idea, or a topic you want to follow." icon="search" title="Explore the network" />}
+        {submittedQuery && !isSearching && resultCount === 0 && !error && <EmptyState compact description="Try a different spelling or broader search filters." icon="search" title={`No ${kind === "all" ? "results" : kind} found for “${submittedQuery}”`} />}
 
         {resultCount > 0 && <div className="search-results" aria-live="polite">
           <div className="results-summary"><p>Results for <strong>“{submittedQuery}”</strong></p><span>{page?.totalElements ?? resultCount} found</span></div>
           {kind === "all" ? <div className="universal-search-groups">
             {conversations.length > 0 && <section><header><h2>AI chats</h2><button onClick={() => changeKind("conversations")} type="button">See all</button></header>{conversationResults(conversations)}</section>}
             {users.length > 0 && <section><header><h2>People</h2><button onClick={() => changeKind("users")} type="button">See all</button></header><div className="people-grid">{users.map((user) => <article className="person-card" key={user.id}><UserAvatar accessToken={accessToken} className="profile-avatar" displayName={user.displayName} profileMediaId={user.profileMediaId} profilePicture={user.profilePicture}/><div className="person-copy"><h2>{user.displayName}{user.verifiedStatus !== "NONE" && <span className="verified-badge" title={user.verifiedStatus}>✓</span>}</h2><p className="username">@{user.username}</p><button className="profile-link-button" onClick={() => onViewProfile(user.username)} type="button">View profile</button></div></article>)}</div></section>}
-            {posts.length > 0 && <section><header><h2>Posts</h2><button onClick={() => changeKind("posts")} type="button">See all</button></header><div className="post-results">{posts.map((post) => <article className="post-card compact-search-post" key={post.id}><div className="post-author-row"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/><div><button className="inline-author-button" onClick={() => onViewProfile(post.author.username)} type="button">{post.author.displayName}</button><p>@{post.author.username} · {formatDate(post.createdAt)}</p></div></div><RichPostText className="post-content" onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} text={post.textContent}/></article>)}</div></section>}
+            {posts.length > 0 && <section><header><h2>Posts</h2><button onClick={() => changeKind("posts")} type="button">See all</button></header><div className="post-results">{posts.map((post) => <PostCard accessToken={accessToken} compact currentUserId={currentUserId} key={post.id} onError={setError} onOpen={() => onOpenPost(post.id)} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post}/>)}</div></section>}
             {news.length > 0 && <section><header><h2>Global news</h2><button onClick={() => changeKind("news")} type="button">See all</button></header>{newsResults(news)}</section>}
             {hashtags.length > 0 && <section><header><h2>Hashtags</h2><button onClick={() => changeKind("hashtags")} type="button">See all</button></header><div className="hashtag-search-results">{hashtags.map((tag) => <button key={tag.id} onClick={() => onViewHashtag(tag.normalizedTag)} type="button"><strong>#{tag.displayTag}</strong><span>{formatCount(tag.postCount)} {tag.postCount === 1 ? "post" : "posts"}</span></button>)}</div></section>}
           </div>
           : kind === "users" ? <div className="people-grid">{users.map((user) => <article className="person-card" key={user.id}><UserAvatar accessToken={accessToken} className="profile-avatar" displayName={user.displayName} profileMediaId={user.profileMediaId} profilePicture={user.profilePicture}/><div className="person-copy"><h2>{user.displayName}{user.verifiedStatus !== "NONE" && <span className="verified-badge" title={user.verifiedStatus}>✓</span>}</h2><p className="username">@{user.username}</p><p className="bio">{user.bio || "Exploring and building with AbhiAI."}</p><p className="follower-count">{formatCount(user.followerCount)} followers</p><button className="profile-link-button" onClick={() => onViewProfile(user.username)} type="button">View profile</button></div></article>)}</div>
-          : kind === "posts" ? <div className="post-results">{posts.map((post) => <article className="post-card" key={post.id}><div className="post-author-row"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/><div><button className="inline-author-button" onClick={() => onViewProfile(post.author.username)} type="button">{post.author.displayName}</button><p>@{post.author.username} · {formatDate(post.createdAt)}</p></div><span className="visibility-pill">{post.visibility.toLowerCase()}</span></div><RichPostText className="post-content" onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} text={post.textContent} />{post.media.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((media) => <PostAttachment accessToken={accessToken} asset={media} key={media.id} />)}</div>}<div className="post-metrics" aria-label="Post activity"><span>♡ {formatCount(post.likeCount)}</span><span>↩ {formatCount(post.replyCount)}</span><span>↻ {formatCount(post.repostCount)}</span><span>◉ {formatCount(post.viewCount)}</span></div></article>)}</div>
+          : kind === "posts" ? <div className="post-results">{posts.map((post) => <PostCard accessToken={accessToken} currentUserId={currentUserId} key={post.id} onError={setError} onOpen={() => onOpenPost(post.id)} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post}/>)}</div>
           : kind === "hashtags" ? <div className="hashtag-search-results">{hashtags.map((tag) => <button key={tag.id} onClick={() => onViewHashtag(tag.normalizedTag)} type="button"><strong>#{tag.displayTag}</strong><span>{formatCount(tag.postCount)} {tag.postCount === 1 ? "post" : "posts"}</span></button>)}</div>
           : kind === "news" ? newsResults(news)
           : conversationResults(conversations)}

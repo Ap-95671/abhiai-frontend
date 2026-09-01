@@ -4,6 +4,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AuthenticatedImage } from "@/components/authenticated-image";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { api, ApiError, Story, UserProfile } from "@/lib/api";
 
@@ -167,7 +168,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
         </form>
         {error && <p className="inline-error" role="alert">{error}</p>}
         {isLoading && <div className="feed-loading">Loading stories…</div>}
-        {!isLoading && stories.length === 0 && !error && <div className="feature-empty-state compact"><span className="empty-state-icon">◌</span><h2>No active stories yet</h2><p>Create a text, image, or video story. It will automatically expire after 24 hours.</p></div>}
+        {!isLoading && stories.length === 0 && !error && <EmptyState compact description="Create a text, image, or video story. It will automatically expire after 24 hours." icon="story" title="No active stories yet" />}
         {stories.length > 0 && <div className="story-rail" aria-label="Active stories">{stories.map((story, index) => (
           <button className={story.viewedByCurrentUser ? "story-card viewed" : "story-card"} key={story.id} onClick={() => setSelectedIndex(index)} style={{ background: story.backgroundColor }} type="button">
             <StoryPreview accessToken={accessToken} story={story} />

@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { GroupMessagesPanel } from "@/components/group-messages-panel";
 import { ReportButton } from "@/components/report-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 type MessagesPanelProps = {
@@ -191,7 +192,7 @@ export function MessagesPanel({ accessToken, onUnauthorized, onViewProfile }: Me
 
         <section className="dm-thread" aria-label={selected ? `Conversation with ${selected.participant.displayName}` : "Direct message thread"}>
           {error && <p className="inline-error dm-error" role="alert">{error}</p>}
-          {!selected ? <div className="feature-empty-state"><span className="empty-state-icon" aria-hidden="true">✉</span><h2>Your private inbox</h2><p>Select a conversation or start a new one using someone&apos;s username.</p></div> : <>
+          {!selected ? <EmptyState description="Select a conversation or start a new one using someone’s username." icon="message" title="Your private inbox" /> : <>
             <header className="dm-thread-header">
               <button aria-label="Back to conversations" className="dm-mobile-back" onClick={() => setSelected(null)} type="button">←</button>
               <button aria-label={`View ${selected.participant.displayName}'s profile`} className="avatar-button" onClick={() => onViewProfile(selected.participant.username)} type="button"><UserAvatar accessToken={accessToken} className="profile-avatar" displayName={selected.participant.displayName} profileMediaId={selected.participant.profileMediaId} profilePicture={selected.participant.profilePicture}/></button>

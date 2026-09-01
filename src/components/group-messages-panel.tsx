@@ -13,6 +13,7 @@ import {
   PageResponse,
 } from "@/lib/api";
 import { ReportButton } from "@/components/report-button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type GroupMessagesPanelProps = {
   accessToken: string;
@@ -334,7 +335,7 @@ export function GroupMessagesPanel({
 
     <section className="dm-thread" aria-label={selected ? `${selected.name} group conversation` : "Group conversation"}>
       {error && <p className="inline-error dm-error" role="alert">{error}</p>}
-      {!selected ? <div className="feature-empty-state"><span className="empty-state-icon" aria-hidden="true">♟</span><h2>Your groups</h2><p>Select a group, create one, or accept a pending invitation.</p></div> : <>
+      {!selected ? <EmptyState description="Select a group, create one, or accept a pending invitation." icon="community" title="Your groups" /> : <>
         <header className="dm-thread-header group-thread-header">
           <GroupAvatar group={selected} />
           <div><strong>{selected.name}</strong><p>{selected.memberCount} member{selected.memberCount === 1 ? "" : "s"} · {selected.currentUserRole.toLowerCase()}</p></div>
