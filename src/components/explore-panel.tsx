@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { PostAttachment } from "@/components/post-attachment";
 import { RichPostText } from "@/components/rich-post-text";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   api,
   ApiError,
@@ -17,10 +18,6 @@ type ExplorePanelProps = {
   onViewHashtag: (tag: string) => void;
   onViewProfile: (username: string) => void;
 };
-
-function initials(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
 
 function formatCount(value: number) {
   return new Intl.NumberFormat(undefined, { notation: "compact" }).format(value);
@@ -55,7 +52,7 @@ function ExplorePost({
     <article className="explore-post-card">
       {mediaFirst && attachments}
       <div className="post-author-row">
-        <div className="profile-avatar small-avatar" aria-hidden="true">{initials(post.author.displayName)}</div>
+        <UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/>
         <div>
           <button className="inline-author-button" onClick={() => onViewProfile(post.author.username)} type="button">
             {post.author.displayName}
@@ -145,7 +142,7 @@ export function ExplorePanel({
               <div className="explore-people-list">
                 {explore.suggestedAccounts.map((user) => (
                   <button key={user.id} onClick={() => onViewProfile(user.username)} type="button">
-                    <span className="profile-avatar small-avatar" aria-hidden="true">{initials(user.displayName)}</span>
+                    <UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={user.displayName} profileMediaId={user.profileMediaId} profilePicture={user.profilePicture}/>
                     <span><strong>{user.displayName}</strong><small>@{user.username} · {formatCount(user.followerCount)} followers</small></span>
                     <b aria-hidden="true">›</b>
                   </button>

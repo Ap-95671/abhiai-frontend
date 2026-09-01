@@ -961,6 +961,10 @@ export const api = {
     return request(`/posts/${postId}/replies?size=50`, {}, accessToken);
   },
 
+  getPost(accessToken: string, postId: string): Promise<PostSearchResult> {
+    return request(`/posts/${postId}`, {}, accessToken);
+  },
+
   createReply(accessToken: string, postId: string, textContent: string): Promise<PostReply> {
     return request(`/posts/${postId}/replies`, { method: "POST", body: JSON.stringify({ textContent }) }, accessToken);
   },

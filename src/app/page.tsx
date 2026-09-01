@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import { AuthScreen } from "@/components/auth/auth-screen";
 import { AuthenticatedImage } from "@/components/authenticated-image";
 import { BrandIntro } from "@/components/branding/brand-intro";
 import { ThinkingIndicator } from "@/components/chat/thinking-indicator";
+import { MessageContent } from "@/components/chat/message-content";
 import { ToolMenu, UploadPurpose } from "@/components/chat/tool-menu";
 import { LandingPage } from "@/components/landing/landing-page";
 import { NotificationsPanel } from "@/components/notifications-panel";
@@ -25,6 +26,7 @@ import { ArticlesPanel } from "@/components/articles-panel";
 import { CreatorDashboard } from "@/components/creator-dashboard";
 import { NewsPanel } from "@/components/news/news-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 import {
@@ -94,10 +96,6 @@ function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function initials(value: string) {
-  return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "A";
 }
 
 function groupConversations(items: ConversationSummary[]): ConversationGroup[] {
@@ -178,6 +176,15 @@ export default function Home() {
   const [accountMenuStyle, setAccountMenuStyle] = useState<CSSProperties>();
   const shouldFollowStreamRef = useRef(true);
   const pendingNewsPromptStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setMobileSidebarOpen(false); };
+    document.addEventListener("keydown", close);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", close); };
+  }, [mobileSidebarOpen]);
 
   const conversationId = selectedConversation?.id;
   const socialWorkspace = pathname === "/social" || pathname === "/news";
@@ -1014,6 +1021,8 @@ export default function Home() {
     <>
     <main className={sidebarCollapsed ? "app-shell sidebar-is-collapsed" : "app-shell"}>
       <button
+        aria-controls="app-sidebar"
+        aria-expanded={mobileSidebarOpen}
         aria-label={mobileSidebarOpen ? "Close navigation" : "Open navigation"}
         className="mobile-sidebar-trigger"
         onClick={() => setMobileSidebarOpen((current) => !current)}
@@ -1022,7 +1031,7 @@ export default function Home() {
         <AppIcon name={mobileSidebarOpen ? "chevron-left" : "menu"} />
       </button>
       {mobileSidebarOpen && <button aria-label="Close navigation" className="sidebar-scrim" onClick={() => setMobileSidebarOpen(false)} type="button" />}
-      <aside className={`${socialWorkspace ? "sidebar social-sidebar" : "sidebar"}${mobileSidebarOpen ? " mobile-open" : ""}`}>
+      <aside aria-label={socialWorkspace ? "Social navigation" : "AI navigation"} className={`${socialWorkspace ? "sidebar social-sidebar" : "sidebar"}${mobileSidebarOpen ? " mobile-open" : ""}`} id="app-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand-row">
           <div className="brand-lockup" title="AbhiAI">
@@ -1042,7 +1051,7 @@ export default function Home() {
           </button>
           </div>
           {!socialWorkspace && (
-            <button aria-label="New conversation" className="new-chat-button" disabled={isCreatingConversation} onClick={createConversation} title="New conversation" type="button">
+            <button aria-label="New conversation" className="new-chat-button" disabled={isCreatingConversation} onClick={() => { setMobileSidebarOpen(false); void createConversation(); }} title="New conversation" type="button">
               <AppIcon name="plus" /> <span className="sidebar-label">New conversation</span>
             </button>
           )}
@@ -1132,7 +1141,7 @@ export default function Home() {
             title={sidebarCollapsed ? "Account menu" : currentUser?.displayName ?? "Account menu"}
             type="button"
           >
-            <span className="account-avatar">{initials(currentUser?.displayName ?? "AbhiAI")}</span>
+            <UserAvatar accessToken={accessToken} className="account-avatar" displayName={currentUser?.displayName ?? "AbhiAI"} profileMediaId={currentUser?.profileMediaId} profilePicture={currentUser?.profilePicture}/>
             <span className="account-copy sidebar-label"><strong>{currentUser?.displayName ?? "Your account"}</strong><small>{currentUser ? `@${currentUser.username}` : "Profile and sign out"}</small></span>
             <AppIcon className="sidebar-label" name="more" />
           </button>
@@ -1448,74 +1457,6 @@ function MessageBubble({
       </div>
     </article>
   );
-}
-
-function renderInlineMarkdown(value: string, keyPrefix: string): ReactNode[] {
-  const tokens = value.split(/(`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)]+\)|\*\*[^*]+\*\*)/g);
-  return tokens.filter(Boolean).map((token, index) => {
-    const key = `${keyPrefix}-${index}`;
-    if (token.startsWith("`") && token.endsWith("`")) return <code key={key}>{token.slice(1, -1)}</code>;
-    const link = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
-    if (link) return <a href={link[2]} key={key} rel="noreferrer" target="_blank">{link[1]}</a>;
-    if (token.startsWith("**") && token.endsWith("**")) return <strong key={key}>{token.slice(2, -2)}</strong>;
-    return token;
-  });
-}
-
-function MessageContent({ content }: { content: string }) {
-  const lines = content.split("\n");
-  const blocks: ReactNode[] = [];
-  let index = 0;
-  while (index < lines.length) {
-    const line = lines[index];
-    if (line.startsWith("```")) {
-      const language = line.slice(3).trim();
-      const code: string[] = [];
-      index += 1;
-      while (index < lines.length && !lines[index].startsWith("```")) code.push(lines[index++]);
-      blocks.push(<pre key={`code-${index}`}><span>{language || "code"}</span><code>{code.join("\n")}</code></pre>);
-      index += 1;
-      continue;
-    }
-    if (line.includes("|") && index + 1 < lines.length && /^\s*\|?\s*:?-+/.test(lines[index + 1])) {
-      const tableLines = [line];
-      let tableIndex = index + 2;
-      while (tableIndex < lines.length && lines[tableIndex].includes("|")) tableLines.push(lines[tableIndex++]);
-      const rows: string[][] = tableLines
-        .map((row) => row.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()));
-      blocks.push(<div className="message-table-wrap" key={`table-${index}`}><table><thead><tr>{rows[0].map((cell, cellIndex) => <th key={cellIndex}>{renderInlineMarkdown(cell, `th-${index}-${cellIndex}`)}</th>)}</tr></thead><tbody>{rows.slice(1).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{renderInlineMarkdown(cell, `td-${rowIndex}-${cellIndex}`)}</td>)}</tr>)}</tbody></table></div>);
-      index = tableIndex;
-      continue;
-    }
-    if (/^[-*]\s+/.test(line)) {
-      const items: string[] = [];
-      while (index < lines.length && /^[-*]\s+/.test(lines[index])) items.push(lines[index++].replace(/^[-*]\s+/, ""));
-      blocks.push(<ul key={`ul-${index}`}>{items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineMarkdown(item, `li-${itemIndex}`)}</li>)}</ul>);
-      continue;
-    }
-    if (/^\d+\.\s+/.test(line)) {
-      const items: string[] = [];
-      while (index < lines.length && /^\d+\.\s+/.test(lines[index])) items.push(lines[index++].replace(/^\d+\.\s+/, ""));
-      blocks.push(<ol key={`ol-${index}`}>{items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineMarkdown(item, `oli-${itemIndex}`)}</li>)}</ol>);
-      continue;
-    }
-    const heading = line.match(/^(#{1,3})\s+(.+)$/);
-    if (heading) {
-      const Heading = heading[1].length === 1 ? "h2" : heading[1].length === 2 ? "h3" : "h4";
-      blocks.push(<Heading key={`heading-${index}`}>{renderInlineMarkdown(heading[2], `heading-${index}`)}</Heading>);
-      index += 1;
-      continue;
-    }
-    if (!line.trim()) {
-      index += 1;
-      continue;
-    }
-    const paragraph = [line];
-    index += 1;
-    while (index < lines.length && lines[index].trim() && !/^(#{1,3})\s|^```|^[-*]\s+|^\d+\.\s+/.test(lines[index])) paragraph.push(lines[index++]);
-    blocks.push(<p key={`p-${index}`}>{renderInlineMarkdown(paragraph.join("\n"), `p-${index}`)}</p>);
-  }
-  return <div className="message-content rich-message-content">{blocks}</div>;
 }
 
 function providerLabel(provider?: string | null) {

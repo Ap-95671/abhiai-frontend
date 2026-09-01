@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api, ApiError, PageResponse, SocialNotification } from "@/lib/api";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 type NotificationsPanelProps = {
   accessToken: string;
@@ -26,15 +27,6 @@ const notificationVerb = {
   POST_REPOST: "reposted your post",
   MENTION: "mentioned you in a post",
 } as const;
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
 
 function formatRelativeDate(value: string) {
   const date = new Date(value);
@@ -177,7 +169,7 @@ export function NotificationsPanel({
                 key={notification.id}
               >
                 <button className="notification-avatar" aria-label={`View ${notification.actor.displayName}'s profile`} onClick={() => onViewProfile(notification.actor.username)} type="button">
-                  {initials(notification.actor.displayName)}
+                  <UserAvatar accessToken={accessToken} className="notification-avatar-visual" displayName={notification.actor.displayName} profileMediaId={notification.actor.profileMediaId} profilePicture={notification.actor.profilePicture}/>
                   <span className={`notification-type ${notification.type.toLowerCase()}`}>
                     {notificationSymbol[notification.type]}
                   </span>

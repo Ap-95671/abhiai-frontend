@@ -4,6 +4,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AuthenticatedImage } from "@/components/authenticated-image";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { api, ApiError, Story, UserProfile } from "@/lib/api";
 
 type StoriesPanelProps = {
@@ -14,10 +15,6 @@ type StoriesPanelProps = {
 
 const REACTIONS = ["❤️", "🔥", "😂", "👏", "😮"];
 const BACKGROUNDS = ["#263B80", "#6D28D9", "#BE185D", "#047857", "#B45309", "#1F2937"];
-
-function initials(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
 
 function timeLeft(expiresAt: string) {
   const minutes = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 60_000));
@@ -175,7 +172,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
           <button className={story.viewedByCurrentUser ? "story-card viewed" : "story-card"} key={story.id} onClick={() => setSelectedIndex(index)} style={{ background: story.backgroundColor }} type="button">
             <StoryPreview accessToken={accessToken} story={story} />
             <span className="story-card-shade" />
-            <span className="story-card-author"><span className="profile-avatar small-avatar">{initials(story.author.displayName)}</span><strong>{story.author.displayName}</strong><small>{timeLeft(story.expiresAt)}</small></span>
+            <span className="story-card-author"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={story.author.displayName} profileMediaId={story.author.profileMediaId} profilePicture={story.author.profilePicture}/><strong>{story.author.displayName}</strong><small>{timeLeft(story.expiresAt)}</small></span>
           </button>
         ))}</div>}
       </div>
@@ -183,7 +180,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
         <div className="story-viewer-backdrop" role="dialog" aria-modal="true" aria-label={`${selected.author.displayName}'s story`} onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedIndex(null); }}>
           <div className="story-viewer" style={{ background: selected.backgroundColor }}>
             <div className="story-progress"><span /></div>
-            <header><button className="story-viewer-author" onClick={() => onViewProfile(selected.author.username)} type="button"><span className="profile-avatar small-avatar">{initials(selected.author.displayName)}</span><span><strong>{selected.author.displayName}</strong><small>@{selected.author.username} · {timeLeft(selected.expiresAt)}</small></span></button>{profile?.id === selected.author.id && <button className="story-delete" onClick={() => void removeSelectedStory()} type="button">Delete</button>}<button className="story-close" onClick={() => setSelectedIndex(null)} type="button" aria-label="Close story">×</button></header>
+            <header><button className="story-viewer-author" onClick={() => onViewProfile(selected.author.username)} type="button"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={selected.author.displayName} profileMediaId={selected.author.profileMediaId} profilePicture={selected.author.profilePicture}/><span><strong>{selected.author.displayName}</strong><small>@{selected.author.username} · {timeLeft(selected.expiresAt)}</small></span></button>{profile?.id === selected.author.id && <button className="story-delete" onClick={() => void removeSelectedStory()} type="button">Delete</button>}<button className="story-close" onClick={() => setSelectedIndex(null)} type="button" aria-label="Close story">×</button></header>
             <StoryViewerMedia accessToken={accessToken} story={selected} />
             {selected.textContent && <p className="story-viewer-caption">{selected.textContent}</p>}
             <button aria-label="Previous story" className="story-previous" disabled={selectedIndex === 0} onClick={() => setSelectedIndex((index) => index === null ? null : Math.max(0, index - 1))} type="button">‹</button>

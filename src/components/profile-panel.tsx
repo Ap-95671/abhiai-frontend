@@ -1,18 +1,18 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, PageResponse, PostSearchResult, ProfileReply, ProfileUpdate, UserProfile } from "@/lib/api";
 import { AuthenticatedImage } from "@/components/authenticated-image";
 import { PostAttachment } from "@/components/post-attachment";
 import { ReportButton } from "@/components/report-button";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 type ProfilePanelProps = { accessToken: string; username?: string; onUnauthorized: () => void };
 type ProfileTab = "posts" | "replies" | "media" | "likes";
 
-function initials(name: string) { return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
 function compact(value: number) { return new Intl.NumberFormat(undefined, { notation: "compact" }).format(value); }
 
 export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfilePanelProps) {
@@ -34,6 +34,8 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
   const [postPage, setPostPage] = useState<PageResponse<PostSearchResult> | null>(null);
   const [replyPage, setReplyPage] = useState<PageResponse<ProfileReply> | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [contentError, setContentError] = useState("");
+  const contentRequestId = useRef(0);
   const [lightbox, setLightbox] = useState<"profile" | "cover" | null>(null);
 
   const loadProfile = useCallback(async () => {
@@ -63,24 +65,28 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
 
   const loadContent = useCallback(async (tab: ProfileTab, page = 0, append = false) => {
     if (!profile) return;
-    setIsLoadingContent(true); setError("");
+    const currentRequest = ++contentRequestId.current;
+    setIsLoadingContent(true); setContentError("");
     try {
       if (tab === "replies") {
         const next = await api.getProfileReplies(accessToken, profile.username, page);
+        if (currentRequest !== contentRequestId.current) return;
         setReplyPage((current) => append && current ? { ...next, content: [...current.content, ...next.content] } : next);
         setPostPage(null);
       } else {
         const next = tab === "posts" ? await api.getProfilePosts(accessToken, profile.username, page)
           : tab === "media" ? await api.getProfileMedia(accessToken, profile.username, page)
           : await api.getProfileLikes(accessToken, profile.username, page);
+        if (currentRequest !== contentRequestId.current) return;
         setPostPage((current) => append && current ? { ...next, content: [...current.content, ...next.content] } : next);
         setReplyPage(null);
       }
     } catch (contentError) {
       if (contentError instanceof ApiError && contentError.status === 401) return onUnauthorized();
-      setError(contentError instanceof Error ? contentError.message : "Profile content could not be loaded.");
-      setPostPage(null); setReplyPage(null);
-    } finally { setIsLoadingContent(false); }
+      if (currentRequest !== contentRequestId.current) return;
+      setContentError(contentError instanceof Error ? contentError.message : "Profile content could not be loaded.");
+      if (!append) { setPostPage(null); setReplyPage(null); }
+    } finally { if (currentRequest === contentRequestId.current) setIsLoadingContent(false); }
   }, [accessToken, onUnauthorized, profile]);
 
   useEffect(() => { if (profile) queueMicrotask(() => void loadContent(activeTab)); }, [activeTab, loadContent, profile]);
@@ -141,15 +147,13 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
   const coverImage = profile.coverMediaId
     ? <AuthenticatedImage accessToken={accessToken} alt={`${profile.displayName} cover`} className="profile-cover-image" mediaId={profile.coverMediaId}/>
     : profile.coverPicture ? <img alt={`${profile.displayName} cover`} className="profile-cover-image" src={profile.coverPicture}/> : null;
-  const profileImage = profile.profileMediaId
-    ? <AuthenticatedImage accessToken={accessToken} alt={profile.displayName} className="profile-avatar-image" mediaId={profile.profileMediaId}/>
-    : profile.profilePicture ? <img alt={profile.displayName} className="profile-avatar-image" src={profile.profilePicture}/> : null;
+  const profileImage = <UserAvatar accessToken={accessToken} className="profile-avatar-image" displayName={profile.displayName} profileMediaId={profile.profileMediaId} profilePicture={profile.profilePicture}/>;
 
   return <section className="workspace-view" aria-labelledby="profile-title">
     <div className="profile-cover">{coverImage && <button aria-label={`View ${profile.displayName}'s cover photo`} className="profile-cover-button" onClick={() => setLightbox("cover")} type="button">{coverImage}</button>}</div>
     <div className="profile-page">
       <div className="profile-hero">
-        <div className="profile-large-avatar">{profileImage ? <button aria-label={`View ${profile.displayName}'s profile photo`} className="profile-avatar-button" onClick={() => setLightbox("profile")} type="button">{profileImage}</button> : initials(profile.displayName)}</div>
+        <div className="profile-large-avatar">{profile.profileMediaId || profile.profilePicture ? <button aria-label={`View ${profile.displayName}'s profile photo`} className="profile-avatar-button" onClick={() => setLightbox("profile")} type="button">{profileImage}</button> : profileImage}</div>
         {ownProfile ? <div className="profile-actions"><button className="secondary-button" onClick={() => setEditing(!editing)} type="button">{editing ? "Cancel" : "Edit profile"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void togglePrivacy()} type="button">{profile.accountPrivacy === "PRIVATE" ? "Make public" : "Make private"}</button></div> : <div className="profile-actions"><button className={following ? "secondary-button" : "primary-button"} disabled={isSaving || blockedByMe} onClick={() => void toggleFollow()} type="button">{following ? "Following" : "Follow"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void toggleMute()} type="button">{muteId ? "Unmute" : "Mute"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void toggleBlock()} type="button">{blockedByMe ? "Unblock" : "Block"}</button><ReportButton accessToken={accessToken} className="secondary-button" onUnauthorized={onUnauthorized} targetId={profile.id} targetType="USER"/></div>}
       </div>
       <h1 id="profile-title">{profile.displayName}{profile.verifiedStatus !== "NONE" && <span className="verified-badge">✓</span>}</h1>
@@ -175,14 +179,15 @@ export function ProfilePanel({ accessToken, username, onUnauthorized }: ProfileP
         {(["posts", "replies", "media", "likes"] as ProfileTab[]).map((tab) => <button aria-current={activeTab === tab ? "page" : undefined} className={activeTab === tab ? "active" : ""} key={tab} onClick={() => setActiveTab(tab)} type="button">{tab[0].toUpperCase() + tab.slice(1)}</button>)}
       </nav>}
       {!blockedByMe && <div aria-live="polite" className="profile-content">
+        {contentError && <div className="profile-content-error" role="alert"><p>{contentError}</p><button className="secondary-button" onClick={() => void loadContent(activeTab)} type="button">Try again</button></div>}
         {isLoadingContent && !postPage && !replyPage ? <div aria-label={`Loading ${activeTab}`} className="feed-loading" role="status"><span/><span/></div>
-          : activeTab === "replies" ? <>
+          : (!contentError || postPage || replyPage) && (activeTab === "replies" ? <>
             {replyPage?.content.length ? <div className="profile-content-list">{replyPage.content.map((reply) => <article className="profile-reply-card" key={reply.id}><p className="profile-reply-context">Replied to @{reply.post.author.username}</p><p>{reply.textContent}</p><small>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(reply.createdAt))}</small><div className="profile-parent-post"><strong>{reply.post.author.displayName}</strong><p>{reply.post.textContent}</p></div></article>)}</div> : !isLoadingContent && <p className="profile-empty">No visible replies yet.</p>}
             {replyPage && !replyPage.last && <button className="load-more-button" disabled={isLoadingContent} onClick={() => void loadContent(activeTab, replyPage.page + 1, true)} type="button">{isLoadingContent ? "Loading…" : "Load more"}</button>}
           </> : <>
-            {postPage?.content.length ? <div className="profile-content-list">{postPage.content.map((post) => <article className={`social-post${post.pinned ? " pinned-profile-post" : ""}`} key={post.id}>{post.pinned && <p className="pinned-label">◆ Pinned post</p>}<div className="social-post-head"><span className="profile-avatar small-avatar">{initials(post.author.displayName)}</span><div className="author-button"><strong>{post.author.displayName}</strong><span>@{post.author.username} · {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(post.createdAt))}</span></div><span className="visibility-pill">{post.visibility.toLowerCase()}</span>{ownProfile && activeTab === "posts" && <button className="profile-pin-button" disabled={isSaving} onClick={() => void togglePin(post)} type="button">{post.pinned ? "Unpin" : "Pin"}</button>}</div><p className="social-post-content">{post.textContent}</p>{post.media.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((asset) => <PostAttachment accessToken={accessToken} asset={asset} key={asset.id}/>)}</div>}<div className="post-metrics"><span>{compact(post.likeCount)} likes</span><span>{compact(post.replyCount)} replies</span><span>{compact(post.repostCount)} reposts</span></div></article>)}</div> : !isLoadingContent && <p className="profile-empty">No visible {activeTab} yet.</p>}
+            {postPage?.content.length ? <div className="profile-content-list">{postPage.content.map((post) => <article className={`social-post${post.pinned ? " pinned-profile-post" : ""}`} key={post.id}>{post.pinned && <p className="pinned-label">◆ Pinned post</p>}<div className="social-post-head"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/><div className="author-button"><strong>{post.author.displayName}</strong><span>@{post.author.username} · {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(post.createdAt))}</span></div><span className="visibility-pill">{post.visibility.toLowerCase()}</span>{ownProfile && activeTab === "posts" && <button className="profile-pin-button" disabled={isSaving} onClick={() => void togglePin(post)} type="button">{post.pinned ? "Unpin" : "Pin"}</button>}</div><p className="social-post-content">{post.textContent}</p>{post.media.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((asset) => <PostAttachment accessToken={accessToken} asset={asset} key={asset.id}/>)}</div>}<div className="post-metrics"><span>{compact(post.likeCount)} likes</span><span>{compact(post.replyCount)} replies</span><span>{compact(post.repostCount)} reposts</span></div></article>)}</div> : !isLoadingContent && <p className="profile-empty">No visible {activeTab} yet.</p>}
             {postPage && !postPage.last && <button className="load-more-button" disabled={isLoadingContent} onClick={() => void loadContent(activeTab, postPage.page + 1, true)} type="button">{isLoadingContent ? "Loading…" : "Load more"}</button>}
-          </>}
+          </>)}
       </div>}
     </div>
     <ImageLightbox onClose={() => setLightbox(null)} open={lightbox === "cover"} title={`${profile.displayName}'s cover photo`}>

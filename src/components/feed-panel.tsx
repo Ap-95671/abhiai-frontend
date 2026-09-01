@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { api, ApiError, PageResponse, Poll, PostReply, PostSearchResult, PostVisibility, UserProfile } from "@/lib/api";
 import { PostAttachment } from "@/components/post-attachment";
@@ -8,6 +9,7 @@ import { RichPostText } from "@/components/rich-post-text";
 import { ReportButton } from "@/components/report-button";
 import { AppIcon } from "@/components/ui/app-icon";
 import { NewsBrief } from "@/components/news/news-brief";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 type FeedPanelProps = {
   accessToken: string;
@@ -15,10 +17,6 @@ type FeedPanelProps = {
   onViewHashtag: (tag: string) => void;
   onViewProfile: (username: string) => void;
 };
-
-function initials(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
 
 function relativeDate(value: string) {
   const minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60_000);
@@ -50,6 +48,10 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
   const [pollEnabled, setPollEnabled] = useState(false);
   const [pollChoices, setPollChoices] = useState(["", ""]);
   const [pollDuration, setPollDuration] = useState(24);
+  const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
+  const postDetailClose = useRef<HTMLButtonElement | null>(null);
+  const postDetailDialog = useRef<HTMLElement | null>(null);
+  const postReturnFocus = useRef<HTMLElement | null>(null);
 
   const loadFeed = useCallback(async (nextPage: number, append: boolean) => {
     setIsLoading(true);
@@ -73,6 +75,57 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
   useEffect(() => {
     queueMicrotask(() => void loadFeed(0, false));
   }, [loadFeed]);
+
+  const closePost = useCallback(() => {
+    setSelectedPost(null);
+    if (window.history.state?.abhiaiPostDetail) window.history.back();
+    else window.history.replaceState(window.history.state, "", "/social");
+    queueMicrotask(() => postReturnFocus.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const sync = async () => {
+      const match = window.location.hash.match(/^#post-(.+)$/);
+      if (!match) setSelectedPost(null);
+      else {
+        const id = decodeURIComponent(match[1]);
+        const loadedPost = posts.find((post) => post.id === id);
+        if (loadedPost) setSelectedPost(loadedPost);
+        else try { const fetched = await api.getPost(accessToken, id); if (active) setSelectedPost(fetched); }
+        catch (postError) { if (postError instanceof ApiError && postError.status === 401) onUnauthorized(); }
+      }
+    };
+    const handlePopState = () => void sync();
+    queueMicrotask(handlePopState);
+    window.addEventListener("popstate", handlePopState);
+    return () => { active = false; window.removeEventListener("popstate", handlePopState); };
+  }, [accessToken, onUnauthorized, posts]);
+
+  useEffect(() => {
+    if (!selectedPost) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    queueMicrotask(() => postDetailClose.current?.focus());
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") return closePost();
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(postDetailDialog.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])") ?? []);
+      const first = focusable[0]; const last = focusable.at(-1);
+      if (!first || !last) return event.preventDefault();
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", handleKeyDown); };
+  }, [closePost, selectedPost]);
+
+  function openPost(post: PostSearchResult) {
+    if (selectedPost?.id === post.id) return;
+    postReturnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelectedPost(post);
+    window.history.pushState({ ...(window.history.state ?? {}), abhiaiPostDetail: true }, "", `/social#post-${encodeURIComponent(post.id)}`);
+  }
 
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,7 +172,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
       <div className="workspace-content feed-hub">
         <div className="feed-workspace">
         <form className="post-composer" onSubmit={publish}>
-          <div className="profile-avatar" aria-hidden="true">{profile ? initials(profile.displayName) : "A"}</div>
+          <UserAvatar accessToken={accessToken} className="profile-avatar" displayName={profile?.displayName ?? "AbhiAI"} profileMediaId={profile?.profileMediaId} profilePicture={profile?.profilePicture}/>
           <textarea aria-label="Create a social post" maxLength={1000} onChange={(event) => setDraft(event.target.value)} placeholder="Share an idea, update, or question…" rows={3} value={draft} />
           {attachments.length > 0 && <div className="composer-image-list">{attachments.map((file,index)=><div key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button aria-label={`Remove ${file.name}`} onClick={()=>setAttachments((items)=>items.filter((_,i)=>i!==index))} type="button">×</button></div>)}</div>}
           {pollEnabled && <div className="poll-composer">{pollChoices.map((choice, index) => <div key={index}><input aria-label={`Poll choice ${index + 1}`} maxLength={100} onChange={(event) => setPollChoices((items) => items.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Choice ${index + 1}`} required value={choice}/>{pollChoices.length > 2 && <button aria-label={`Remove poll choice ${index + 1}`} onClick={() => setPollChoices((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button">×</button>}</div>)}<div className="poll-composer-settings">{pollChoices.length < 4 && <button onClick={() => setPollChoices((items) => [...items, ""])} type="button">＋ Add choice</button>}<label>Duration<select onChange={(event) => setPollDuration(Number(event.target.value))} value={pollDuration}><option value={1}>1 hour</option><option value={24}>1 day</option><option value={72}>3 days</option><option value={168}>7 days</option></select></label></div></div>}
@@ -139,19 +192,20 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
         {isLoading && posts.length === 0 && <div aria-label="Loading your feed" className="feed-loading" role="status"><span/><span/><span/></div>}
         {!isLoading && posts.length === 0 && !error && <div className="feature-empty-state compact"><h2>Your feed is ready</h2><p>Create a post or follow people from Search to bring your network to life.</p></div>}
         <div className="social-feed">
-          {posts.map((post) => <FeedPost accessToken={accessToken} currentUserId={profile?.id} key={post.id} onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
+          {posts.map((post) => <FeedPost accessToken={accessToken} currentUserId={profile?.id} key={post.id} onDelete={removePost} onError={setError} onOpen={openPost} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={post} />)}
         </div>
         {page && !page.last && <button className="load-more-button" disabled={isLoading} onClick={() => void loadFeed(page.page + 1, true)} type="button">{isLoading ? "Loading…" : "Load more posts"}</button>}
         </div>
         <NewsBrief accessToken={accessToken} onUnauthorized={onUnauthorized} />
       </div>
+      {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="post-detail-title" aria-modal="true" className="post-detail-dialog" ref={postDetailDialog} role="dialog"><header><h2 id="post-detail-title">Post</h2><button aria-label="Close post detail" onClick={closePost} ref={postDetailClose} type="button">×</button></header><FeedPost accessToken={accessToken} currentUserId={profile?.id} detail onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={selectedPost}/></section></div>, document.body)}
     </section>
   );
 }
 
-function FeedPost({ accessToken, currentUserId, onDelete, onError, onUnauthorized, onViewHashtag, onViewProfile, post }: {
+function FeedPost({ accessToken, currentUserId, detail = false, onDelete, onError, onOpen, onUnauthorized, onViewHashtag, onViewProfile, post }: {
   accessToken: string; currentUserId?: string; onDelete: (id: string) => void; onError: (message: string) => void;
-  onUnauthorized: () => void; onViewHashtag: (tag: string) => void; onViewProfile: (username: string) => void; post: PostSearchResult;
+  detail?: boolean; onOpen?: (post: PostSearchResult) => void; onUnauthorized: () => void; onViewHashtag: (tag: string) => void; onViewProfile: (username: string) => void; post: PostSearchResult;
 }) {
   const [liked, setLiked] = useState(false); const [reposted, setReposted] = useState(false); const [bookmarked, setBookmarked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likeCount); const [repostCount, setRepostCount] = useState(post.repostCount); const [replyCount, setReplyCount] = useState(post.replyCount);
@@ -249,9 +303,14 @@ function FeedPost({ accessToken, currentUserId, onDelete, onError, onUnauthorize
     finally { setBusy(""); }
   }
 
-  return <article className="social-post" id={`post-${post.id}`}>
+  function openFromCard(event: MouseEvent<HTMLElement>) {
+    if (detail || !onOpen || (event.target as HTMLElement).closest("button,a,input,select,textarea,[role=button]")) return;
+    onOpen(post);
+  }
+
+  return <article className={`social-post${detail ? " post-detail-card" : " clickable-post"}`} id={detail ? undefined : `post-${post.id}`} onClick={openFromCard} onKeyDown={(event) => { if (!detail && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onOpen?.(post); } }} role={detail ? undefined : "link"} tabIndex={detail ? undefined : 0}>
     <div className="social-post-head">
-      <button aria-label={`View ${post.author.displayName}'s profile`} className="avatar-button" onClick={() => onViewProfile(post.author.username)} type="button"><span className="profile-avatar small-avatar">{initials(post.author.displayName)}</span></button>
+      <button aria-label={`View ${post.author.displayName}'s profile`} className="avatar-button" onClick={() => onViewProfile(post.author.username)} type="button"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/></button>
       <button className="author-button" onClick={() => onViewProfile(post.author.username)} type="button"><strong>{post.author.displayName}</strong><span>@{post.author.username} · {relativeDate(post.createdAt)}</span></button>
       <span className="visibility-pill">{post.visibility.toLowerCase()}</span>
       <div className="post-options" ref={postMenuRef}>
@@ -273,6 +332,6 @@ function FeedPost({ accessToken, currentUserId, onDelete, onError, onUnauthorize
       <button aria-label="Share post" onClick={() => void sharePost()} title="Share" type="button"><AppIcon name="share"/><span>{shareStatus === "copied" ? "Copied" : "Share"}</span></button>
       <button aria-label={`${bookmarked ? "Remove bookmark" : "Bookmark post"}`} className={bookmarked ? "selected bookmark" : ""} disabled={busy === "bookmark"} onClick={() => void toggle("bookmark")} title="Bookmark" type="button"><AppIcon name="bookmark"/><span>Save</span></button>
     </div>
-    {showReplies && <div className="replies-panel"><form className="reply-form" onSubmit={reply}><input aria-label="Write a reply" maxLength={1000} onChange={(event) => setReplyDraft(event.target.value)} placeholder="Write a reply…" value={replyDraft}/><button disabled={!replyDraft.trim() || busy === "reply"} type="submit">Reply</button></form>{replies.length === 0 ? <p className="no-replies">No replies yet.</p> : replies.map((item) => <div className="reply-item" key={item.id}><strong>{item.author.displayName}</strong><span>@{item.author.username} · {relativeDate(item.createdAt)}</span>{currentUserId!==item.author.id&&<ReportButton accessToken={accessToken} onUnauthorized={onUnauthorized} targetContext="POST_REPLY" targetId={item.id} targetType="COMMENT"/>}<p>{item.textContent}</p></div>)}</div>}
+    {showReplies && <div className="replies-panel"><form className="reply-form" onSubmit={reply}><input aria-label="Write a reply" maxLength={1000} onChange={(event) => setReplyDraft(event.target.value)} placeholder="Write a reply…" value={replyDraft}/><button disabled={!replyDraft.trim() || busy === "reply"} type="submit">Reply</button></form>{replies.length === 0 ? <p className="no-replies">No replies yet.</p> : replies.map((item) => <div className="reply-item" key={item.id}><UserAvatar accessToken={accessToken} className="reply-avatar" displayName={item.author.displayName} profileMediaId={item.author.profileMediaId} profilePicture={item.author.profilePicture}/><div><strong>{item.author.displayName}</strong><span>@{item.author.username} · {relativeDate(item.createdAt)}</span>{currentUserId!==item.author.id&&<ReportButton accessToken={accessToken} onUnauthorized={onUnauthorized} targetContext="POST_REPLY" targetId={item.id} targetType="COMMENT"/>}<p>{item.textContent}</p></div></div>)}</div>}
   </article>;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import { NewsImage } from "@/components/news/news-image";
@@ -17,6 +18,15 @@ const regions = [
   ["global", "🌍 Global"], ["india", "India"], ["us", "US"], ["europe", "Europe"], ["asia", "Asia"],
   ["middle-east", "Middle East"], ["africa", "Africa"], ["americas", "Americas"],
 ] as const;
+const SAVED_NEWS_STORAGE_KEY = "abhiai.saved-news-article-ids";
+
+function validExternalUrl(value?: string | null) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+  } catch { return ""; }
+}
 
 function relativeTime(value: string) {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
@@ -29,7 +39,7 @@ function relativeTime(value: string) {
   return days === 1 ? "Yesterday" : `${days}d ago`;
 }
 
-function NewsCard({ article, onAsk, onOpen }: { article: NewsArticle; onAsk: (article: NewsArticle) => void; onOpen: (article: NewsArticle) => void }) {
+function NewsCard({ article, onAsk, onOpen, onSave, saved }: { article: NewsArticle; onAsk: (article: NewsArticle) => void; onOpen: (article: NewsArticle) => void; onSave: (article: NewsArticle) => void; saved: boolean }) {
   const [shareLabel, setShareLabel] = useState("Share");
   async function share() {
     const url = `${window.location.origin}/news#${encodeURIComponent(article.id)}`;
@@ -54,7 +64,7 @@ function NewsCard({ article, onAsk, onOpen }: { article: NewsArticle; onAsk: (ar
       <div className="news-story-actions">
         <button onClick={() => onAsk(article)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button>
         <button onClick={() => void share()} type="button"><AppIcon name="share"/> {shareLabel}</button>
-        <button aria-label="Save story (coming soon)" disabled title="Save is coming soon" type="button"><AppIcon name="bookmark"/> Save</button>
+        <button aria-pressed={saved} className={saved ? "selected" : ""} onClick={() => onSave(article)} type="button"><AppIcon name="bookmark"/> {saved ? "Saved" : "Save"}</button>
       </div>
     </article>
   );
@@ -73,10 +83,19 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [shareLabel, setShareLabel] = useState("Share");
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set(JSON.parse(window.localStorage.getItem(SAVED_NEWS_STORAGE_KEY) ?? "[]") as string[]); }
+    catch { return new Set(); }
+  });
   const requestId = useRef(0);
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const modalReturnFocus = useRef<HTMLElement | null>(null);
+  const articlesRef = useRef<NewsArticle[]>([]);
+  const openingId = useRef("");
+
+  useEffect(() => { articlesRef.current = articles; }, [articles]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(searchDraft.trim()), 450);
@@ -97,7 +116,7 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
       if (currentRequest !== requestId.current) return;
       if (loadError instanceof ApiError && loadError.status === 401) return onUnauthorized();
       setError("News is temporarily unavailable.");
-      if (!append) setArticles([]);
+      if (!append && articlesRef.current.length === 0) setArticles([]);
     } finally {
       if (currentRequest === requestId.current) { setLoading(false); setLoadingMore(false); }
     }
@@ -105,18 +124,28 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
 
   useEffect(() => { queueMicrotask(() => void load()); }, [load]);
 
+  const syncStoryFromLocation = useCallback(async () => {
+    const id = window.location.hash ? decodeURIComponent(window.location.hash.slice(1)) : "";
+    if (!id) { setSelected(null); openingId.current = ""; return; }
+    if (openingId.current === id) return;
+    openingId.current = id;
+    const match = articlesRef.current.find((article) => article.id === id);
+    try { setSelected(match ?? await api.getNewsArticle(accessToken, id)); }
+    catch { setSelected(null); }
+    finally { openingId.current = ""; }
+  }, [accessToken]);
+
   useEffect(() => {
-    if (!articles.length || selected || !window.location.hash) return;
-    const id = decodeURIComponent(window.location.hash.slice(1));
-    const match = articles.find((article) => article.id === id);
-    if (match) queueMicrotask(() => setSelected(match));
-    else void api.getNewsArticle(accessToken, id).then(setSelected).catch(() => undefined);
-  }, [accessToken, articles, selected]);
+    queueMicrotask(() => void syncStoryFromLocation());
+    window.addEventListener("popstate", syncStoryFromLocation);
+    return () => window.removeEventListener("popstate", syncStoryFromLocation);
+  }, [syncStoryFromLocation]);
 
   const closeStory = useCallback(() => {
     setSelected(null);
     setShareLabel("Share");
-    window.history.replaceState(null, "", "/news");
+    if (window.history.state?.abhiaiNewsArticle) window.history.back();
+    else window.history.replaceState(window.history.state, "", "/news");
     queueMicrotask(() => modalReturnFocus.current?.focus());
   }, []);
 
@@ -146,9 +175,22 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
   const standardStories = useMemo(() => articles.slice(1), [articles]);
 
   function openStory(article: NewsArticle) {
+    if (selected?.id === article.id || openingId.current === article.id) return;
     modalReturnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    openingId.current = article.id;
     setSelected(article);
-    window.history.replaceState(null, "", `/news#${encodeURIComponent(article.id)}`);
+    window.history.pushState({ ...(window.history.state ?? {}), abhiaiNewsArticle: true }, "", `/news#${encodeURIComponent(article.id)}`);
+    openingId.current = "";
+  }
+
+  function toggleSaved(article: NewsArticle) {
+    setSavedIds((current) => {
+      const next = new Set(current);
+      if (next.has(article.id)) next.delete(article.id); else next.add(article.id);
+      try { window.localStorage.setItem(SAVED_NEWS_STORAGE_KEY, JSON.stringify([...next])); }
+      catch { setError("This browser could not save the story."); return current; }
+      return next;
+    });
   }
 
   function askAbhiAI(article: NewsArticle) {
@@ -168,7 +210,8 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
   }
 
   return (
-    <section aria-hidden={selected ? true : undefined} aria-labelledby="news-page-title" className="workspace-view news-workspace-view" inert={selected ? true : undefined}>
+    <section aria-labelledby="news-page-title" className="workspace-view news-workspace-view">
+      <div aria-hidden={selected ? true : undefined} inert={selected ? true : undefined}>
       <header className="workspace-header news-page-header">
         <div><p className="eyebrow">AbhiAI Social · Global</p><h1 id="news-page-title">Global News</h1><p>Stay informed without leaving AbhiAI.</p></div>
         <button aria-label="Refresh news" className="news-refresh-button" disabled={loading} onClick={() => void load(0, false, true)} type="button"><AppIcon name="repost"/> Refresh</button>
@@ -193,11 +236,12 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
             <div className="news-featured-copy"><p>{featured.category.toUpperCase()} · {relativeTime(featured.publishedAt)}</p><h2>{featured.title}</h2>{featured.description && <span>{featured.description}</span>}<small>Source: {featured.sourceName}{featured.relatedStoryCount > 1 ? ` · Reported by ${featured.relatedStoryCount} sources` : ""}</small><div><button onClick={() => openStory(featured)} type="button">Read Story</button><button onClick={() => askAbhiAI(featured)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button></div></div>
           </article>
         )}
-        {standardStories.length > 0 && <><div className="news-section-heading"><div><p className="eyebrow">Latest stories</p><h2>{query ? `Results for “${query}”` : `${regions.find(([value]) => value === region)?.[1]} briefing`}</h2></div>{page && <small>{page.stale ? "Showing cached stories" : `Updated ${relativeTime(page.updatedAt)}`}</small>}</div><div className="news-story-grid">{standardStories.map((article) => <NewsCard article={article} key={article.id} onAsk={askAbhiAI} onOpen={openStory}/>)}</div></>}
+        {standardStories.length > 0 && <><div className="news-section-heading"><div><p className="eyebrow">Latest stories</p><h2>{query ? `Results for “${query}”` : `${regions.find(([value]) => value === region)?.[1]} briefing`}</h2></div>{page && <small>{page.stale ? "Showing cached stories" : `Updated ${relativeTime(page.updatedAt)}`}</small>}</div><div className="news-story-grid">{standardStories.map((article) => <NewsCard article={article} key={article.id} onAsk={askAbhiAI} onOpen={openStory} onSave={toggleSaved} saved={savedIds.has(article.id)}/>)}</div></>}
         {page?.hasMore && <button className="load-more-button news-load-more" disabled={loadingMore} onClick={() => void load(page.page + 1, true)} type="button">{loadingMore ? "Loading stories…" : "Load more stories"}</button>}
       </div>
+      </div>
 
-      {selected && <div className="news-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeStory(); }} role="presentation"><article aria-labelledby="news-detail-title" aria-modal="true" className="news-detail" ref={dialogRef} role="dialog"><button aria-label="Close story preview" className="news-detail-close" onClick={closeStory} ref={closeButtonRef} type="button">×</button><NewsImage alt={selected.title} className="news-detail-image" src={selected.imageUrl}/><div className="news-detail-content"><p className="eyebrow">{selected.category} · {relativeTime(selected.publishedAt)}</p><h2 id="news-detail-title">{selected.title}</h2><p className="news-detail-source">Reported by <strong>{selected.sourceName}</strong>{selected.author ? ` · ${selected.author}` : ""}</p>{selected.description ? <p className="news-detail-description">{selected.description}</p> : <p className="news-detail-description muted">The publisher did not provide a description. Open the original story for full context.</p>}{selected.sources.length > 1 && <div className="news-related-sources"><strong>Also reported by</strong><p>{selected.sources.map((source) => source.name).join(" · ")}</p></div>}<div className="news-detail-actions"><a href={selected.articleUrl} rel="noopener noreferrer" target="_blank">Read Original <span aria-hidden="true">↗</span></a><button onClick={() => askAbhiAI(selected)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button><button onClick={() => void shareSelected()} type="button"><AppIcon name="share"/> {shareLabel}</button><button aria-label="Save story (coming soon)" disabled title="Save is coming soon" type="button"><AppIcon name="bookmark"/> Save</button></div><p className="news-copyright-note">AbhiAI displays publisher-provided metadata only. Read the original for the complete reporting.</p></div></article></div>}
+      {selected && createPortal(<div className="news-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeStory(); }} role="presentation"><article aria-labelledby="news-detail-title" aria-modal="true" className="news-detail" ref={dialogRef} role="dialog"><button aria-label="Close article" className="news-detail-close" onClick={closeStory} ref={closeButtonRef} type="button">×</button><NewsImage alt={selected.title} className="news-detail-image" src={selected.imageUrl}/><div className="news-detail-content"><p className="eyebrow">{selected.category} · {relativeTime(selected.publishedAt)}</p><h2 id="news-detail-title">{selected.title}</h2><p className="news-detail-source">Reported by <strong>{selected.sourceName}</strong>{selected.author ? ` · ${selected.author}` : ""}</p>{selected.description ? <p className="news-detail-description">{selected.description}</p> : <p className="news-detail-description muted">The publisher did not provide a description. Open the original story for full context.</p>}{selected.sources.length > 1 && <div className="news-related-sources"><strong>Also reported by</strong><p>{selected.sources.map((source) => source.name).join(" · ")}</p></div>}<div className="news-detail-actions">{validExternalUrl(selected.articleUrl) && <a href={validExternalUrl(selected.articleUrl)} rel="noopener noreferrer" target="_blank">Read Original <span aria-hidden="true">↗</span></a>}<button onClick={() => askAbhiAI(selected)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button><button onClick={() => void shareSelected()} type="button"><AppIcon name="share"/> {shareLabel}</button><button aria-pressed={savedIds.has(selected.id)} className={savedIds.has(selected.id) ? "selected" : ""} onClick={() => toggleSaved(selected)} type="button"><AppIcon name="bookmark"/> {savedIds.has(selected.id) ? "Saved" : "Save"}</button></div><p className="news-copyright-note">AbhiAI displays publisher-provided metadata only. Read the original for the complete reporting.</p></div></article></div>, document.body)}
     </section>
   );
 }

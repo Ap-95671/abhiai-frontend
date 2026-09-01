@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Reveal } from "@/components/motion/reveal";
@@ -27,6 +27,15 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
   const [capability, setCapability] = useState<keyof typeof capabilityCopy>("Chat");
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", close);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", close); };
+  }, [menuOpen]);
+
   function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onStart(prompt.trim() || undefined);
@@ -35,6 +44,7 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
   return (
     <main className={styles.page}>
       <ScrollMotion />
+      {menuOpen && <button aria-label="Close navigation" className={styles.menuBackdrop} onClick={() => setMenuOpen(false)} type="button"/>}
       <header className={styles.navbar} data-scroll-navbar>
         <a aria-label="AbhiAI home" className={styles.brand} href="#top">
           <span><Image alt="" height={38} priority src="/abhiai-logo.png" width={38} /></span>
@@ -44,11 +54,11 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
           <i /><i />
         </button>
         <nav className={menuOpen ? styles.navOpen : ""} aria-label="Public navigation">
-          <a href="#product">Product</a><a href="#ai">AI</a><a href="#social">Social</a><a href="#explore">Explore</a><a href="#about">About</a>
+          <a href="#product" onClick={() => setMenuOpen(false)}>Product</a><a href="#ai" onClick={() => setMenuOpen(false)}>AI</a><a href="#social" onClick={() => setMenuOpen(false)}>Social</a><a href="#explore" onClick={() => setMenuOpen(false)}>Explore</a><a href="#about" onClick={() => setMenuOpen(false)}>About</a>
           <div className={styles.mobileNavActions}>
             <ThemeToggle />
-            <button onClick={onLogin} type="button">Log in</button>
-            <button onClick={() => onStart()} type="button">Get started</button>
+            <button onClick={() => { setMenuOpen(false); onLogin(); }} type="button">Log in</button>
+            <button onClick={() => { setMenuOpen(false); onStart(); }} type="button">Get started</button>
           </div>
         </nav>
         <div className={styles.navActions}>

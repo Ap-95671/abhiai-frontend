@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 
 import { PostAttachment } from "@/components/post-attachment";
 import { RichPostText } from "@/components/rich-post-text";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   api,
   ApiError,
@@ -23,10 +24,6 @@ type SearchPanelProps = {
   onViewHashtag: (tag: string) => void;
   onViewProfile: (username: string) => void;
 };
-
-function initials(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
 
 function formatCount(value: number) {
   return new Intl.NumberFormat(undefined, { notation: "compact" }).format(value);
@@ -159,8 +156,8 @@ export function SearchPanel({
 
         {resultCount > 0 && <div className="search-results" aria-live="polite">
           <div className="results-summary"><p>Results for <strong>“{submittedQuery}”</strong></p><span>{page?.totalElements ?? resultCount} found</span></div>
-          {kind === "users" ? <div className="people-grid">{users.map((user) => <article className="person-card" key={user.id}><div className="profile-avatar" aria-hidden="true">{initials(user.displayName)}</div><div className="person-copy"><h2>{user.displayName}{user.verifiedStatus !== "NONE" && <span className="verified-badge" title={user.verifiedStatus}>✓</span>}</h2><p className="username">@{user.username}</p><p className="bio">{user.bio || "Exploring and building with AbhiAI."}</p><p className="follower-count">{formatCount(user.followerCount)} followers</p><button className="profile-link-button" onClick={() => onViewProfile(user.username)} type="button">View profile</button></div></article>)}</div>
-          : kind === "posts" ? <div className="post-results">{posts.map((post) => <article className="post-card" key={post.id}><div className="post-author-row"><div className="profile-avatar small-avatar" aria-hidden="true">{initials(post.author.displayName)}</div><div><button className="inline-author-button" onClick={() => onViewProfile(post.author.username)} type="button">{post.author.displayName}</button><p>@{post.author.username} · {formatDate(post.createdAt)}</p></div><span className="visibility-pill">{post.visibility.toLowerCase()}</span></div><RichPostText className="post-content" onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} text={post.textContent} />{post.media.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((media) => <PostAttachment accessToken={accessToken} asset={media} key={media.id} />)}</div>}<div className="post-metrics" aria-label="Post activity"><span>♡ {formatCount(post.likeCount)}</span><span>↩ {formatCount(post.replyCount)}</span><span>↻ {formatCount(post.repostCount)}</span><span>◉ {formatCount(post.viewCount)}</span></div></article>)}</div>
+          {kind === "users" ? <div className="people-grid">{users.map((user) => <article className="person-card" key={user.id}><UserAvatar accessToken={accessToken} className="profile-avatar" displayName={user.displayName} profileMediaId={user.profileMediaId} profilePicture={user.profilePicture}/><div className="person-copy"><h2>{user.displayName}{user.verifiedStatus !== "NONE" && <span className="verified-badge" title={user.verifiedStatus}>✓</span>}</h2><p className="username">@{user.username}</p><p className="bio">{user.bio || "Exploring and building with AbhiAI."}</p><p className="follower-count">{formatCount(user.followerCount)} followers</p><button className="profile-link-button" onClick={() => onViewProfile(user.username)} type="button">View profile</button></div></article>)}</div>
+          : kind === "posts" ? <div className="post-results">{posts.map((post) => <article className="post-card" key={post.id}><div className="post-author-row"><UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/><div><button className="inline-author-button" onClick={() => onViewProfile(post.author.username)} type="button">{post.author.displayName}</button><p>@{post.author.username} · {formatDate(post.createdAt)}</p></div><span className="visibility-pill">{post.visibility.toLowerCase()}</span></div><RichPostText className="post-content" onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} text={post.textContent} />{post.media.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((media) => <PostAttachment accessToken={accessToken} asset={media} key={media.id} />)}</div>}<div className="post-metrics" aria-label="Post activity"><span>♡ {formatCount(post.likeCount)}</span><span>↩ {formatCount(post.replyCount)}</span><span>↻ {formatCount(post.repostCount)}</span><span>◉ {formatCount(post.viewCount)}</span></div></article>)}</div>
           : <div className="hashtag-search-results">{hashtags.map((tag) => <button key={tag.id} onClick={() => onViewHashtag(tag.normalizedTag)} type="button"><strong>#{tag.displayTag}</strong><span>{formatCount(tag.postCount)} {tag.postCount === 1 ? "post" : "posts"}</span></button>)}</div>}
           {page && !page.last && <button className="load-more-button" disabled={isSearching} onClick={() => void runSearch(page.page + 1, true)} type="button">{isSearching ? "Loading…" : "Load more"}</button>}
         </div>}

@@ -7,6 +7,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { PostAttachment } from "@/components/post-attachment";
 import { RichPostText } from "@/components/rich-post-text";
 import { ReportButton } from "@/components/report-button";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   api,
   ApiError,
@@ -352,7 +353,7 @@ export function CommunityPanel({
 
                 {selected.joined ? (
                   <form className={styles.composer} onSubmit={publish}>
-                    <span className={styles.profileAvatar} aria-hidden="true">{profile ? initials(profile.displayName) : "A"}</span>
+                    <UserAvatar accessToken={accessToken} className={styles.profileAvatar} displayName={profile?.displayName ?? "AbhiAI"} profileMediaId={profile?.profileMediaId} profilePicture={profile?.profilePicture}/>
                     <textarea maxLength={1000} onChange={(event) => setDraft(event.target.value)} placeholder={`Share something with ${selected.name}…`} rows={3} value={draft} />
                     {attachments.length > 0 && <div className={styles.attachments}>{attachments.map((file, index) => <span key={`${file.name}-${file.lastModified}`}><b>{file.name}</b><button aria-label={`Remove ${file.name}`} onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button">×</button></span>)}</div>}
                     <div className={styles.composerFooter}><label>＋ Media<input accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,application/pdf" disabled={attachments.length >= 4 || isBusy} multiple onChange={(event) => { chooseAttachments(event.target.files); event.target.value = ""; }} type="file" /></label><span>{draft.length}/1000</span><button disabled={!draft.trim() || isBusy} type="submit">{isBusy ? "Publishing…" : "Publish"}</button></div>
@@ -365,7 +366,7 @@ export function CommunityPanel({
                   {!isLoadingCommunity && posts.length === 0 && <div className={styles.emptyFeed}><span aria-hidden="true">✎</span><h3>Start the first discussion</h3><p>{selected.joined ? "Share a question, an insight, or something you are building." : "Join this community to start its first discussion."}</p></div>}
                   {posts.map((post) => (
                     <article className={styles.post} key={post.id}>
-                      <header><button onClick={() => onViewProfile(post.author.username)} type="button"><span className={styles.postAvatar}>{initials(post.author.displayName)}</span></button><button className={styles.author} onClick={() => onViewProfile(post.author.username)} type="button"><strong>{post.author.displayName}</strong><span>@{post.author.username} · {relativeDate(post.createdAt)}</span></button>{post.community && <span className={styles.communityPill}>c/{post.community.slug}</span>}<span className={styles.publicPill}>Public</span></header>
+                      <header><button aria-label={`View ${post.author.displayName}'s profile`} onClick={() => onViewProfile(post.author.username)} type="button"><UserAvatar accessToken={accessToken} className={styles.postAvatar} displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/></button><button className={styles.author} onClick={() => onViewProfile(post.author.username)} type="button"><strong>{post.author.displayName}</strong><span>@{post.author.username} · {relativeDate(post.createdAt)}</span></button>{post.community && <span className={styles.communityPill}>c/{post.community.slug}</span>}<span className={styles.publicPill}>Public</span></header>
                       <RichPostText className={styles.postContent} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} text={post.textContent} />
                       {post.media?.length > 0 && <div className="post-media-grid">{post.media.map((asset) => <PostAttachment accessToken={accessToken} asset={asset} key={asset.id} />)}</div>}
                       <footer><span>♡ {post.likeCount}</span><span>↩ {post.replyCount}</span><span>↻ {post.repostCount}</span><time>{relativeDate(post.createdAt)}</time></footer>

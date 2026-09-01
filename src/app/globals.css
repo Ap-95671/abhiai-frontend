@@ -1169,6 +1169,21 @@ button:active:not(:disabled) { transform: translateY(1px); }
 .rich-message-content pre > span { color: #74747c; font-size: .65rem; left: 14px; position: absolute; text-transform: uppercase; top: 10px; }
 .rich-message-content pre code { background: transparent; border: 0; color: #d8d8dd; display: block; line-height: 1.6; padding: 0; white-space: pre; }
 .rich-message-content a { color: #9ca5ff; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.rich-message-content .katex-display { margin: 1rem 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: .25rem 0; }
+.rich-message-content .katex-display > .katex { text-align: left; }
+.user-avatar-image { display: block; object-fit: cover; }
+.user-avatar-fallback { align-items: center; display: flex; justify-content: center; }
+.post-media-open { background: transparent; border: 0; cursor: zoom-in; display: block; height: 100%; padding: 0; width: 100%; }
+.post-media-open:focus-visible { outline: 3px solid var(--blue); outline-offset: -3px; }
+.clickable-post { cursor: pointer; }
+.clickable-post:focus-visible { outline: 3px solid var(--blue); outline-offset: -3px; }
+.post-detail-backdrop { align-items: center; background: rgba(0,0,0,.72); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 90; }
+.post-detail-dialog { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 24px 80px rgba(0,0,0,.35); max-height: min(88vh,900px); max-width: 760px; overflow: auto; width: 100%; }
+.post-detail-dialog > header { align-items: center; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; padding: 14px 18px; position: sticky; top: 0; z-index: 2; background: var(--surface); }
+.post-detail-dialog > header h2 { font-size: 1.05rem; margin: 0; }
+.post-detail-dialog > header button { background: var(--surface-secondary); border: 1px solid var(--border); border-radius: 50%; color: var(--foreground); font-size: 1.4rem; height: 40px; width: 40px; }
+.post-detail-card { border: 0; border-radius: 0; margin: 0; }
+@media (max-width: 600px) { .post-detail-backdrop { align-items: stretch; padding: 0; }.post-detail-dialog { border-radius: 0; max-height: 100dvh; }.post-detail-dialog > header { min-height: 58px; } }
 .message-table-wrap { margin: 16px 0; max-width: 100%; overflow-x: auto; }
 .message-table-wrap table { border-collapse: collapse; font-size: .86rem; width: 100%; }
 .message-table-wrap th, .message-table-wrap td { border: 1px solid #2d2d32; padding: 9px 11px; text-align: left; }
@@ -1568,6 +1583,18 @@ button:active:not(:disabled) { transform: translateY(1px); }
 .social-actions button small { color: inherit; font-size: .66rem; margin-left: 2px; opacity: .72; }
 .social-actions button:hover,
 .social-actions button.selected { background: var(--surface-hover); color: var(--blue); }
+.reply-item { align-items: start; display: grid; gap: 10px; grid-template-columns: 30px minmax(0, 1fr); }
+.reply-item > div { min-width: 0; }
+.reply-avatar { background: var(--surface-raised); border-radius: 50%; color: var(--blue); font-size: .68rem; font-weight: 800; height: 30px; width: 30px; }
+.reply-avatar .user-avatar-image { border-radius: inherit; height: 100%; width: 100%; }
+.profile-content-error { align-items: center; background: color-mix(in srgb, var(--danger) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--danger) 36%, var(--line)); border-radius: 12px; color: var(--danger); display: flex; gap: 14px; justify-content: space-between; margin: 18px 0; padding: 14px 16px; }
+.profile-content-error p { margin: 0; }
+.news-story-actions button.selected,
+.news-detail-actions button.selected { background: color-mix(in srgb, var(--blue) 15%, var(--surface-raised)); border-color: color-mix(in srgb, var(--blue) 45%, var(--line)); color: var(--blue); }
+.notification-avatar-visual { border-radius: 50%; height: 100%; width: 100%; }
+.notification-avatar-visual.user-avatar-image { object-fit: cover; }
+.video-reply-list > div { align-items: start; display: grid; gap: 8px; grid-template-columns: 30px minmax(0, 1fr); }
+.video-reply-list > div > div { min-width: 0; }
 
 [data-theme="light"] .post-composer,
 [data-theme="light"] .social-post { background: #fff; box-shadow: 0 8px 28px rgba(24,24,30,.055); }

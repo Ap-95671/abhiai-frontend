@@ -10,16 +10,13 @@ import {
   PostReply,
   PostSearchResult,
 } from "@/lib/api";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 type VideoFeedPanelProps = {
   accessToken: string;
   onUnauthorized: () => void;
   onViewProfile: (username: string) => void;
 };
-
-function initials(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
 
 export function VideoFeedPanel({ accessToken, onUnauthorized, onViewProfile }: VideoFeedPanelProps) {
   const [posts, setPosts] = useState<PostSearchResult[]>([]);
@@ -193,7 +190,7 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
       <div className="video-gradient" aria-hidden="true" />
       <div className="video-caption">
         <button className="video-author" onClick={() => onViewProfile(post.author.username)} type="button">
-          <span className="profile-avatar small-avatar">{initials(post.author.displayName)}</span>
+          <UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={post.author.displayName} profileMediaId={post.author.profileMediaId} profilePicture={post.author.profilePicture}/>
           <span><strong>{post.author.displayName}</strong><small>@{post.author.username}</small></span>
         </button>
         <p>{post.textContent}</p>
@@ -213,7 +210,7 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
           </form>
           <div className="video-reply-list">
             {replies.length === 0 ? <p>No replies yet.</p> : replies.map((reply) => (
-              <div key={reply.id}><strong>{reply.author.displayName}</strong><span>@{reply.author.username}</span><p>{reply.textContent}</p></div>
+              <div key={reply.id}><UserAvatar accessToken={accessToken} className="reply-avatar" displayName={reply.author.displayName} profileMediaId={reply.author.profileMediaId} profilePicture={reply.author.profilePicture}/><div><strong>{reply.author.displayName}</strong><span>@{reply.author.username}</span><p>{reply.textContent}</p></div></div>
             ))}
           </div>
         </div>

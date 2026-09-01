@@ -11,16 +11,13 @@ import {
 } from "@/lib/api";
 import { GroupMessagesPanel } from "@/components/group-messages-panel";
 import { ReportButton } from "@/components/report-button";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 type MessagesPanelProps = {
   accessToken: string;
   onUnauthorized: () => void;
   onViewProfile: (username: string) => void;
 };
-
-function initials(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
 
 function timeLabel(value: string) {
   const date = new Date(value);
@@ -184,7 +181,7 @@ export function MessagesPanel({ accessToken, onUnauthorized, onViewProfile }: Me
             {!isLoading && conversations.length === 0 && <p className="dm-empty">No direct messages yet. Start with a username above.</p>}
             {conversations.map((conversation) => (
               <button className={selected?.id === conversation.id ? "active" : ""} key={conversation.id} onClick={() => void loadHistory(conversation)} type="button">
-                <span className="profile-avatar small-avatar" aria-hidden="true">{initials(conversation.participant.displayName)}</span>
+                <UserAvatar accessToken={accessToken} className="profile-avatar small-avatar" displayName={conversation.participant.displayName} profileMediaId={conversation.participant.profileMediaId} profilePicture={conversation.participant.profilePicture}/>
                 <span className="dm-list-copy"><strong>{conversation.participant.displayName}</strong><small>{conversation.lastMessagePreview ?? `@${conversation.participant.username}`}</small></span>
                 <span className="dm-list-meta">{conversation.lastMessageAt && <time>{timeLabel(conversation.lastMessageAt)}</time>}{conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</b>}</span>
               </button>
@@ -197,7 +194,7 @@ export function MessagesPanel({ accessToken, onUnauthorized, onViewProfile }: Me
           {!selected ? <div className="feature-empty-state"><span className="empty-state-icon" aria-hidden="true">✉</span><h2>Your private inbox</h2><p>Select a conversation or start a new one using someone&apos;s username.</p></div> : <>
             <header className="dm-thread-header">
               <button aria-label="Back to conversations" className="dm-mobile-back" onClick={() => setSelected(null)} type="button">←</button>
-              <button className="profile-avatar" onClick={() => onViewProfile(selected.participant.username)} type="button">{initials(selected.participant.displayName)}</button>
+              <button aria-label={`View ${selected.participant.displayName}'s profile`} className="avatar-button" onClick={() => onViewProfile(selected.participant.username)} type="button"><UserAvatar accessToken={accessToken} className="profile-avatar" displayName={selected.participant.displayName} profileMediaId={selected.participant.profileMediaId} profilePicture={selected.participant.profilePicture}/></button>
               <div><button onClick={() => onViewProfile(selected.participant.username)} type="button">{selected.participant.displayName}</button><p>@{selected.participant.username}</p></div>
             </header>
             <div className="dm-history" aria-live="polite">
