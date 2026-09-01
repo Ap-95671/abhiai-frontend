@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppIcon } from "@/components/ui/app-icon";
 import { api, ApiError, NewsArticle, NewsPage } from "@/lib/api";
 import { NewsImage } from "@/components/news/news-image";
+import { useSpeechPlayback } from "@/components/voice/use-speech-playback";
 
 function relativeTime(value: string) {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
@@ -23,6 +24,7 @@ export function NewsBrief({ accessToken, onUnauthorized }: { accessToken: string
   const [page, setPage] = useState<NewsPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const speech = useSpeechPlayback();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,6 +43,15 @@ export function NewsBrief({ accessToken, onUnauthorized }: { accessToken: string
 
   function openStory(article: NewsArticle) {
     router.push(`/news#${encodeURIComponent(article.id)}`);
+  }
+
+  function playBrief() {
+    if (!page?.content.length) return;
+    const brief = page.content.map((article, index) => {
+      const description = article.description ? ` ${article.description}` : "";
+      return `Story ${index + 1}. ${article.title}.${description} Source: ${article.sourceName}.`;
+    }).join(" ");
+    speech.play("todays-news-brief", `Today's global news brief. ${brief}`);
   }
 
   return (
@@ -67,7 +78,15 @@ export function NewsBrief({ accessToken, onUnauthorized }: { accessToken: string
             ))}
           </div>
         )}
-        {page && <footer>{page.stale ? "Showing cached stories" : `Updated ${relativeTime(page.updatedAt)}`}</footer>}
+        {page && <footer className="news-brief-footer">
+          <span>{page.stale ? "Showing cached stories" : `Updated ${relativeTime(page.updatedAt)}`}</span>
+          {speech.supported && page.content.length > 0 && <div className="news-brief-audio" aria-label="News audio controls">
+            {speech.status === "idle" ? <button onClick={playBrief} type="button"><AppIcon name="speaker"/> Listen</button> : <>
+              <button onClick={speech.toggle} type="button"><AppIcon name={speech.status === "playing" ? "pause" : "speaker"}/> {speech.status === "playing" ? "Pause" : "Resume"}</button>
+              <button aria-label="Stop news playback" onClick={speech.stop} type="button"><AppIcon name="stop"/></button>
+            </>}
+          </div>}
+        </footer>}
       </div>
     </aside>
   );

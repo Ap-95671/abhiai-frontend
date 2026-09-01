@@ -19,7 +19,9 @@ export type AppIconName =
   | "linkedin"
   | "menu"
   | "message"
+  | "microphone"
   | "more"
+  | "pause"
   | "plus"
   | "profile"
   | "poll"
@@ -28,6 +30,8 @@ export type AppIconName =
   | "search"
   | "share"
   | "send"
+  | "speaker"
+  | "stop"
   | "social"
   | "story"
   | "sun"
@@ -55,7 +59,9 @@ const paths: Record<AppIconName, ReactNode> = {
   linkedin: <><rect height="18" rx="2" width="18" x="3" y="3"/><path d="M8 11v6M8 8v.01M12 17v-6M12 13.5c.7-1.65 4-1.8 4 1.2V17"/></>,
   menu: <><path d="M4 7h16M4 12h16M4 17h16"/></>,
   message: <><path d="M4 5h16v12H8l-4 4V5Z"/></>,
+  microphone: <><rect height="11" rx="4" width="7" x="8.5" y="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6"/></>,
   more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+  pause: <><path d="M8 5v14M16 5v14"/></>,
   plus: <path d="M12 5v14M5 12h14"/>,
   profile: <><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.5-5 3-7 7.5-7s7 2 7.5 7"/></>,
   poll: <><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></>,
@@ -64,6 +70,8 @@ const paths: Record<AppIconName, ReactNode> = {
   search: <><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></>,
   share: <><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></>,
   send: <><path d="m4 12 16-8-5 16-3-6-8-2Z"/><path d="m12 14 8-10"/></>,
+  speaker: <><path d="M4 10h4l5-4v12l-5-4H4z"/><path d="M16 9c1.5 1.7 1.5 4.3 0 6M18.5 6.5c3 3 3 8 0 11"/></>,
+  stop: <rect height="12" rx="1.5" width="12" x="6" y="6"/>,
   social: <><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></>,
   story: <><circle cx="12" cy="12" r="8"/><path d="M9 9.5 15.5 12 9 14.5v-5Z"/></>,
   sun: <><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></>,

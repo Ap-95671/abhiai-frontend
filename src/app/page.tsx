@@ -25,9 +25,12 @@ import { HashtagPanel } from "@/components/hashtag-panel";
 import { ArticlesPanel } from "@/components/articles-panel";
 import { CreatorDashboard } from "@/components/creator-dashboard";
 import { NewsPanel } from "@/components/news/news-panel";
+import { MemoryPanel } from "@/components/memory-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { VoiceInput } from "@/components/voice/voice-input";
+import { SpeechPlaybackController, useSpeechPlayback } from "@/components/voice/use-speech-playback";
 
 import {
   api,
@@ -48,7 +51,7 @@ const ACTIVE_CONVERSATION_STORAGE_KEY = "abhiai.active-conversation-id";
 
 type AuthMode = "login" | "register";
 type GuestView = "landing" | "auth";
-type ActiveView = "chat" | "feed" | "news" | "explore" | "communities" | "articles" | "creator" | "messages" | "stories" | "videos" | "hashtags" | "search" | "notifications" | "profile";
+type ActiveView = "chat" | "feed" | "news" | "explore" | "communities" | "articles" | "creator" | "messages" | "stories" | "videos" | "hashtags" | "search" | "notifications" | "profile" | "memory";
 type ComposerMode = "chat" | "image";
 type AttachmentUploadState = {
   filename: string;
@@ -164,6 +167,8 @@ export default function Home() {
   const [webSearchAllowed, setWebSearchAllowed] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showLatest, setShowLatest] = useState(false);
+  const speechPlayback = useSpeechPlayback();
+  const stopSpeechPlayback = speechPlayback.stop;
   const streamAbortController = useRef<AbortController | null>(null);
   const createConversationLockRef = useRef(false);
   const activeConversationIdRef = useRef<string | undefined>(undefined);
@@ -201,6 +206,10 @@ export default function Home() {
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    stopSpeechPlayback();
+  }, [conversationId, stopSpeechPlayback]);
 
   useEffect(() => {
     queueMicrotask(() => setSidebarCollapsed(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true"));
@@ -1148,7 +1157,9 @@ export default function Home() {
         </div>
       </aside>
 
-      {socialWorkspace && activeView === "feed" ? (
+      {activeView === "memory" ? (
+        <MemoryPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} />
+      ) : socialWorkspace && activeView === "feed" ? (
         <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : socialWorkspace && activeView === "explore" ? (
         <ExplorePanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
@@ -1169,7 +1180,18 @@ export default function Home() {
       ) : socialWorkspace && activeView === "hashtags" ? (
         <HashtagPanel accessToken={accessToken} initialTag={selectedHashtag} onUnauthorized={handleSessionExpired} onViewProfile={viewProfile} />
       ) : socialWorkspace && activeView === "search" ? (
-        <SearchPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
+        <SearchPanel
+          accessToken={accessToken}
+          onOpenConversation={(id) => {
+            setActiveView("chat");
+            router.push("/chat");
+            void selectConversation(accessToken, id);
+          }}
+          onOpenNews={(id) => router.push(`/news#${encodeURIComponent(id)}`)}
+          onUnauthorized={handleSessionExpired}
+          onViewHashtag={viewHashtag}
+          onViewProfile={viewProfile}
+        />
       ) : socialWorkspace && activeView === "notifications" ? (
         <NotificationsPanel
           accessToken={accessToken}
@@ -1240,6 +1262,7 @@ export default function Home() {
                     key={message.id}
                     message={message}
                     onCopy={copyMessage}
+                    speechPlayback={speechPlayback}
                   />
                 ))
               )}
@@ -1310,6 +1333,11 @@ export default function Home() {
                 rows={1}
                 value={messageDraft}
               />
+              <VoiceInput
+                disabled={isSending || composerMode === "image"}
+                onChange={setMessageDraft}
+                value={messageDraft}
+              />
               {isSending ? (
                 <button aria-label="Stop generating" className="stop-button" onClick={stopGeneration} type="button">■</button>
               ) : (
@@ -1362,7 +1390,13 @@ export default function Home() {
                 rows={2}
                 value={messageDraft}
               />
-              <div><span>Start a new conversation</span><button aria-label="Start chat" disabled={isCreatingConversation || !messageDraft.trim()} type="submit"><AppIcon name="send" /></button></div>
+              <div>
+                <span>Start a new conversation</span>
+                <div className="home-composer-actions">
+                  <VoiceInput disabled={isCreatingConversation} onChange={setMessageDraft} value={messageDraft} />
+                  <button aria-label="Start chat" disabled={isCreatingConversation || !messageDraft.trim()} type="submit"><AppIcon name="send" /></button>
+                </div>
+              </div>
             </form>
             <div aria-label="Quick actions" className="quick-actions">
               <button disabled={isCreatingConversation} onClick={() => void startQuickAction("image", "Create an image of ")} type="button"><AppIcon name="image"/><span><strong>Create image</strong><small>Generate from a prompt</small></span></button>
@@ -1395,6 +1429,7 @@ export default function Home() {
     {accountMenuOpen && accountMenuStyle && createPortal(
       <div className="account-menu account-menu-portal" ref={accountMenuRef} role="menu" style={accountMenuStyle}>
         <button onClick={() => { viewProfile(); router.push("/social"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
+        <button onClick={() => { setActiveView("memory"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="ai"/> Memory & privacy</button>
         <ThemeToggle menuItem />
         <button className="danger-menu-item" onClick={signOut} role="menuitem" type="button">Sign out</button>
       </div>,
@@ -1409,13 +1444,16 @@ function MessageBubble({
   copied,
   message,
   onCopy,
+  speechPlayback,
 }: {
   accessToken: string;
   copied: boolean;
   message: ChatMessage;
   onCopy: (message: ChatMessage) => void;
+  speechPlayback: SpeechPlaybackController;
 }) {
   const isUser = message.role === "USER";
+  const isSpeaking = speechPlayback.activeMessageId === message.id;
   return (
     <article className={isUser ? "message user-message" : "message assistant-message"}>
       <div className="message-avatar">
@@ -1424,20 +1462,57 @@ function MessageBubble({
       <div className="message-body">
         <div className="message-meta">
           <p className="message-role">{isUser ? "You" : "AbhiAI"}</p>
-          <button
-            aria-label={`Copy ${isUser ? "your" : "AbhiAI"} message`}
-            className="copy-message-button"
-            onClick={() => void onCopy(message)}
-            type="button"
-          >
-            {copied ? "Copied" : "Copy"}
-          </button>
+          <div className="message-actions">
+            <button
+              aria-label={`Copy ${isUser ? "your" : "AbhiAI"} message`}
+              className="copy-message-button"
+              onClick={() => void onCopy(message)}
+              type="button"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+            {!isUser && speechPlayback.supported && (
+              <>
+                <button
+                  aria-label={isSpeaking && speechPlayback.status === "playing" ? "Pause spoken response" : isSpeaking ? "Resume spoken response" : "Read response aloud"}
+                  aria-pressed={isSpeaking}
+                  className={`speech-action-button${isSpeaking ? " active" : ""}`}
+                  onClick={() => isSpeaking ? speechPlayback.toggle() : speechPlayback.play(message.id, message.content)}
+                  type="button"
+                >
+                  <AppIcon name={isSpeaking && speechPlayback.status === "playing" ? "pause" : "speaker"} />
+                  {isSpeaking && speechPlayback.status === "playing" ? "Pause" : isSpeaking ? "Resume" : "Listen"}
+                </button>
+                {isSpeaking && (
+                  <button
+                    aria-label="Stop spoken response"
+                    className="speech-action-button"
+                    onClick={speechPlayback.stop}
+                    type="button"
+                  >
+                    <AppIcon name="stop" /> Stop
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
         {isUser ? <p className="message-content">{message.content}</p> : <MessageContent content={message.content} />}
         {!isUser && message.model && (
           <p className="model-attribution">
             Answered using {providerLabel(message.provider)} · {message.model}{message.fallbackUsed ? " · fallback used" : ""}
           </p>
+        )}
+        {!isUser && message.citations && message.citations.length > 0 && (
+          <section aria-label="Sources used for this response" className="message-citations">
+            <p><AppIcon name="globe"/> Sources</p>
+            <div>
+              {message.citations.map((citation, index) => {
+                const href = safeExternalHref(citation.url);
+                return href ? <a href={href} key={`${citation.url}-${index}`} rel="noopener noreferrer" target="_blank"><span>{index + 1}</span><span><strong>{citation.title}</strong><small>{citation.domain}</small></span><b aria-hidden="true">↗</b></a> : null;
+              })}
+            </div>
+          </section>
         )}
         {message.attachments && message.attachments.length > 0 && (
           <div className="message-attachments">
@@ -1466,4 +1541,13 @@ function providerLabel(provider?: string | null) {
     cohere: "Cohere", openrouter: "OpenRouter", abhena: "Abhena",
   };
   return provider ? labels[provider] ?? provider : "AbhiAI";
+}
+
+function safeExternalHref(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
 }

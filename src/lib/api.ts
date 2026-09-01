@@ -23,6 +23,25 @@ export type ChatMessage = {
   outputTokens?: number | null;
   latencyMs?: number | null;
   fallbackUsed?: boolean;
+  citations?: MessageCitation[];
+};
+
+export type MessageCitation = {
+  title: string;
+  url: string;
+  domain: string;
+};
+
+export type UserMemory = {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MemorySettings = {
+  enabled: boolean;
+  memories: UserMemory[];
 };
 
 export type ModelOption = {
@@ -561,6 +580,16 @@ export const api = {
   ): Promise<PageResponse<Hashtag>> {
     const params = new URLSearchParams({ q: query, page: String(page), size: String(size) });
     return request(`/search/hashtags?${params.toString()}`, {}, accessToken);
+  },
+
+  searchConversations(
+    accessToken: string,
+    query: string,
+    page = 0,
+    size = 20,
+  ): Promise<PageResponse<ConversationSummary>> {
+    const params = new URLSearchParams({ q: query, page: String(page), size: String(size) });
+    return request(`/conversations/search?${params.toString()}`, {}, accessToken);
   },
 
   getExplore(accessToken: string, limit = 8): Promise<ExploreResult> {
@@ -1190,5 +1219,25 @@ export const api = {
       { method: "DELETE" },
       accessToken,
     );
+  },
+
+  getMemorySettings(accessToken: string): Promise<MemorySettings> {
+    return request("/memory", {}, accessToken);
+  },
+
+  updateMemorySettings(accessToken: string, enabled: boolean): Promise<MemorySettings> {
+    return request("/memory", { method: "PATCH", body: JSON.stringify({ enabled }) }, accessToken);
+  },
+
+  createMemory(accessToken: string, content: string): Promise<UserMemory> {
+    return request("/memory/items", { method: "POST", body: JSON.stringify({ content }) }, accessToken);
+  },
+
+  deleteMemory(accessToken: string, memoryId: string): Promise<void> {
+    return request(`/memory/items/${encodeURIComponent(memoryId)}`, { method: "DELETE" }, accessToken);
+  },
+
+  clearMemories(accessToken: string): Promise<void> {
+    return request("/memory/items", { method: "DELETE" }, accessToken);
   },
 };
