@@ -58,7 +58,13 @@ export function NewsBrief({ accessToken, onUnauthorized }: { accessToken: string
     <aside aria-labelledby="news-brief-title" className="news-brief-rail">
       <div className="news-brief-card">
         <header>
-          <div><span aria-hidden="true">🌍</span><h2 id="news-brief-title">Today&apos;s Brief</h2></div>
+          <div className="news-brief-heading">
+            <span aria-hidden="true" className="news-brief-mark"><AppIcon name="globe" /></span>
+            <span>
+              <small>Global intelligence</small>
+              <h2 id="news-brief-title">Today&apos;s Brief</h2>
+            </span>
+          </div>
           <button onClick={() => router.push("/news")} type="button">View all <span aria-hidden="true">→</span></button>
         </header>
         {loading && !page && <div aria-label="Loading today's news" className="news-brief-skeleton" role="status"><i/><i/><i/><i/></div>}

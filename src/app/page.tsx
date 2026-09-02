@@ -66,20 +66,43 @@ const durableSocialViews = new Set<ActiveView>([
   "videos", "hashtags", "search", "notifications", "profile", "memory",
 ]);
 
-const socialNavigation: Array<{ view: ActiveView; label: string; icon: AppIconName }> = [
-  { view: "feed", label: "Feed", icon: "feed" },
-  { view: "explore", label: "Explore", icon: "explore" },
-  { view: "news", label: "News", icon: "globe" },
-  { view: "communities", label: "Communities", icon: "community" },
-  { view: "articles", label: "Articles", icon: "article" },
-  { view: "creator", label: "Creator Studio", icon: "create" },
-  { view: "messages", label: "Messages", icon: "message" },
-  { view: "stories", label: "Stories", icon: "story" },
-  { view: "videos", label: "Videos", icon: "video" },
-  { view: "hashtags", label: "Tags", icon: "hash" },
-  { view: "search", label: "Search", icon: "search" },
-  { view: "notifications", label: "Notifications", icon: "bell" },
-  { view: "profile", label: "Profile", icon: "profile" },
+const socialNavigationGroups: Array<{
+  label: string;
+  items: Array<{ view: ActiveView; label: string; icon: AppIconName }>;
+}> = [
+  {
+    label: "Discover",
+    items: [
+      { view: "feed", label: "Feed", icon: "feed" },
+      { view: "explore", label: "Explore", icon: "explore" },
+      { view: "news", label: "News", icon: "globe" },
+    ],
+  },
+  {
+    label: "Connect",
+    items: [
+      { view: "communities", label: "Communities", icon: "community" },
+      { view: "messages", label: "Messages", icon: "message" },
+      { view: "notifications", label: "Notifications", icon: "bell" },
+    ],
+  },
+  {
+    label: "Publish",
+    items: [
+      { view: "articles", label: "Articles", icon: "article" },
+      { view: "creator", label: "Creator Studio", icon: "create" },
+      { view: "stories", label: "Stories", icon: "story" },
+      { view: "videos", label: "Videos", icon: "video" },
+    ],
+  },
+  {
+    label: "Library",
+    items: [
+      { view: "hashtags", label: "Tags", icon: "hash" },
+      { view: "search", label: "Search", icon: "search" },
+      { view: "profile", label: "Profile", icon: "profile" },
+    ],
+  },
 ];
 
 function errorMessage(error: unknown) {
@@ -1143,25 +1166,30 @@ export default function Home() {
             <button aria-current="page" className="active" onClick={() => navigateWorkspace("chat", "chat")} title="AI Chat" type="button">
               <AppIcon name="ai" /> <span className="sidebar-label">AI Chat</span>
             </button>
-          ) : (<>
-          {socialNavigation.map((item) => (
-            <button
-              aria-current={activeView === item.view ? "page" : undefined}
-              className={activeView === item.view ? "active" : ""}
-              key={item.view}
-              onClick={() => item.view === "news" ? navigateWorkspace("news") : item.view === "hashtags" ? (viewHashtag(), setMobileSidebarOpen(false)) : item.view === "profile" ? (viewProfile(), setMobileSidebarOpen(false)) : navigateWorkspace(item.view)}
-              title={item.label}
-              type="button"
-            >
-              <AppIcon name={item.icon} /> <span className="sidebar-label">{item.label}</span>
-              {item.view === "notifications" && unreadNotificationCount > 0 && (
-                <strong className="notification-badge" aria-label={`${unreadNotificationCount} unread notifications`}>
-                  {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-                </strong>
-              )}
-            </button>
+          ) : socialNavigationGroups.map((group) => (
+            <section className="navigation-group" key={group.label}>
+              <p className="navigation-group-label sidebar-label">{group.label}</p>
+              <div className="navigation-group-items">
+                {group.items.map((item) => (
+                  <button
+                    aria-current={activeView === item.view ? "page" : undefined}
+                    className={activeView === item.view ? "active" : ""}
+                    key={item.view}
+                    onClick={() => item.view === "news" ? navigateWorkspace("news") : item.view === "hashtags" ? (viewHashtag(), setMobileSidebarOpen(false)) : item.view === "profile" ? (viewProfile(), setMobileSidebarOpen(false)) : navigateWorkspace(item.view)}
+                    title={item.label}
+                    type="button"
+                  >
+                    <AppIcon name={item.icon} /> <span className="sidebar-label">{item.label}</span>
+                    {item.view === "notifications" && unreadNotificationCount > 0 && (
+                      <strong className="notification-badge" aria-label={`${unreadNotificationCount} unread notifications`}>
+                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                      </strong>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
-          </>)}
         </nav>
 
         <nav className={!socialWorkspace ? "conversation-list" : "conversation-list hidden"} aria-label="Conversations">
