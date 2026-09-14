@@ -472,6 +472,24 @@ async function request<T>(
 }
 
 export const api = {
+
+  assistantConfig(accessToken: string): Promise<{ enabled: boolean; voiceAvailable: boolean }> {
+    return request("/assistant/config", { signal: AbortSignal.timeout(15000) }, accessToken);
+  },
+  openAssistant(accessToken: string, fresh = false): Promise<ConversationDetail> {
+    return request("/assistant/conversation", { method: "POST", body: JSON.stringify({ fresh }), signal: AbortSignal.timeout(15000) }, accessToken);
+  },
+  saveAssistantTranscript(accessToken: string, id: string, messages: { id: string; role: MessageRole; content: string }[]): Promise<void> {
+    return request(`/assistant/conversations/${id}/transcript`, {
+      method: "PUT", body: JSON.stringify({ messages }), keepalive: true, signal: AbortSignal.timeout(15000),
+    }, accessToken);
+  },
+  createAssistantSession(accessToken: string, body: { id: string; conversationId: string }, signal: AbortSignal): Promise<{ id: string; token: string; model: string; expiresAt: string; idleSeconds: number }> {
+    return request("/assistant/sessions", { method: "POST", body: JSON.stringify(body), signal }, accessToken);
+  },
+  closeAssistantSession(accessToken: string, id: string): Promise<void> {
+    return request(`/assistant/sessions/${id}`, { method: "DELETE", keepalive: true }, accessToken);
+  },
   async register(displayName: string, email: string, password: string): Promise<void> {
     await request("/auth/register", {
       method: "POST",
@@ -498,8 +516,8 @@ export const api = {
     );
   },
 
-  getConversation(accessToken: string, conversationId: string): Promise<ConversationDetail> {
-    return request(`/conversations/${conversationId}`, {}, accessToken);
+  getConversation(accessToken: string, conversationId: string, signal?: AbortSignal): Promise<ConversationDetail> {
+    return request(`/conversations/${conversationId}`, { signal }, accessToken);
   },
 
   renameConversation(

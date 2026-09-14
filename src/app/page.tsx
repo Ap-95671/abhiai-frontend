@@ -29,6 +29,7 @@ import { MemoryPanel } from "@/components/memory-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { AiCharacterLauncher } from "@/components/ai-character/ai-character-launcher";
 import { VoiceInput } from "@/components/voice/voice-input";
 import { SpeechPlaybackController, useSpeechPlayback } from "@/components/voice/use-speech-playback";
 
@@ -1517,6 +1518,7 @@ export default function Home() {
         </div>
       )}
     </main>
+    {accessToken && currentUser && <AiCharacterLauncher key={currentUser.id} token={accessToken} userId={currentUser.id} obstructed={mobileSidebarOpen || accountMenuOpen || !!conversationDialog} />}
     {accountMenuOpen && accountMenuStyle && createPortal(
       <div className="account-menu account-menu-portal" ref={accountMenuRef} role="menu" style={accountMenuStyle}>
         <button onClick={() => { viewProfile(); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
