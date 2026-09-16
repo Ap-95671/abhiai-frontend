@@ -1,12 +1,14 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState, useId } from "react";
 
 import { AppIcon } from "@/components/ui/app-icon";
-import { api, ApiError, MemorySettings } from "@/lib/api";
+import { api, ApiError, MemorySettings, MemoryCategory } from "@/lib/api";
 
 export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: string; onUnauthorized: () => void }) {
+  const prefix = useId();
   const [settings, setSettings] = useState<MemorySettings | null>(null);
+  const [category, setCategory] = useState<MemoryCategory>("PREFERENCE");
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -26,7 +28,7 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
   async function toggleEnabled() {
     if (!settings) return;
     setSaving(true); setError("");
-    try { setSettings(await api.updateMemorySettings(accessToken, !settings.enabled)); }
+    try { setSettings(await api.updateMemorySettings(accessToken, !settings.enabled)); window.dispatchEvent(new Event("abhiai:memory-changed")); }
     catch (saveError) {
       if (saveError instanceof ApiError && saveError.status === 401) return onUnauthorized();
       setError(saveError instanceof Error ? saveError.message : "Memory preference could not be updated.");
@@ -39,9 +41,9 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
     if (!content || !settings) return;
     setSaving(true); setError("");
     try {
-      const memory = await api.createMemory(accessToken, content);
+      const memory = await api.createMemory(accessToken, content, category);
       setSettings({ ...settings, memories: [memory, ...settings.memories] });
-      setDraft("");
+      setDraft(""); window.dispatchEvent(new Event("abhiai:memory-changed"));
     } catch (saveError) {
       if (saveError instanceof ApiError && saveError.status === 401) return onUnauthorized();
       setError(saveError instanceof Error ? saveError.message : "Memory could not be saved.");
@@ -49,11 +51,11 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
   }
 
   async function removeMemory(id: string) {
-    if (!settings) return;
+    if (!settings || !window.confirm("Delete this saved memory?")) return;
     setSaving(true); setError("");
     try {
       await api.deleteMemory(accessToken, id);
-      setSettings({ ...settings, memories: settings.memories.filter((memory) => memory.id !== id) });
+      setSettings({ ...settings, memories: settings.memories.filter((memory) => memory.id !== id) }); window.dispatchEvent(new Event("abhiai:memory-changed"));
     } catch (saveError) {
       if (saveError instanceof ApiError && saveError.status === 401) return onUnauthorized();
       setError(saveError instanceof Error ? saveError.message : "Memory could not be deleted.");
@@ -63,15 +65,15 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
   async function clearAll() {
     if (!settings || settings.memories.length === 0 || !window.confirm("Delete every saved memory? This cannot be undone.")) return;
     setSaving(true); setError("");
-    try { await api.clearMemories(accessToken); setSettings({ ...settings, memories: [] }); }
+    try { await api.clearMemories(accessToken); setSettings({ ...settings, memories: [] }); window.dispatchEvent(new Event("abhiai:memory-changed")); }
     catch (saveError) {
       if (saveError instanceof ApiError && saveError.status === 401) return onUnauthorized();
       setError(saveError instanceof Error ? saveError.message : "Memories could not be cleared.");
     } finally { setSaving(false); }
   }
 
-  return <section aria-labelledby="memory-title" className="workspace-view memory-workspace-view">
-    <header className="workspace-header"><div><p className="eyebrow">AI privacy</p><h1 id="memory-title">Memory & personalization</h1><p>You decide exactly what AbhiAI may remember across conversations.</p></div></header>
+  return <section aria-labelledby={`${prefix}-memory-title`} className="workspace-view memory-workspace-view">
+    <header className="workspace-header"><div><p className="eyebrow">AI privacy</p><h1 id={`${prefix}-memory-title`}>Memory & personalization</h1><p>You decide exactly what AbhiAI may remember across conversations.</p></div></header>
     <div className="workspace-content memory-workspace">
       {loading && <div aria-label="Loading memory settings" className="memory-loading" role="status"><i/><i/><i/></div>}
       {error && <p className="inline-error" role="alert">{error}</p>}
@@ -82,14 +84,15 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
         </section>
 
         <form className="memory-create-card" onSubmit={(event) => void addMemory(event)}>
-          <label htmlFor="new-memory">Add something you want AbhiAI to remember</label>
-          <textarea id="new-memory" maxLength={500} onChange={(event) => setDraft(event.target.value)} placeholder="For example: I prefer concise answers with practical examples." value={draft}/>
+          <label htmlFor={`${prefix}-new-memory`}>Add something you want AbhiAI to remember</label>
+          <label htmlFor={`${prefix}-memory-category`}>Category</label><select id={`${prefix}-memory-category`} value={category} onChange={event=>setCategory(event.target.value as MemoryCategory)}>{(["PREFERENCE","INTEREST","ASSISTANT_SETTING","PROJECT_CONTEXT"] as const).map(value=><option key={value} value={value}>{value.toLowerCase().replaceAll("_"," ")}</option>)}</select>
+          <textarea id={`${prefix}-new-memory`} maxLength={500} onChange={(event) => setDraft(event.target.value)} placeholder="For example: I prefer concise answers with practical examples." value={draft}/>
           <footer><span>{draft.length}/500 · Never save passwords, API keys, or highly sensitive information.</span><button disabled={saving || !draft.trim()} type="submit">Save memory</button></footer>
         </form>
 
         <section className="memory-list-card">
           <header><div><h2>Saved memories</h2><p>{settings.memories.length} of 50</p></div>{settings.memories.length > 0 && <button className="memory-clear" disabled={saving} onClick={() => void clearAll()} type="button">Clear all</button>}</header>
-          {settings.memories.length === 0 ? <div className="memory-empty"><AppIcon name="bookmark"/><h3>No saved memories</h3><p>Nothing from your conversations is remembered automatically.</p></div> : <ul>{settings.memories.map((memory) => <li key={memory.id}><span>{memory.content}</span><button aria-label={`Delete memory: ${memory.content}`} disabled={saving} onClick={() => void removeMemory(memory.id)} type="button">Delete</button></li>)}</ul>}
+          {settings.memories.length === 0 ? <div className="memory-empty"><AppIcon name="bookmark"/><h3>No saved memories</h3><p>Nothing from your conversations is remembered automatically.</p></div> : <ul>{settings.memories.map((memory) => <li key={memory.id}><span><small>{(memory.category ?? "PREFERENCE").toLowerCase().replaceAll("_"," ")}</small><br/>{memory.content}</span><button aria-label={`Delete memory: ${memory.content}`} disabled={saving} onClick={() => void removeMemory(memory.id)} type="button">Delete</button></li>)}</ul>}
         </section>
       </>}
     </div>

@@ -21,6 +21,17 @@ function load(file, mocks = {}, globals = {}) {
 }
 const root = path.resolve(__dirname, '../src/components/ai-character');
 const state = load(path.join(root, 'assistant-state.ts'));
+test('document context cannot follow the user into a different chat or page', () => {
+  const {currentDocumentContext} = load(path.join(root, 'context-types.ts'));
+  const first = {pageType:'conversation',entityId:'chat-a'};
+  const second = {pageType:'conversation',entityId:'chat-b'};
+  const news = {pageType:'news',entityId:'article-a'};
+  const document = {pageType:'document',entityId:'file-a',parentId:'chat-a',externalProcessingAllowed:true};
+  assert.equal(currentDocumentContext(first, document), document);
+  assert.equal(currentDocumentContext(second, document), second);
+  assert.equal(currentDocumentContext(news, document), news);
+  assert.equal(currentDocumentContext(first, null), first);
+});
 test('character supports voice, typed, interruption, recovery transitions', () => {
   let current = 'idle';
   for (const [event, expected] of [['listen','listening'],['think','thinking'],['speak','speaking'],['listen','listening'],['fail','error'],['settle','idle'],['think','thinking'],['settle','idle']]) {
@@ -39,7 +50,7 @@ test('voice and text messages form one ordered, bounded realtime context', () =>
 });
 const activeVoices=[];
 test.afterEach(()=>{activeVoices.splice(0).forEach(v=>v.close());});
-function fixture({ permission, sessionError } = {}) {
+function fixture({ permission, sessionError, tool } = {}) {
   const calls = [], messages = [], statuses = [], errors = [];
   const track = { enabled:true, onended:null, stopped:false, stop() { this.stopped = true; } };
   const stream = { getTracks:()=>[track], getAudioTracks:()=>[track] };
@@ -71,7 +82,7 @@ function fixture({ permission, sessionError } = {}) {
   });
   const voice=new RealtimeVoice('jwt-test',{
     connection:s=>statuses.push(s),character:s=>calls.push({type:'character',s}),microphone:v=>calls.push({type:'mic',v}),busy:v=>calls.push({type:'busy',v}),
-    message:m=>messages.push(m),level(){},error:e=>errors.push(e),
+    message:m=>messages.push(m),level(){},error:e=>errors.push(e), tool, event:e=>calls.push({type:"event",...e}),
   });
   activeVoices.push(voice);
   const event=async e=>{Socket.last.onmessage?.({data:JSON.stringify(e)});await new Promise(r=>setImmediate(r));};
@@ -154,4 +165,54 @@ test('audio-driven meter samples real signal values, smooths them, and releases 
   const meter=new AudioMeter(context,value=>levels.push(value));meter.attach({});frame(34);
   assert(levels.at(-1)>0&&levels.at(-1)<1);const previous=levels.at(-1);frame(68);assert(levels.at(-1)>previous);
   meter.stop();assert(cancelled);assert.equal(disconnected,2);assert.equal(levels.at(-1),0);
+});
+
+const contextTypes = load(path.join(root, 'context-types.ts'));
+const tools = load(path.join(root, 'tool-types.ts'));
+test('V2 context keeps only approved fields and bounded selections', () => {
+  const result=contextTypes.boundedContext({pageType:'news',entityId:'A',selectedText:'x'.repeat(5000),password:'never send',metadata:{token:'secret'}});
+  assert.equal(result.selectedText.length,2000);assert.equal(result.password,undefined);assert.equal(result.metadata,undefined);
+  assert.equal(contextTypes.boundedContext({...result,entityId:'B'}).entityId,'B');
+});
+test('V2 rejects selection from fields and from unrelated content', () => {
+  const input={nodeType:1,closest:selector=>selector.includes('input')?{}:null};
+  assert.equal(contextTypes.selectedContextText({isCollapsed:false,anchorNode:input,focusNode:input}),'');
+  const unrelated={nodeType:1,closest:()=>null};
+  assert.equal(contextTypes.selectedContextText({isCollapsed:false,anchorNode:unrelated,focusNode:unrelated}),'');
+  const surface={};const text={nodeType:1,closest:selector=>selector==='[data-assistant-context]'?surface:null};
+  assert.equal(contextTypes.selectedContextText({isCollapsed:false,anchorNode:text,focusNode:text,getRangeAt:()=>({cloneContents:()=>({querySelector:()=>null})}),toString:()=> 'Selected paragraph'}),'Selected paragraph');
+});
+test('expressions stay separate from activity and silence closes the mouth smoothly', () => {
+  assert.equal(state.validExpression('supportive'),'supportive');assert.equal(state.validExpression('publish'),'neutral');
+  assert.equal(state.transition('listening','think'),'thinking');
+  const attack=state.smoothMouth(0,.15,33);assert(attack>0&&attack<1);
+  const release=state.smoothMouth(attack,0,33);assert(release<attack&&release>0);
+  let level=attack;for(let i=0;i<30;i++)level=state.smoothMouth(level,0,33);assert.equal(level,0);
+});
+test('tool result links cannot navigate to scripts or external destinations', () => {
+  for(const href of ['javascript:alert(1)','//evil.test','/social\\evil','https://evil.test','/settings?token=secret'])assert.equal(tools.safeToolHref(href),undefined);
+  assert.equal(tools.safeToolHref('/social#post-123'),'/social#post-123');
+});
+test('voice tool calls return results to Gemini using the exact function id', async () => {
+  const received=[];
+  const f=fixture({tool:async(name,args)=>{received.push({name,args});return {tool:name,kind:'cards',title:'Search results',text:'Found Java',cards:[{title:'Java post'}],expression:'happy'};}});
+  await f.ready();await f.event({toolCall:{functionCalls:[{id:'fc-1',name:'SEARCH_ABHIAI',args:{query:'Java'}}]}});
+  assert.equal(received[0].name,'SEARCH_ABHIAI');assert.equal(received[0].args.query,'Java');
+  const response=f.calls.find(c=>c.toolResponse);assert.equal(response.toolResponse.functionResponses[0].id,'fc-1');
+  assert.equal(response.toolResponse.functionResponses[0].response.result.cards[0].title,'Java post');
+});
+test('cancelled voice tools cannot send stale results or cards after navigation', async () => {
+  let resolve,signal;
+  const f=fixture({tool:(_name,_args,s)=>{signal=s;return new Promise(r=>{resolve=r;});}});
+  await f.ready();await f.event({toolCall:{functionCalls:[{id:'old',name:'GET_CURRENT_POST',args:{}}]}});
+  f.voice.updateContext();assert.equal(signal.aborted,true);
+  resolve({tool:'GET_CURRENT_POST',kind:'cards',title:'Old post',cards:[]});await new Promise(r=>setImmediate(r));
+  assert.equal(f.calls.filter(c=>c.toolResponse).length,0);
+  assert.equal(f.calls.filter(c=>c.type==='event'&&c.result).length,0);
+});
+test('provider tool cancellation and failures preserve the voice/text fallback path', async () => {
+  const f=fixture({tool:async()=>{throw new Error('internal secret');}});await f.ready();
+  await f.event({toolCall:{functionCalls:[{id:'fail',name:'SEARCH_ABHIAI',args:{query:'Java'}}]}});
+  const response=f.calls.find(c=>c.toolResponse);assert(!JSON.stringify(response).includes('internal secret'));
+  assert.equal(f.voice.connected,true);assert(response.toolResponse.functionResponses[0].response.error);
 });

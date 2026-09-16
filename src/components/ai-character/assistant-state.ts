@@ -44,3 +44,17 @@ export function realtimeHistory(messages: AssistantMessage[]) {
     parts: [{ text: message.content }],
   }));
 }
+
+export const expressions = ["neutral", "happy", "curious", "thinking", "excited", "supportive", "confused", "serious"] as const;
+export type AssistantExpression = typeof expressions[number];
+export type AnimationMode = "full" | "reduced" | "off";
+export function validExpression(value: unknown): AssistantExpression {
+  return expressions.includes(value as AssistantExpression) ? value as AssistantExpression : "neutral";
+}
+/** Noise gate plus frame-rate independent attack/release; no oscillation during silence. */
+export function smoothMouth(previous: number, rms: number, elapsedMs: number): number {
+  const target = rms < 0.018 ? 0 : Math.min(1, Math.pow((rms - 0.018) / 0.16, 0.7));
+  const blend = 1 - Math.exp(-Math.max(0, Math.min(elapsedMs, 100)) / (target > previous ? 45 : 95));
+  const next = previous + (target - previous) * blend;
+  return next < 0.018 ? 0 : next;
+}

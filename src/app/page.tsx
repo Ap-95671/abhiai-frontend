@@ -29,7 +29,8 @@ import { MemoryPanel } from "@/components/memory-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { AiCharacterLauncher } from "@/components/ai-character/ai-character-launcher";
+import { usePageContext, AssistantDocumentButton } from "@/components/ai-character/abhiai-context";
+import { useAssistantSession } from "@/components/ai-character/assistant-workspace";
 import { VoiceInput } from "@/components/voice/voice-input";
 import { SpeechPlaybackController, useSpeechPlayback } from "@/components/voice/use-speech-playback";
 
@@ -212,6 +213,11 @@ export default function Home() {
   const [locationSearch, setLocationSearch] = useState("");
   const shouldFollowStreamRef = useRef(true);
   const pendingNewsPromptStartedRef = useRef(false);
+  useAssistantSession(sessionResolved, accessToken, currentUser?.id, mobileSidebarOpen || accountMenuOpen || !!conversationDialog);
+  usePageContext(accessToken ? { pageType: activeView === "chat" ? "conversation" : activeView === "news" ? "news" : activeView === "feed" ? "feed" : activeView === "search" ? "search" : "other",
+    route: pathname, entityId: activeView === "chat" ? selectedConversation?.id : undefined,
+    title: activeView === "chat" ? selectedConversation?.title : undefined } : null, 1);
+
 
   useEffect(() => {
     const syncLocation = () => setLocationSearch(window.location.search);
@@ -1343,6 +1349,8 @@ export default function Home() {
                 sortedMessages.map((message) => (
                   <MessageBubble
                     accessToken={accessToken}
+                    conversationId={conversationId}
+                    documentProcessingAllowed={externalProcessingAllowed}
                     copied={copiedMessageId === message.id}
                     key={message.id}
                     message={message}
@@ -1377,6 +1385,7 @@ export default function Home() {
                   )}
                   {chatAttachments.map((attachment) => (
                     <span key={attachment.id}>
+                      {attachment.kind === "DOCUMENT" && selectedConversation && <AssistantDocumentButton id={attachment.id} conversationId={selectedConversation.id} title={attachment.filename} allowed={externalProcessingAllowed} />}
                       {attachment.kind === "IMAGE" && (
                         <AuthenticatedImage accessToken={accessToken} alt={attachment.filename} className="chat-attachment-thumbnail" mediaId={attachment.mediaId} thumbnail />
                       )}
@@ -1518,7 +1527,6 @@ export default function Home() {
         </div>
       )}
     </main>
-    {accessToken && currentUser && <AiCharacterLauncher key={currentUser.id} token={accessToken} userId={currentUser.id} obstructed={mobileSidebarOpen || accountMenuOpen || !!conversationDialog} />}
     {accountMenuOpen && accountMenuStyle && createPortal(
       <div className="account-menu account-menu-portal" ref={accountMenuRef} role="menu" style={accountMenuStyle}>
         <button onClick={() => { viewProfile(); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
@@ -1533,6 +1541,7 @@ export default function Home() {
 }
 
 function MessageBubble({
+  conversationId, documentProcessingAllowed,
   accessToken,
   copied,
   message,
@@ -1540,6 +1549,7 @@ function MessageBubble({
   speechPlayback,
 }: {
   accessToken: string;
+  conversationId?: string; documentProcessingAllowed: boolean;
   copied: boolean;
   message: ChatMessage;
   onCopy: (message: ChatMessage) => void;
@@ -1548,7 +1558,7 @@ function MessageBubble({
   const isUser = message.role === "USER";
   const isSpeaking = speechPlayback.activeMessageId === message.id;
   return (
-    <article className={isUser ? "message user-message" : "message assistant-message"}>
+    <article data-assistant-context="conversation" className={isUser ? "message user-message" : "message assistant-message"}>
       <div className="message-avatar">
         {isUser ? "You" : <Image alt="AbhiAI" height={32} src="/abhiai-logo.png" width={32} />}
       </div>
@@ -1618,7 +1628,7 @@ function MessageBubble({
                 mediaId={attachment.mediaId}
               />
             ) : (
-              <span className="message-document" key={attachment.id}>▤ {attachment.filename}</span>
+              <span className="message-document" key={attachment.id}>▤ {attachment.filename}{conversationId && <AssistantDocumentButton id={attachment.id} conversationId={conversationId} title={attachment.filename} allowed={documentProcessingAllowed}/>}</span>
             ))}
           </div>
         )}

@@ -1,3 +1,4 @@
+import { smoothMouth } from "./assistant-state";
 /** Meter an actual media stream. Playback stays on the audio element (no double output). */
 export class AudioMeter {
   private source: MediaStreamAudioSourceNode | null = null;
@@ -16,10 +17,11 @@ export class AudioMeter {
     const sample = (now: number) => {
       if (!this.analyser) return;
       if (now - previous >= 33) { // Cap UI updates at 30 fps.
+        const elapsed = previous ? now - previous : 33;
         previous = now;
         this.analyser.getByteTimeDomainData(values);
         const rms = Math.sqrt(values.reduce((sum, value) => sum + ((value - 128) / 128) ** 2, 0) / values.length);
-        this.value = this.value * 0.55 + Math.min(1, rms * 7) * 0.45;
+        this.value = smoothMouth(this.value, rms, elapsed);
         this.onLevel(this.value < 0.015 ? 0 : this.value);
       }
       this.frame = requestAnimationFrame(sample);

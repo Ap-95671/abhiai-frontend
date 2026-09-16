@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { api, ApiError, PageResponse, PostSearchResult, ProfileReply, ProfileUpdate, UserProfile } from "@/lib/api";
+import { usePageContext, useAbhiAIContext, openAssistant } from "@/components/ai-character/abhiai-context";
 import { AuthenticatedImage } from "@/components/authenticated-image";
 import { ReportButton } from "@/components/report-button";
 import { PostCard } from "@/components/social/post-card";
@@ -23,6 +24,7 @@ type ProfileTab = "posts" | "replies" | "media" | "likes";
 function compact(value: number) { return new Intl.NumberFormat(undefined, { notation: "compact" }).format(value); }
 
 export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHashtag, onViewProfile }: ProfilePanelProps) {
+  const assistantOpen = useAbhiAIContext()?.assistantOpen;
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentUserId, setCurrentUserId] = useState("");
   const [following, setFollowing] = useState(false);
@@ -45,6 +47,9 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
   const contentRequestId = useRef(0);
   const [lightbox, setLightbox] = useState<"profile" | "cover" | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
+  usePageContext(!isLoading && profile && (!username || username.toLowerCase() === profile.username.toLowerCase())
+    ? selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}` }
+      : { pageType: "profile", entityId: profile.username, title: profile.displayName } : null);
   const postDialogRef = useRef<HTMLElement | null>(null);
   const postCloseRef = useRef<HTMLButtonElement | null>(null);
   const postReturnFocus = useRef<HTMLElement | null>(null);
@@ -136,6 +141,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
     document.body.style.overflow = "hidden";
     queueMicrotask(() => postCloseRef.current?.focus());
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if ((event.target as HTMLElement)?.closest("[data-assistant-panel]")) return;
       if (event.key === "Escape") return closePost();
       if (event.key !== "Tab") return;
       const focusable = Array.from(postDialogRef.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])") ?? []);
@@ -270,7 +276,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
           </>)}
       </div>}
     </div>
-    {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="profile-post-detail-title" aria-modal="true" className="post-detail-dialog" ref={postDialogRef} role="dialog"><header><h2 id="profile-post-detail-title">Post</h2><button aria-label="Close post detail" onClick={closePost} ref={postCloseRef} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={currentUserId} detail onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={selectedPost}/></section></div>, document.body)}
+    {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="profile-post-detail-title" aria-modal={!assistantOpen} className="post-detail-dialog" data-assistant-context="post" ref={postDialogRef} role="dialog"><header><h2 id="profile-post-detail-title">Post</h2><button className="post-assistant-action" type="button" onClick={openAssistant}>Talk about this post</button><button aria-label="Close post detail" onClick={closePost} ref={postCloseRef} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={currentUserId} detail onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={selectedPost}/></section></div>, document.body)}
     <ImageLightbox onClose={() => setLightbox(null)} open={lightbox === "cover"} title={`${profile.displayName}'s cover photo`}>
       {profile.coverMediaId ? <AuthenticatedImage accessToken={accessToken} alt={`${profile.displayName} cover`} mediaId={profile.coverMediaId}/> : profile.coverPicture ? <img alt={`${profile.displayName} cover`} src={profile.coverPicture}/> : null}
     </ImageLightbox>

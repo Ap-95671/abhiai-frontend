@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useAbhiAIContext } from "./abhiai-context";
 import { CharacterAvatar } from "./character-avatar";
 import styles from "./assistant.module.css";
 
@@ -12,7 +13,14 @@ export function AiCharacterLauncher({ token, userId, obstructed }: { token: stri
   const [config, setConfig] = useState<{ enabled: boolean; voiceAvailable: boolean }>();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const setAssistantOpen = useAbhiAIContext()?.setAssistantOpen;
+  useEffect(() => { setAssistantOpen?.(open); }, [open,setAssistantOpen]);
   const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const show = () => { setLoaded(true); setOpen(true); };
+    window.addEventListener("abhiai:open-assistant", show);
+    return () => window.removeEventListener("abhiai:open-assistant", show);
+  }, []);
   useEffect(() => {
     let active = true;
     void api.assistantConfig(token).then(value => { if (active) setConfig(value); }).catch(() => {});
@@ -34,7 +42,7 @@ export function AiCharacterLauncher({ token, userId, obstructed }: { token: stri
     const observer = new ResizeObserver(position);
     observer.observe(document.body);
     const mutations = new MutationObserver(position);
-    mutations.observe(document.querySelector(".app-shell") ?? document.body, { childList: true, subtree: true });
+    mutations.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("resize", position); position();
     return () => { observer.disconnect(); mutations.disconnect(); window.removeEventListener("resize", position); };
   }, [config?.enabled]);

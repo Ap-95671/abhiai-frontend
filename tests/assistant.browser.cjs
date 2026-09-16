@@ -64,7 +64,7 @@ async function setup(browser, viewport) {
       return route.fulfill({status:204});
     }
     if(p.endsWith('/messages/stream')) {
-      const content=req.postDataJSON().content;state.textRequests.push({path:p,content,history:[...state.history]});
+      const content=req.postDataJSON().content;state.textRequests.push({path:p,content,body:req.postDataJSON(),history:[...state.history]});
       const user={id:crypto.randomUUID(),role:'USER',content,createdAt:date};
       const reply={id:crypto.randomUUID(),role:'ASSISTANT',content:'Hello! Let’s explore that together.',createdAt:date};
       if(p.includes(id))state.history.push(user,reply);
@@ -84,7 +84,9 @@ async function setup(browser, viewport) {
     return json(empty);
   });
   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(origin+'/chat');await page.getByRole('button',{name:'Talk to AbhiAI',exact:true}).waitFor();
+  await page.goto(origin+'/chat');
+  try { await page.getByRole('button',{name:'Talk to AbhiAI',exact:true}).waitFor(); }
+  catch (error) { console.error('Page errors:',errors); console.error((await page.locator('body').innerText()).slice(0,1400)); throw error; }
   return {context,page,state,errors};
 }
 async function open(page){await page.getByRole('button',{name:'Talk to AbhiAI',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByLabel('Message AbhiAI Assistant').waitFor();await page.getByRole('button',{name:'Start live microphone'}).waitFor({state:'visible'});}
@@ -92,7 +94,7 @@ async function bounds(page){return page.getByRole('dialog').evaluate(el=>{
   const box=el.getBoundingClientRect(), input=el.querySelector('textarea').getBoundingClientRect();
   return {width:box.width,height:box.height,left:box.left,right:box.right,bottom:box.bottom,inputBottom:input.bottom,viewportWidth:innerWidth,viewportHeight:innerHeight,overflow:el.scrollWidth>el.clientWidth+1};
 });}
-(async()=>{
+async function run(){
   const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--mute-audio']});
   try {
     const f=await setup(browser,{width:1440,height:1000}); const {page,state}=f;
@@ -199,4 +201,6 @@ async function bounds(page){return page.getByRole('dialog').evaluate(el=>{
     await failure.context.close();
     console.log(JSON.stringify({passed:true,checks:['text','minimize/reopen','permission denied','text fallback','text to voice context','voice to text context','transcript order','microphone cleanup','audio-driven mouth','barge-in','network failure/text fallback','existing chat','reload persistence','social/news/profile/notifications/search navigation','dark/light','reduced motion','mobile back','seven viewports','failed persistence blocks context loss and retries'],screenshots:output},null,2));
   } finally {await browser.close();}
-})().catch(error=>{console.error(error);process.exitCode=1;});
+}
+module.exports={setup,open,bounds,profile,conversation,normal,id,userId,empty,date};
+if(require.main===module) run().catch(error=>{console.error(error);process.exitCode=1;});

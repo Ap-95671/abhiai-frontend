@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
+import { usePageContext, useAbhiAIContext, openAssistant } from "@/components/ai-character/abhiai-context";
 import { NewsImage } from "@/components/news/news-image";
 import { AppIcon } from "@/components/ui/app-icon";
 import { api, ApiError, NewsArticle, NewsPage } from "@/lib/api";
@@ -71,6 +72,7 @@ function NewsCard({ article, onAsk, onOpen, onSave, saved }: { article: NewsArti
 }
 
 export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string; onUnauthorized: () => void }) {
+  const assistantOpen = useAbhiAIContext()?.assistantOpen;
   const router = useRouter();
   const [category, setCategory] = useState("latest");
   const [region, setRegion] = useState("global");
@@ -79,6 +81,7 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [page, setPage] = useState<NewsPage | null>(null);
   const [selected, setSelected] = useState<NewsArticle | null>(null);
+  usePageContext(selected ? { pageType: "news", entityId: selected.id, title: selected.title } : null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
@@ -155,6 +158,7 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
     document.body.style.overflow = "hidden";
     queueMicrotask(() => closeButtonRef.current?.focus());
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if ((event.target as HTMLElement)?.closest("[data-assistant-panel]")) return;
       if (event.key === "Escape") closeStory();
       if (event.key !== "Tab" || !dialogRef.current) return;
       const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'));
@@ -242,7 +246,7 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
       </div>
       </div>
 
-      {selected && createPortal(<div className="news-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeStory(); }} role="presentation"><article aria-labelledby="news-detail-title" aria-modal="true" className="news-detail" ref={dialogRef} role="dialog"><button aria-label="Close article" className="news-detail-close" onClick={closeStory} ref={closeButtonRef} type="button">×</button><NewsImage alt={selected.title} className="news-detail-image" src={selected.imageUrl}/><div className="news-detail-content"><p className="eyebrow">{selected.category} · {relativeTime(selected.publishedAt)}</p><h2 id="news-detail-title">{selected.title}</h2><p className="news-detail-source">Reported by <strong>{selected.sourceName}</strong>{selected.author ? ` · ${selected.author}` : ""}</p>{selected.description ? <p className="news-detail-description">{selected.description}</p> : <p className="news-detail-description muted">The publisher did not provide a description. Open the original story for full context.</p>}{selected.sources.length > 1 && <div className="news-related-sources"><strong>Also reported by</strong><p>{selected.sources.map((source) => source.name).join(" · ")}</p></div>}<div className="news-detail-actions">{validExternalUrl(selected.articleUrl) && <a href={validExternalUrl(selected.articleUrl)} rel="noopener noreferrer" target="_blank">Read Original <span aria-hidden="true">↗</span></a>}<button onClick={() => askAbhiAI(selected)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button><button onClick={() => void shareSelected()} type="button"><AppIcon name="share"/> {shareLabel}</button><button aria-pressed={savedIds.has(selected.id)} className={savedIds.has(selected.id) ? "selected" : ""} onClick={() => toggleSaved(selected)} type="button"><AppIcon name="bookmark"/> {savedIds.has(selected.id) ? "Saved" : "Save"}</button></div><p className="news-copyright-note">AbhiAI displays publisher-provided metadata only. Read the original for the complete reporting.</p></div></article></div>, document.body)}
+      {selected && createPortal(<div className="news-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeStory(); }} role="presentation"><article aria-labelledby="news-detail-title" aria-modal={!assistantOpen} className="news-detail" ref={dialogRef} role="dialog"><button aria-label="Close article" className="news-detail-close" onClick={closeStory} ref={closeButtonRef} type="button">×</button><NewsImage alt={selected.title} className="news-detail-image" src={selected.imageUrl}/><div className="news-detail-content" data-assistant-context="news"><p className="eyebrow">{selected.category} · {relativeTime(selected.publishedAt)}</p><h2 id="news-detail-title">{selected.title}</h2><p className="news-detail-source">Reported by <strong>{selected.sourceName}</strong>{selected.author ? ` · ${selected.author}` : ""}</p>{selected.description ? <p className="news-detail-description">{selected.description}</p> : <p className="news-detail-description muted">The publisher did not provide a description. Open the original story for full context.</p>}{selected.sources.length > 1 && <div className="news-related-sources"><strong>Also reported by</strong><p>{selected.sources.map((source) => source.name).join(" · ")}</p></div>}<div className="news-detail-actions"><button type="button" onClick={openAssistant}>Talk about this article</button>{validExternalUrl(selected.articleUrl) && <a href={validExternalUrl(selected.articleUrl)} rel="noopener noreferrer" target="_blank">Read Original <span aria-hidden="true">↗</span></a>}<button onClick={() => askAbhiAI(selected)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button><button onClick={() => void shareSelected()} type="button"><AppIcon name="share"/> {shareLabel}</button><button aria-pressed={savedIds.has(selected.id)} className={savedIds.has(selected.id) ? "selected" : ""} onClick={() => toggleSaved(selected)} type="button"><AppIcon name="bookmark"/> {savedIds.has(selected.id) ? "Saved" : "Save"}</button></div><p className="news-copyright-note">AbhiAI displays publisher-provided metadata only. Read the original for the complete reporting.</p></div></article></div>, document.body)}
     </section>
   );
 }

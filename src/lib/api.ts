@@ -1,3 +1,5 @@
+import type { AbhiAIPageContext } from "@/components/ai-character/context-types";
+import type { AssistantEvent, AssistantToolResult } from "@/components/ai-character/tool-types";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
 export type MessageRole = "USER" | "ASSISTANT" | "SYSTEM";
@@ -32,7 +34,10 @@ export type MessageCitation = {
   domain: string;
 };
 
+export type MemoryCategory = "PREFERENCE" | "INTEREST" | "ASSISTANT_SETTING" | "PROJECT_CONTEXT";
 export type UserMemory = {
+  category?: MemoryCategory;
+  source?: string;
   id: string;
   content: string;
   createdAt: string;
@@ -486,6 +491,9 @@ export const api = {
   },
   createAssistantSession(accessToken: string, body: { id: string; conversationId: string }, signal: AbortSignal): Promise<{ id: string; token: string; model: string; expiresAt: string; idleSeconds: number }> {
     return request("/assistant/sessions", { method: "POST", body: JSON.stringify(body), signal }, accessToken);
+  },
+  assistantTool(accessToken: string, body: { conversationId: string; name: string; arguments: Record<string,string>; context: AbhiAIPageContext | null }, signal?: AbortSignal): Promise<AssistantToolResult> {
+    return request("/assistant/tools", { method: "POST", body: JSON.stringify(body), signal }, accessToken);
   },
   closeAssistantSession(accessToken: string, id: string): Promise<void> {
     return request(`/assistant/sessions/${id}`, { method: "DELETE", keepalive: true }, accessToken);
@@ -1114,6 +1122,8 @@ export const api = {
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: {
+      assistantContext?: AbhiAIPageContext | null;
+      onAssistantEvent?: (event: AssistantEvent) => void;
       attachmentIds?: string[];
       externalProcessingAllowed?: boolean;
       webSearchAllowed?: boolean;
@@ -1127,6 +1137,7 @@ export const api = {
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         content,
+        assistantContext: options?.assistantContext,
         attachmentIds: options?.attachmentIds ?? [],
         externalProcessingAllowed: options?.externalProcessingAllowed ?? false,
         webSearchAllowed: options?.webSearchAllowed ?? false,
@@ -1164,6 +1175,7 @@ export const api = {
           if (line.startsWith("event:")) eventName = line.slice(6).trim();
           if (line.startsWith("data:")) {
             const data = line.slice(5).trimStart();
+            if (eventName === "assistant") options?.onAssistantEvent?.(JSON.parse(data) as AssistantEvent);
             if (eventName === "chunk") onChunk(data);
             if (eventName === "complete") completed = JSON.parse(data) as ChatExchange;
             if (eventName === "error") streamError = ((JSON.parse(data) as { message?: string }).message ?? "Chat generation failed");
@@ -1247,8 +1259,8 @@ export const api = {
     return request("/memory", { method: "PATCH", body: JSON.stringify({ enabled }) }, accessToken);
   },
 
-  createMemory(accessToken: string, content: string): Promise<UserMemory> {
-    return request("/memory/items", { method: "POST", body: JSON.stringify({ content }) }, accessToken);
+  createMemory(accessToken: string, content: string, category: MemoryCategory = "PREFERENCE"): Promise<UserMemory> {
+    return request("/memory/items", { method: "POST", body: JSON.stringify({ content, category }) }, accessToken);
   },
 
   deleteMemory(accessToken: string, memoryId: string): Promise<void> {

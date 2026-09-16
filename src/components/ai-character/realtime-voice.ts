@@ -1,9 +1,12 @@
+import { toolLabels, type AssistantToolResult, type AssistantEvent } from "./tool-types";
 import { api, ApiError } from "@/lib/api";
 import { AudioMeter } from "./audio-meter";
 import { encodePcm, decodePcm } from "./pcm-audio";
 import { realtimeHistory, type AssistantMessage, type CharacterEvent, type VoiceConnectionState } from "./assistant-state";
 
 type GeminiEvent = {
+  toolCall?: { functionCalls?: { id: string; name: string; args?: Record<string, string> }[] };
+  toolCallCancellation?: { ids?: string[] };
   setupComplete?: object; error?: object; goAway?: object;
   serverContent?: {
     interrupted?: boolean; turnComplete?: boolean; generationComplete?: boolean;
@@ -16,6 +19,9 @@ export type VoiceCallbacks = {
   connection(state: VoiceConnectionState): void; character(event: CharacterEvent): void;
   microphone(active: boolean): void; busy(value: boolean): void; message(message: AssistantMessage): void;
   level(value: number): void; error(message: string): void;
+  tool?(name: string, args: Record<string,string>, signal: AbortSignal): Promise<AssistantToolResult>;
+  event?(event: AssistantEvent): void;
+  newTurn?(): void;
 };
 
 /** One disposable Gemini Live socket. Permanent provider credentials never enter this class. */
@@ -47,6 +53,9 @@ export class RealtimeVoice {
   private assistant: AssistantMessage | null = null;
   private receiveQueue = Promise.resolve();
   private history: AssistantMessage[] = [];
+  private toolRequests = new Map<string, AbortController>();
+  private toolCount = 0;
+  private contextRevision = 0;
   constructor(private token: string, private callbacks: VoiceCallbacks) {}
   static supported() {
     return typeof WebSocket !== "undefined" && typeof AudioContext !== "undefined"
@@ -180,7 +189,46 @@ export class RealtimeVoice {
     source.start(this.playAt); this.playAt += buffer.duration;
     this.callbacks.character("speak"); this.callbacks.busy(true);
   }
+  private cancelTools(ids?: string[]) {
+    for (const [id, controller] of this.toolRequests) {
+      if (!ids || ids.includes(id)) { controller.abort(); this.toolRequests.delete(id); }
+    }
+    this.callbacks.event?.({ status: "" });
+  }
+  private async runTool(call: { id: string; name: string; args?: Record<string,string> }) {
+    if (this.toolRequests.has(call.id)) return;
+    const controller = new AbortController(); this.toolRequests.set(call.id, controller);
+    const timeout = this.later(() => controller.abort(), 20000);
+    const revision = this.contextRevision;
+    try {
+      if (++this.toolCount > 8 || !this.callbacks.tool) throw new Error("Tools unavailable");
+      this.generating = true; this.callbacks.busy(true); this.callbacks.character("think"); this.watchResponse();
+      this.callbacks.event?.({ status: toolLabels[call.name] ?? "Reading current content…" });
+      const result = await this.callbacks.tool(call.name,call.args ?? {},controller.signal);
+      if (!this.connected || revision !== this.contextRevision || !this.toolRequests.has(call.id)) return;
+      if (controller.signal.aborted) throw new Error("Tool timed out");
+      this.callbacks.event?.({ result, expression: result.expression, status: "" });
+      this.send({ toolResponse: { functionResponses: [{ id: call.id, name: call.name, response: { result } }] } });
+    } catch {
+      if (this.connected && this.toolRequests.has(call.id) && revision === this.contextRevision) {
+        const message = "This tool or content is unavailable, or access was denied. You can still chat.";
+        this.callbacks.event?.({ notice: message, status: "" });
+        this.send({ toolResponse: { functionResponses: [{ id: call.id, name: call.name, response: { error: message } }] } });
+      }
+    } finally { this.clear(timeout); this.toolRequests.delete(call.id); }
+  }
+  updateContext() {
+    this.contextRevision++; this.cancelTools(); this.interrupt();
+    if (this.connected) this.send({ clientContent: { turns: [{ role: "user", parts: [{ text: JSON.stringify({
+      contextRevision: this.contextRevision, pageStatus: "changed; previous page context is obsolete; retrieve current context before the next answer"
+    }) }] }], turnComplete: false } });
+  }
   private handle(event: GeminiEvent) {
+    if (event.toolCallCancellation) this.cancelTools(event.toolCallCancellation.ids);
+    if (event.toolCall?.functionCalls) {
+      if (event.toolCall.functionCalls.length > 8) { this.fail("Too many tool requests. Continue by text."); return; }
+      for (const call of event.toolCall.functionCalls) void this.runTool(call);
+    }
     if (event.error) { this.fail("Gemini Live encountered a problem. Check Gemini quota or continue by text."); return; }
     if (event.goAway) { this.fail("Gemini Live session is ending. Tap the microphone to reconnect with your saved conversation."); return; }
     if (event.setupComplete) {
@@ -191,10 +239,10 @@ export class RealtimeVoice {
     }
     const content = event.serverContent;
     if (!content) return;
-    if (content.interrupted) { this.finalizeInterrupted(); this.suppressOutput = false; }
+    if (content.interrupted) { this.cancelTools(); this.finalizeInterrupted(); this.suppressOutput = false; }
     if (content.inputTranscription?.text) {
       this.activity(); this.watchResponse();
-      if (!this.user || this.user.final) { this.user = this.newMessage("USER"); this.turnDone = false; }
+      if (!this.user || this.user.final) { this.callbacks.newTurn?.(); this.toolCount = 0; this.user = this.newMessage("USER"); this.turnDone = false; }
       this.user.content += content.inputTranscription.text; this.emit(this.user);
       this.callbacks.character("think");
     }
@@ -227,7 +275,7 @@ export class RealtimeVoice {
     }
   }
   sendText(content: string) {
-    this.interrupt(); this.suppressOutput = false;
+    this.cancelTools(); this.callbacks.newTurn?.(); this.toolCount = 0; this.interrupt(); this.suppressOutput = false;
     this.user = { ...this.newMessage("USER"), content, final: true }; this.emit(this.user);
     this.send({ clientContent: { turns: [{ role: "user", parts: [{ text: content }] }], turnComplete: true } });
     this.generating = true; this.turnDone = false;
@@ -243,6 +291,7 @@ export class RealtimeVoice {
     catch { if (!this.closed) this.callbacks.error("Audio is blocked. Press Enable audio, or turn Auto Speak off."); }
   }
   interrupt() {
+    this.cancelTools();
     if (!this.connected || (!this.generating && !this.sources.size)) return;
     // Any clientContent message interrupts Gemini generation; false avoids requesting a new answer.
     this.send({ clientContent: { turnComplete: false } });
@@ -268,7 +317,7 @@ export class RealtimeVoice {
   private fail(message: string) { this.close(); this.callbacks.character("fail"); this.callbacks.error(message); }
   close() {
     if (this.closed) return;
-    this.closed = true; this.ready = false; this.abort.abort(); this.finalizeInterrupted();
+    this.cancelTools(); this.closed = true; this.ready = false; this.abort.abort(); this.finalizeInterrupted();
     if (this.user && !this.user.final) { this.user.final = true; this.user.content ||= "[Voice input ended before transcription completed]"; this.emit(this.user); }
     this.timers.forEach(timer => clearTimeout(timer)); this.timers.clear(); this.stopMicrophone();
     if (this.socket) { this.socket.onmessage = null; this.socket.onopen = null; this.socket.onclose = null; this.socket.onerror = null; this.socket.close(); }

@@ -2141,3 +2141,5 @@ button:active:not(:disabled) { transform: translateY(1px); }
   .social-post:hover, .news-story-card:hover, .news-brief-story:hover,
   .primary-button:hover, .publish-post-button:hover { transform: none; }
 }
+
+.post-detail-dialog > header button.post-assistant-action { border-radius:10px; font-size:.75rem; height:auto; min-height:38px; width:auto; padding:8px 12px; white-space:nowrap; margin-left:auto; margin-right:8px; }

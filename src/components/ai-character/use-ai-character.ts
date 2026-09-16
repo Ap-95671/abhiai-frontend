@@ -1,12 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useAbhiAIContext } from "./abhiai-context";
+import { type AssistantEvent, type AssistantToolResult } from "./tool-types";
+import { validExpression, type AssistantExpression, type AnimationMode } from "./assistant-state";
 import { api } from "@/lib/api";
 import { useSpeechPlayback } from "@/components/voice/use-speech-playback";
 import { transition, upsertMessage, type AssistantMessage, type VoiceConnectionState } from "./assistant-state";
 import { RealtimeVoice } from "./realtime-voice";
 
 export function useAiCharacter(token: string, visible: boolean, userId: string) {
+  const pageContext = useAbhiAIContext();
+  const currentPage = useRef(pageContext?.page ?? null);
+  const [expression,setExpression] = useState<AssistantExpression>("neutral");
+  const [animations,setAnimations] = useState<AnimationMode>("full");
+  const [toolStatus,setToolStatus] = useState("");
+  const [notice,setNotice] = useState("");
+  const [toolResults,setToolResults] = useState<AssistantToolResult[]>([]);
   const [character, dispatch] = useReducer(transition, "idle");
   const [connection, setConnection] = useState<VoiceConnectionState>("disconnected");
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
@@ -28,10 +38,21 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
   const mounted = useRef(true);
   const shown = useRef(visible);
   const sending = useRef(false);
+  const queuedText = useRef<string | null>(null);
   const textAbort = useRef<AbortController | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const speech = useSpeechPlayback();
   const { stop: stopSpeech } = speech;
+  const pageSerialized = JSON.stringify(pageContext?.page ?? null);
+  const event = useCallback((value: AssistantEvent) => {
+    if (!mounted.current) return;
+    if (value.expression) setExpression(validExpression(value.expression));
+    if (value.status !== undefined) setToolStatus(value.status);
+    if (value.notice) setNotice(value.notice);
+    if (value.result && value.result.kind !== "context" && value.result.kind !== "expression")
+      setToolResults(current => [...current.slice(-7),value.result!]);
+  }, []);
+  const newTurn = useCallback(() => { setToolResults([]); setNotice(""); setToolStatus(""); }, []);
 
   const replace = useCallback((items: AssistantMessage[]) => {
     history.current = items;
@@ -84,7 +105,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     finalizeVoice(); stopSpeech();
   }, [finalizeVoice, stopSpeech]);
   const initialize = useCallback(async (fresh = false) => {
-    setLoading(true); setError("");
+    setLoading(true); setError(""); newTurn();
     try {
       if (fresh) { endVoice(); await flush(); }
       const conversation = await api.openAssistant(token, fresh);
@@ -97,7 +118,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
       dispatch("settle");
     } catch { if (mounted.current) { setError("Your assistant conversation could not load. Please retry."); dispatch("fail"); } }
     finally { if (mounted.current) setLoading(false); }
-  }, [token, endVoice, flush, replace]);
+  }, [token, endVoice, flush, replace, newTurn]);
 
   useEffect(() => {
     mounted.current = true;
@@ -105,6 +126,9 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     queueMicrotask(() => {
       if (!active) return;
       void initialize();
+      try { const stored = localStorage.getItem(`abhiai.assistant.animations.${userId}`);
+        if (stored === "full" || stored === "reduced" || stored === "off") setAnimations(stored);
+      } catch {}
       try { setAutoSpeak(localStorage.getItem(`abhiai.assistant.auto-speak.${userId}`) !== "off"); } catch {}
     });
     return () => {
@@ -114,7 +138,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
   }, [initialize, endVoice, userId]);
   useEffect(() => {
     shown.current = visible;
-    if (!visible) endVoice();
+    if (!visible) { queuedText.current = null; textAbort.current?.abort(); endVoice(); }
   }, [visible, endVoice]);
   useEffect(() => {
     const hide = () => { if (document.hidden) endVoice(); };
@@ -123,6 +147,24 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     window.addEventListener("pagehide", leave);
     return () => { document.removeEventListener("visibilitychange", hide); window.removeEventListener("pagehide", leave); };
   }, [endVoice]);
+  useEffect(() => {
+    currentPage.current = JSON.parse(pageSerialized);
+    if (!currentPage.current) endVoice();
+    else voice.current?.updateContext();
+    queuedText.current = null; textAbort.current?.abort();
+    queueMicrotask(newTurn);
+  }, [pageSerialized, endVoice, newTurn]);
+  useEffect(() => {
+    const changed = () => { endVoice(); setNotice("Memory settings updated. Your next response will use the current settings."); };
+    window.addEventListener("abhiai:memory-changed",changed);
+    return () => window.removeEventListener("abhiai:memory-changed",changed);
+  }, [endVoice]);
+  useEffect(() => {
+    if (character === "error") { queueMicrotask(() => setExpression("confused")); return; }
+    if (character === "thinking") return;
+    const timer = setTimeout(() => setExpression("neutral"),8000);
+    return () => clearTimeout(timer);
+  }, [character, expression]);
   const previousSpeech = useRef(speech.status);
   useEffect(() => {
     if (speech.status === "playing") dispatch("speak");
@@ -131,14 +173,18 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
   }, [speech.status, busy, microphone]);
 
   async function send(content: string) {
-    if (!id.current || sending.current || busy || !content.trim()) return false;
+    if (!id.current || !content.trim()) return false;
+    if (sending.current) {
+      if (!textAbort.current) return false;
+      queuedText.current = content; textAbort.current.abort(); return true;
+    }
     sending.current = true; setError("");
     let realtimeTurn = false;
     try {
       if (voice.current?.connected) { realtimeTurn = true; voice.current.sendText(content.trim()); return true; }
       endVoice();
       await flush();
-      stopSpeech(); setBusy(true); dispatch("think");
+      stopSpeech(); newTurn(); setBusy(true); setExpression("thinking"); dispatch("think");
       const user: AssistantMessage = { id: crypto.randomUUID(), role: "USER", content: content.trim(), final: true };
       const reply: AssistantMessage = { id: crypto.randomUUID(), role: "ASSISTANT", content: "", final: false };
       const before = history.current;
@@ -150,7 +196,8 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
           if (controller.signal.aborted || !mounted.current) return;
           reply.content += chunk;
           replace(upsertMessage(history.current, { ...reply }));
-        }, controller.signal);
+        }, controller.signal, { assistantContext: currentPage.current,
+          onAssistantEvent: value => { if (!controller.signal.aborted && mounted.current) event(value); } });
         replace([...before, { ...user, id: exchange.userMessage.id }, {
           ...reply, id: exchange.assistantMessage.id, content: exchange.assistantMessage.content, final: true,
         }]);
@@ -168,7 +215,10 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
       } finally { clearTimeout(timeout); }
       dispatch("settle"); return true;
     } catch { setError("Your response was interrupted or could not be saved. Check the conversation before retrying your message."); dispatch("fail"); return false; }
-    finally { sending.current = false; if (!realtimeTurn) setBusy(false); textAbort.current = null; }
+    finally { sending.current = false; setToolStatus(""); if (!realtimeTurn) setBusy(false); textAbort.current = null;
+      const next = queuedText.current; queuedText.current = null;
+      if (next && mounted.current && shown.current) queueMicrotask(() => void send(next));
+    }
   }
   async function toggleMicrophone() {
     setError(""); stopSpeech();
@@ -182,6 +232,8 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
         setConnection(state);
         if (state === "disconnected" || state === "expired") finalizeVoice();
       }, character: dispatch, microphone: setMicrophone, busy: setBusy,
+      event, newTurn,
+      tool: (name,args,signal) => api.assistantTool(token,{ conversationId: id.current!, name, arguments: args, context: currentPage.current },signal),
       message: receive, level: setLevel, error: message => { setError(message); dispatch("fail"); },
     });
     voice.current = client;
@@ -192,8 +244,11 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     if (!next) stopSpeech();
     try { localStorage.setItem(`abhiai.assistant.auto-speak.${userId}`, next ? "on" : "off"); } catch {}
   }
-  function interrupt() { stopSpeech(); voice.current?.interrupt(); dispatch(microphone ? "listen" : "settle"); }
-  return { character, connection, messages, conversationId, loading, busy, microphone, level, error, autoSpeak, unsaved,
+  function interrupt() { textAbort.current?.abort(); stopSpeech(); voice.current?.interrupt(); dispatch(microphone ? "listen" : "settle"); }
+  function changeAnimations(mode: AnimationMode) {
+    setAnimations(mode); try { localStorage.setItem(`abhiai.assistant.animations.${userId}`,mode); } catch {}
+  }
+  return { expression, animations, changeAnimations, toolStatus, toolResults, notice, pageContext, character, connection, messages, conversationId, loading, busy, microphone, level, error, autoSpeak, unsaved,
     speechSupported: speech.supported, send, toggleMicrophone, toggleAutoSpeak, interrupt, endVoice, initialize,
     retrySave: () => { setError(""); void flush().catch(() => {}); },
     enableAudio: () => voice.current?.enableAudio(),

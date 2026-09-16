@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import { api, ApiError, PageResponse, PostSearchResult, PostVisibility, UserProfile } from "@/lib/api";
 import { AppIcon } from "@/components/ui/app-icon";
+import { usePageContext, useAbhiAIContext, openAssistant } from "@/components/ai-character/abhiai-context";
 import { NewsBrief } from "@/components/news/news-brief";
 import { PostCard } from "@/components/social/post-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -31,6 +32,16 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
   const [pollChoices, setPollChoices] = useState(["", ""]);
   const [pollDuration, setPollDuration] = useState(24);
   const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
+  usePageContext(selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}` } : null);
+  const assistantContext = useAbhiAIContext();
+  const pendingDraft = assistantContext?.draft;
+  const takeDraft = assistantContext?.takeDraft;
+  useEffect(() => {
+    if (!pendingDraft) return;
+    let active = true;
+    queueMicrotask(() => { if (active) { setDraft(current => current ? `${current}\n\n${pendingDraft}` : pendingDraft); takeDraft?.(); } });
+    return () => { active = false; };
+  }, [pendingDraft, takeDraft]);
   const postDetailClose = useRef<HTMLButtonElement | null>(null);
   const postDetailDialog = useRef<HTMLElement | null>(null);
   const postReturnFocus = useRef<HTMLElement | null>(null);
@@ -90,6 +101,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
     document.body.style.overflow = "hidden";
     queueMicrotask(() => postDetailClose.current?.focus());
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if ((event.target as HTMLElement)?.closest("[data-assistant-panel]")) return;
       if (event.key === "Escape") return closePost();
       if (event.key !== "Tab") return;
       const focusable = Array.from(postDetailDialog.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])") ?? []);
@@ -180,7 +192,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
         </div>
         <NewsBrief accessToken={accessToken} onUnauthorized={onUnauthorized} />
       </div>
-      {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="post-detail-title" aria-modal="true" className="post-detail-dialog" ref={postDetailDialog} role="dialog"><header><h2 id="post-detail-title">Post</h2><button aria-label="Close post detail" onClick={closePost} ref={postDetailClose} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={profile?.id} detail onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={selectedPost}/></section></div>, document.body)}
+      {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="post-detail-title" aria-modal={!assistantContext?.assistantOpen} className="post-detail-dialog" data-assistant-context="post" ref={postDetailDialog} role="dialog"><header><h2 id="post-detail-title">Post</h2><button className="post-assistant-action" type="button" onClick={openAssistant}>Talk about this post</button><button aria-label="Close post detail" onClick={closePost} ref={postDetailClose} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={profile?.id} detail onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={selectedPost}/></section></div>, document.body)}
     </section>
   );
 }
