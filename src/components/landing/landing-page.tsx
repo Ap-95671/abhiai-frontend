@@ -94,7 +94,7 @@ export function LandingPage({ onLogin, onStart }: LandingPageProps) {
           <article className={`${styles.floatCard} ${styles.socialCard}`} data-parallax="-14">
             <div className={styles.person}><span>NP</span><div><b>Nia Patel</b><small>@niabuilds · 12m</small></div></div>
             <p>The most useful AI won’t live beside our communities. It will understand them.</p>
-            <footer><span>♡ 482</span><span>◌ 76</span><b>✦ Ask AbhiAI</b></footer>
+            <footer><span>♡ 482</span><span>◌ 76</span><b>Ask AbhiAI</b></footer>
           </article>
           <article className={`${styles.floatCard} ${styles.trendCard}`} data-parallax="22">
             <small>LIVE PULSE</small><b>#HumanCenteredAI</b><span>18.4K perspectives</span>

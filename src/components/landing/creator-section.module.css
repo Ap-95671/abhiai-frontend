@@ -311,3 +311,10 @@
 }
 
 :global([data-theme="light"]) .externalArrow { color: #aaaab2; }
+
+.glow, .section::after, .card::before { display: none; }
+:global(:root) .eyebrow, :global(:root) .role { color: var(--muted); }
+:global(:root) .card { background: var(--surface); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none; }
+:global(:root) .photoFrame { background: var(--line-strong); border-radius: var(--radius-md); box-shadow: none; }
+:global(:root) .photoFrame:hover { box-shadow: none; transform: none; }
+.photoCrop { border-radius: calc(var(--radius-md) - 1px); }

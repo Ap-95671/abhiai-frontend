@@ -41,7 +41,7 @@ export type AppIconName =
   | "youtube";
 
 const paths: Record<AppIconName, ReactNode> = {
-  ai: <><path d="M12 2.75 14.1 8l5.15 2.1L14.1 12.2 12 17.25 9.9 12.2 4.75 10.1 9.9 8 12 2.75Z"/><path d="m18.2 16 .8 2 .8-2 2-.8-2-.8-.8-2-.8 2-2 .8 2 .8Z"/></>,
+  ai: <><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h6"/></>,
   article: <><path d="M6 3.5h9.5L19 7v13.5H6z"/><path d="M15.5 3.5V7H19M9 11h7M9 14h7M9 17h5"/></>,
   bell: <><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 8.5h18C21 16 18 16 18 9Z"/><path d="M9.5 21h5"/></>,
   "chevron-left": <path d="m15 18-6-6 6-6"/>,

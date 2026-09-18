@@ -158,3 +158,22 @@
 
 @media(max-width:900px){:global([data-theme="light"]) .navbar nav{background:#fff;border-color:#d5d5db;box-shadow:0 16px 42px rgba(25,25,32,.12)}:global([data-theme="light"]) .mobileNavActions{border-color:#dddde2}:global([data-theme="light"]) .mobileNavActions button{background:#eeeef1;border-color:#d2d2d8;color:#3d3d44}:global([data-theme="light"]) .mobileNavActions button:last-child{background:#18181b;color:#fff}:global([data-theme="light"]) .menuButton i{background:#45454c}}
 @media(max-width:900px){.menuBackdrop{z-index:19}}
+
+/* Match the product identity while preserving the landing page composition. */
+:global(:root) .page { background: var(--canvas); color: var(--ink); }
+.orbitGlow, .heroVisual::before, .heroVisual::after { display: none; }
+:global(:root) .kicker, :global(:root) .searchAnswer > small, :global(:root) .aiAnswer header small { color: var(--muted); }
+.kicker span { background: var(--accent); box-shadow: none; }
+:global(:root) .prompt, :global(:root) .floatCard, :global(:root) .demoWindow, :global(:root) .workspacePreview, :global(:root) .searchVisual { background: var(--surface); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none; }
+:global(:root) .prompt:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--focus-ring); }
+:global(:root) .promptMark, :global(:root) .miniLogo { background: var(--ink); color: var(--canvas); }
+:global(:root) .aiAnswer, :global(:root) .person > span { background: var(--surface-raised); border-color: var(--line); color: var(--ink); }
+:global(:root) .aiAnswer button { background: var(--surface-active); border-color: var(--line); color: var(--ink); }
+:global(:root) .finalCta { background: var(--surface); }
+:global(:root) .searchAnswer i { background: var(--ink); }
+:global(:root) .capabilityTabs button.activeTab { border-color: var(--accent); color: var(--ink); }
+:global(:root) .page [data-depth-card][data-reveal-state="visible"]:hover { border-color: var(--line-strong); box-shadow: none; transform: none; }
+.sectionCopy li::before { color: var(--muted); content: "—"; }
+:global(:root) .hero::before, :global(:root) .searchSection::before { background: var(--line); }
+
+:global(:root) .trendCard small, :global(:root) .socialCard footer b { color: var(--muted); }

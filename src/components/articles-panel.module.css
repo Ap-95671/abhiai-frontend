@@ -69,3 +69,17 @@
 :global([data-theme="light"]) .prose h2,
 :global([data-theme="light"]) .prose h3 { color: #17171a; }
 :global([data-theme="light"]) .actions button { background: #eeeef1; color: #4f4f57; }
+
+:global(:root) .workspace { background: var(--canvas); }
+.header h1 { font-size: clamp(1.6rem, 3vw, 2.15rem); letter-spacing: -.035em; }
+:global(:root) .editor, :global(:root) .card, :global(:root) .reader { background: var(--surface); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none; }
+:global(:root) .card:hover { background: var(--surface-hover); border-color: var(--line-strong); transform: none; }
+:global(:root) .header > button, :global(:root) .editor button, :global(:root) .comments form button, :global(:root) .more { background: var(--ink); border-radius: var(--radius-sm); color: var(--canvas); }
+:global(:root) .editor input, :global(:root) .editor textarea, :global(:root) .comments textarea { background: var(--input-bg); border-color: var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); }
+:global(:root) .editor input:focus, :global(:root) .editor textarea:focus, :global(:root) .comments textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--focus-ring); }
+:global(:root) .placeholder { background: var(--surface-raised); color: var(--muted); }
+:global(:root) .card footer button, :global(:root) .author, :global(:root) .back { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+:global(:root) .header p, :global(:root) .editor small, :global(:root) .editor footer, :global(:root) .empty, :global(:root) .summary, :global(:root) .card p:not(:global(.eyebrow)) { color: var(--muted); }
+:global(:root) .prose, :global(:root) .comments article p, :global(:root) .editor label { color: var(--ink); }
+:global(:root) .hero { border-color: var(--line); border-radius: var(--radius-md); }
+:global(:root) .actions button { border-radius: var(--radius-sm); }

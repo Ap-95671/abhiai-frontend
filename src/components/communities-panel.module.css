@@ -519,3 +519,31 @@
 :global([data-theme="light"]) .postContent { color: #344054; }
 :global([data-theme="light"]) .communityPill,
 :global([data-theme="light"]) .publicPill { background: #f2f4f8; color: #697386; }
+
+/* Community surfaces follow the shared product palette in either theme. */
+:global(:root) .createPanel, :global(:root) .directory, :global(:root) .communityMain,
+:global(:root) .joinPrompt, :global(:root) .composer, :global(:root) .post {
+  background: var(--surface); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none;
+}
+:global(:root) .welcomeState, :global(:root) .heroBody, :global(:root) .aboutRow, :global(:root) .feed { background: var(--surface); }
+:global(:root) .createIntro .spark, :global(:root) .orbit, :global(:root) .communityIcon { background: var(--surface-active); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none; color: var(--ink); }
+.orbit i, .banner::after, .banner > span::before, .banner > span::after { display: none; }
+:global(:root) .banner { background: var(--surface-active); }
+:global(:root) .communityIconLarge { border-color: var(--surface); box-shadow: none; }
+:global(:root) .communityList > button.selectedCard { background: var(--surface-active); box-shadow: inset 2px 0 0 var(--accent); }
+:global(:root) .communityList > button:hover, :global(:root) .post:hover { background: var(--surface-hover); }
+:global(:root) .directoryHeading button, :global(:root) .filters, :global(:root) .joinPrompt > span { background: var(--surface-raised); color: var(--ink); }
+:global(:root) .filters button.active { background: var(--surface-active); color: var(--ink); }
+:global(:root) .joinButton, :global(:root) .composerFooter > button, :global(:root) .createFooter button { background: var(--ink); border-color: var(--ink); border-radius: var(--radius-sm); color: var(--canvas); }
+:global(:root) .reportButton, :global(:root) .morePosts { background: var(--surface); border-color: var(--line); color: var(--ink); }
+:global(:root) .createPanel input, :global(:root) .createPanel textarea, :global(:root) .slugField, :global(:root) .searchField { background: var(--input-bg); border-color: var(--line-strong); color: var(--ink); }
+:global(:root) .createPanel input:focus, :global(:root) .createPanel textarea:focus, :global(:root) .slugField:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--focus-ring); }
+:global(:root) .slugField input { border: 0; box-shadow: none; }
+:global(:root) .slugField span, :global(:root) .communityPill, :global(:root) .publicPill { background: var(--surface-raised); color: var(--muted); }
+:global(:root) .composer textarea { background: transparent; color: var(--ink); }
+:global(:root) .welcomeState > p:not(:global(.eyebrow)), :global(:root) .heroCopy p, :global(:root) .aboutRow > p, :global(:root) .feedMessage, :global(:root) .emptyFeed, :global(:root) .createIntro p:not(:global(.eyebrow)), :global(:root) .createFooter > span { color: var(--muted); }
+:global(:root) .directoryHeading strong, :global(:root) .cardCopy strong, :global(:root) .author strong, :global(:root) .postContent { color: var(--ink); }
+
+:global(:root) .welcomeState h2 { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.035em; line-height: 1.2; }
+.orbit { height: 56px; width: 56px; transform: none; }
+.orbit svg, .spark svg { height: 24px; width: 24px; }

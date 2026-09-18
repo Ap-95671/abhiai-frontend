@@ -7,6 +7,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { PostAttachment } from "@/components/post-attachment";
 import { RichPostText } from "@/components/rich-post-text";
 import { ReportButton } from "@/components/report-button";
+import { AppIcon } from "@/components/ui/app-icon";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   api,
@@ -290,7 +291,7 @@ export function CommunityPanel({
         {showCreate && (
           <form className={styles.createPanel} onSubmit={createCommunity}>
             <div className={styles.createIntro}>
-              <span className={styles.spark}>✦</span>
+              <span className={styles.spark}><AppIcon name="community" /></span>
               <div><p className="eyebrow">New space</p><h2>Start a community</h2><p>Choose a clear identity so the right people can find it.</p></div>
             </div>
             <label>Name<input autoFocus maxLength={100} onChange={(event) => updateName(event.target.value)} placeholder="AI Builders India" required value={name} /></label>
@@ -328,7 +329,7 @@ export function CommunityPanel({
           <main className={styles.communityMain}>
             {!selected ? (
               <div className={styles.welcomeState}>
-                <div className={styles.orbit} aria-hidden="true"><span>✦</span><i /><i /></div>
+                <div className={styles.orbit} aria-hidden="true"><AppIcon name="community" /><i /><i /></div>
                 <p className="eyebrow">Shared interests, stronger ideas</p>
                 <h2>There is a community for what you are building.</h2>
                 <p>Browse the directory, join a space, and contribute to its conversation.</p>

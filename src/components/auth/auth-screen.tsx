@@ -319,10 +319,6 @@ export function AuthScreen(props: AuthScreenProps) {
                 </button>
               </div>
 
-              <p aria-live="polite" className={styles.privacyNote} hidden={!passwordVisible}>
-                Your password stays private while the characters look away.
-              </p>
-
               {props.authError && <p className={styles.error} role="alert">{props.authError}</p>}
 
               <button aria-busy={props.isAuthenticating} className={styles.submit} disabled={props.isAuthenticating} type="submit">

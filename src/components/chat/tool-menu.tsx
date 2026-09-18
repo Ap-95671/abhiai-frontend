@@ -1,6 +1,8 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useRef, useState } from "react";
+
+import { AppIcon } from "@/components/ui/app-icon";
 
 import styles from "./tool-menu.module.css";
 
@@ -64,7 +66,7 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
           <ToolItem detail="JPEG, PNG, or WebP · up to 5 MB" icon="▧" label="Upload image" onClick={() => selectFile(imageInputRef.current)} />
           <ToolItem detail="Extract text or OCR · up to 10 MB" icon="▤" label="Upload PDF" onClick={() => selectFile(pdfInputRef.current)} />
           <ToolItem detail="UTF-8 plain text · up to 10 MB" icon="⌕" label="Upload text file" onClick={() => selectFile(textInputRef.current)} />
-          <ToolItem detail="Create an image from a prompt" icon="✦" label="Generate image" onClick={() => { setOpen(false); onGenerateImage(); }} />
+          <ToolItem detail="Create an image from a prompt" icon={<AppIcon name="image" />} label="Generate image" onClick={() => { setOpen(false); onGenerateImage(); }} />
           <ToolItem detail="Not available yet" disabled icon="•••" label="More tools" onClick={() => undefined} />
         </div>
       )}
@@ -75,7 +77,7 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
   );
 }
 
-function ToolItem({ detail, disabled = false, icon, label, onClick }: { detail: string; disabled?: boolean; icon: string; label: string; onClick: () => void }) {
+function ToolItem({ detail, disabled = false, icon, label, onClick }: { detail: string; disabled?: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button className={styles.item} disabled={disabled} onClick={onClick} role="menuitem" type="button">
       <span aria-hidden="true" className={styles.icon}>{icon}</span>

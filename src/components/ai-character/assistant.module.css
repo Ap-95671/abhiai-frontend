@@ -1,10 +1,10 @@
-.launcher { align-items:center; background:var(--surface); border:1px solid var(--line-strong); border-radius:999px; bottom:max(20px,env(safe-area-inset-bottom)); box-shadow:var(--shadow-soft); color:var(--ink); display:flex; gap:4px; height:52px; padding:0 16px 0 3px; position:fixed; right:max(20px,env(safe-area-inset-right)); z-index:25; }
+.launcher { align-items:center; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius-md); bottom:max(20px,env(safe-area-inset-bottom)); box-shadow:var(--shadow-soft); color:var(--ink); display:flex; gap:4px; height:52px; padding:0 16px 0 3px; position:fixed; right:max(20px,env(safe-area-inset-right)); z-index:25; }
 .launcher[hidden] { display:none; }
 .launcher span { font-size:.78rem; font-weight:650; }
 .launcher:hover { border-color:var(--accent); background:var(--surface-hover); }
 :global(body:has([aria-modal="true"])) .launcher { visibility:hidden; }
 .loading { background:var(--surface); border:1px solid var(--line); border-radius:14px; bottom:100px; color:var(--ink); padding:20px; position:fixed; right:20px; z-index:55; }
-.panel { background:var(--surface); border:1px solid var(--line-strong); border-radius:24px; box-shadow:var(--shadow-raised); color:var(--ink); height:min(780px,calc(100dvh - 40px)); margin:auto 20px 20px auto; max-height:none; max-width:calc(100vw - 40px); overflow:hidden; padding:0; width:430px; }
+.panel { background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow-raised); color:var(--ink); height:min(780px,calc(100dvh - 40px)); margin:auto 20px 20px auto; max-height:none; max-width:calc(100vw - 40px); overflow:hidden; padding:0; width:430px; }
 .panel::backdrop { background:color-mix(in srgb,var(--overlay-bg) 45%,transparent); }
 .panelInner { display:flex; flex-direction:column; height:100%; min-height:0; }
 .header { align-items:center; border-bottom:1px solid var(--line); display:flex; flex-shrink:0; gap:10px; justify-content:space-between; padding:18px 18px 14px; }
@@ -15,12 +15,12 @@
 .headerActions button:hover, .messageLabel button:hover { background:var(--surface-hover); color:var(--ink); }
 .panel button svg { height:18px; width:18px; }
 .panel button:focus-visible, .launcher:focus-visible, .transcript:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
-.stage { align-items:center; background:radial-gradient(ellipse at 50% 30%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 72%); display:flex; flex-direction:column; flex-shrink:0; min-height:185px; padding:0 16px 12px; position:relative; }
+.stage { align-items:center; background:var(--surface); display:flex; flex-direction:column; flex-shrink:0; min-height:185px; padding:0 16px 12px; position:relative; }
 .avatar { height:142px; width:166px; }
 .avatar svg { height:100%; overflow:visible; width:100%; }
 .smallAvatar { height:48px; width:48px; }
 .smallAvatar .characterBody { animation:none; }
-.shadow { fill:var(--accent); opacity:.13; }
+.shadow { fill:var(--ink); opacity:.08; }
 .body, .ear { fill:color-mix(in srgb,var(--accent) 60%,var(--surface)); }
 .head { fill:color-mix(in srgb,var(--accent) 25%,var(--surface-raised)); stroke:color-mix(in srgb,var(--accent) 65%,var(--line)); stroke-width:1.5; }
 .face { fill:var(--canvas); stroke:var(--line); }
@@ -51,7 +51,7 @@
 .empty strong { font-size:.9rem; font-weight:550; }
 .empty p { color:var(--muted); font-size:.79rem; line-height:1.7; margin:12px 0; }
 .message { font-size:.82rem; line-height:1.65; margin-bottom:18px; min-width:0; overflow-wrap:anywhere; }
-.message[data-role="USER"] { background:var(--surface-raised); border:1px solid var(--line); border-radius:16px 16px 4px 16px; margin-left:24px; padding:10px 14px; }
+.message[data-role="USER"] { background:var(--surface-raised); border:1px solid var(--line); border-radius:10px 10px 3px 10px; margin-left:24px; padding:10px 14px; }
 .message[data-role="ASSISTANT"] { padding:0 4px; }
 .messageLabel { align-items:center; color:var(--muted); display:flex; font-size:.65rem; font-weight:700; gap:8px; letter-spacing:.02em; min-height:24px; }
 .messageLabel button { height:28px; width:30px; }
@@ -62,13 +62,13 @@
 .error { background:color-mix(in srgb,var(--danger) 8%,var(--surface)); border-top:1px solid color-mix(in srgb,var(--danger) 30%,var(--line)); color:var(--ink); flex-shrink:0; font-size:.75rem; line-height:1.5; max-height:110px; overflow:auto; padding:10px 18px; }
 .error button { background:transparent; border:0; color:var(--accent); font-weight:650; padding:8px; text-decoration:underline; }
 .footer { border-top:1px solid var(--line); flex-shrink:0; padding:12px 14px 14px; }
-.composer { align-items:center; background:var(--input-bg); border:1px solid var(--line-strong); border-radius:16px; display:flex; gap:8px; padding:8px; }
-.composer:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--focus-ring); }
+.composer { align-items:center; background:var(--input-bg); border:1px solid var(--line-strong); border-radius:var(--radius-md); display:flex; gap:8px; padding:8px; }
+.composer:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px var(--focus-ring); }
 .composer textarea { background:transparent; border:0; color:var(--ink); flex:1; font-size:16px; line-height:1.4; max-height:100px; min-width:0; outline:0; padding:5px; resize:none; }
 .composer textarea::placeholder { color:var(--muted); }
-.composer button { align-items:center; background:var(--accent); border:0; border-radius:12px; color:var(--canvas); display:flex; height:42px; justify-content:center; width:42px; }
+.composer button { align-items:center; background:var(--ink); border:0; border-radius:var(--radius-sm); color:var(--canvas); display:flex; height:42px; justify-content:center; width:42px; }
 .voiceControls { align-items:center; display:flex; flex-wrap:wrap; gap:6px; padding-top:10px; }
-.voiceControls button { align-items:center; background:var(--surface-raised); border:1px solid var(--line); border-radius:12px; color:var(--ink); display:flex; font-size:.73rem; gap:6px; justify-content:center; min-height:42px; padding:8px 10px; }
+.voiceControls button { align-items:center; background:var(--surface-raised); border:1px solid var(--line); border-radius:var(--radius-sm); color:var(--ink); display:flex; font-size:.73rem; gap:6px; justify-content:center; min-height:42px; padding:8px 10px; }
 .voiceControls .micButton[aria-pressed="true"] { background:color-mix(in srgb,var(--success) 10%,var(--surface)); border-color:var(--success); color:var(--success); }
 .voiceControls .autoSpeak { margin-left:auto; }
 .privacy { color:var(--muted); font-size:.61rem; line-height:1.5; margin:10px 2px 0; }

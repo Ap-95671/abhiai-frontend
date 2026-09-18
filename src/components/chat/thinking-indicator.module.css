@@ -1,10 +1,9 @@
 .indicator { align-items: center; display: flex; gap: 10px; justify-self: start; padding: 2px 0 2px 45px; }
 .logo {
   animation: breathe 1.75s cubic-bezier(.4,0,.2,1) infinite;
-  background: #09090a;
-  border: 1px solid #303034;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 0 0 rgba(111,124,255,0);
   height: 36px;
   overflow: hidden;
   width: 36px;
@@ -12,8 +11,7 @@
 .logo img { display: block; height: 100%; object-fit: cover; width: 100%; }
 .label { clip: rect(0,0,0,0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 @keyframes breathe {
-  0%, 100% { box-shadow: 0 0 0 rgba(111,124,255,0); opacity: .72; transform: scale(.92); }
-  50% { box-shadow: 0 0 24px rgba(111,124,255,.3); opacity: 1; transform: scale(1.08); }
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .logo { animation: none; opacity: 1; transform: none; } }
-:global([data-theme="light"]) .logo { background: #fff; border-color: #d3d3da; }

@@ -7,59 +7,61 @@
   --foreground: var(--ink);
   --border: var(--line);
   --border-subtle: color-mix(in srgb, var(--line) 72%, transparent);
-  --accent: var(--blue);
-  --accent-hover: color-mix(in srgb, var(--blue) 86%, white);
-  --accent-active: color-mix(in srgb, var(--blue) 72%, black);
-  --focus-ring: color-mix(in srgb, var(--blue) 44%, transparent);
+  --accent: #c6a66d;
+  --accent-hover: color-mix(in srgb, var(--accent) 86%, var(--ink));
+  --accent-active: color-mix(in srgb, var(--accent) 72%, var(--canvas));
+  --focus-ring: color-mix(in srgb, var(--accent) 24%, transparent);
   --surface-elevated: var(--surface-raised);
   --warning: #f4b740;
-  --info: #55a7ff;
-  --ink: #f4f4f5;
-  --muted: #8b8b91;
-  --line: #262629;
-  --line-strong: #3a3a3f;
-  --canvas: #000000;
-  --surface: #080809;
-  --surface-raised: #101012;
-  --surface-hover: #17171a;
-  --surface-active: #202024;
-  --navy: #050506;
-  --blue: #6f7cff;
-  --blue-dark: #8993ff;
-  --danger: #ff5c67;
-  --success: #35c98b;
-  --shadow-soft: 0 16px 50px rgba(0, 0, 0, .32);
-  --control-bg: #0d0d0f;
-  --input-bg: #101012;
+  --info: var(--accent);
+  --ink: #f2f1ed;
+  --muted: #a6a8a4;
+  --line: #2c2e2c;
+  --line-strong: #444743;
+  --canvas: #0b0c0c;
+  --surface: #121313;
+  --surface-raised: #1a1b1b;
+  --surface-hover: #222422;
+  --surface-active: #2b2e2b;
+  --navy: var(--surface);
+  /* Compatibility for existing controls; secondary accent uses --accent. */
+  --blue: var(--ink);
+  --blue-dark: var(--ink);
+  --danger: #ed7c83;
+  --success: #79b496;
+  --shadow-soft: 0 4px 14px rgba(0, 0, 0, .18);
+  --control-bg: var(--surface);
+  --input-bg: var(--surface-raised);
   --overlay-bg: rgba(0, 0, 0, .72);
   --border-hover: #494950;
-  --text-subtle: #68686f;
-  --shadow-raised: 0 18px 50px rgba(0, 0, 0, .55);
+  --text-subtle: #92968f;
+  --shadow-raised: 0 12px 32px rgba(0, 0, 0, .28);
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --ink: #18181b;
-  --muted: #64646c;
+  --accent: #80602f;
+  --ink: #202321;
+  --muted: #636660;
   --line: #dedee3;
   --line-strong: #c9c9d0;
-  --canvas: #f7f7f8;
+  --canvas: #f5f4f0;
   --surface: #ffffff;
   --surface-raised: #f2f2f4;
   --surface-hover: #ececef;
   --surface-active: #e3e3e7;
   --navy: #f3f3f5;
-  --blue: #5967e8;
-  --blue-dark: #4856ce;
+  --blue: var(--ink);
+  --blue-dark: var(--ink);
   --danger: #d73545;
   --success: #16845d;
-  --shadow-soft: 0 16px 46px rgba(23, 23, 30, .1);
+  --shadow-soft: 0 4px 14px rgba(25, 28, 24, .06);
   --control-bg: #ffffff;
   --input-bg: #ffffff;
   --overlay-bg: rgba(20, 20, 24, .42);
   --border-hover: #a9a9b2;
   --text-subtle: #73737b;
-  --shadow-raised: 0 18px 50px rgba(23, 23, 30, .14);
+  --shadow-raised: 0 12px 32px rgba(25, 28, 24, .12);
 }
 
 * { box-sizing: border-box; }
@@ -1109,9 +1111,9 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 
 /* Cohesive application shell and interaction refinement */
 :root {
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
   --space-1: 4px;
   --space-2: 8px;
@@ -1837,24 +1839,24 @@ button:active:not(:disabled) { transform: translateY(1px); }
   --content-wide: 1180px;
   --content-reading: 760px;
   --surface-subtle: color-mix(in srgb, var(--surface-raised) 72%, var(--canvas));
-  --accent-soft: color-mix(in srgb, var(--blue) 12%, var(--surface));
-  --accent-border: color-mix(in srgb, var(--blue) 40%, var(--line));
-  --shadow-card: 0 12px 36px rgba(0, 0, 0, .2);
+  --accent-soft: var(--surface-active);
+  --accent-border: var(--line-strong);
+  --shadow-card: none;
 }
 
 [data-theme="light"] {
-  --canvas: #f4f5f7;
-  --surface-raised: #f8f8fa;
-  --surface-hover: #f0f1f4;
-  --surface-active: #e8e9ee;
-  --line: #dfe1e7;
-  --line-strong: #c7cad3;
-  --text-subtle: #6f727c;
-  --shadow-card: 0 10px 32px rgba(25, 28, 38, .065);
+  --canvas: #f5f4f0;
+  --surface-raised: #eeede9;
+  --surface-hover: #e8e7e2;
+  --surface-active: #dfdfd8;
+  --line: #ddded6;
+  --line-strong: #bfc2b8;
+  --text-subtle: #696e64;
+  --shadow-card: none;
 }
 
 :where(button, a, input, textarea, select):focus-visible {
-  outline: 3px solid var(--focus-ring);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -2011,7 +2013,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
 }
 .image-picker:hover, .post-composer-footer .composer-tool:hover, .visibility-control:hover { background: var(--surface-hover); color: var(--ink); }
 .post-composer-footer .composer-tool.active { background: var(--accent-soft); border-color: var(--accent-border); color: var(--blue); }
-.publish-post-button { background: var(--blue); border-color: var(--blue); color: #fff; min-height: 36px; padding: 7px 16px; }
+.publish-post-button { background: var(--ink); border-color: var(--ink); color: var(--canvas); min-height: 36px; padding: 7px 16px; }
 .composer-count { color: var(--text-subtle); }
 .social-feed { gap: 13px; }
 .social-post {
@@ -2044,7 +2046,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
 
 /* Compact, branded intelligence rail */
 .news-brief-card { background: var(--surface); border-radius: 17px; box-shadow: var(--shadow-card); }
-.news-brief-card > header { background: linear-gradient(135deg, var(--accent-soft), transparent 70%); padding: 14px 15px 12px; }
+.news-brief-card > header { background: var(--surface); padding: 14px 15px 12px; }
 .news-brief-heading { min-width: 0; }
 .news-brief-mark { align-items: center; background: var(--blue); border-radius: 10px; color: #fff; display: flex; flex: 0 0 auto; height: 32px; justify-content: center; width: 32px; }
 .news-brief-mark svg { height: 16px; width: 16px; }
@@ -2143,3 +2145,83 @@ button:active:not(:disabled) { transform: translateY(1px); }
 }
 
 .post-detail-dialog > header button.post-assistant-action { border-radius:10px; font-size:.75rem; height:auto; min-height:38px; width:auto; padding:8px 12px; white-space:nowrap; margin-left:auto; margin-right:8px; }
+
+/* AbhiAI product surfaces. Neutral controls, brass focus/selection, depth for overlays. */
+:root .app-shell, :root .chat-panel, :root .workspace-view { background: var(--canvas); }
+:root .sidebar { background: var(--surface); border-color: var(--line); color: var(--ink); }
+:root .chat-header, :root .workspace-header { background: var(--canvas); backdrop-filter: none; }
+:root .eyebrow, :root .news-kicker, :root .news-category { color: var(--muted); }
+:root .primary-navigation button { border-radius: var(--radius-sm); color: var(--muted); font-size: .84rem; font-weight: 550; }
+:root .primary-navigation button.active { background: var(--surface-active); box-shadow: inset 2px 0 0 var(--accent); color: var(--ink); font-weight: 650; }
+:root .social-sidebar .primary-navigation button.active { box-shadow: none; }
+:root .social-sidebar .primary-navigation button.active::before { background: var(--accent); width: 2px; }
+:root .primary-navigation button.active svg { color: var(--ink); }
+:root .primary-navigation button:hover { background: var(--surface-hover); color: var(--ink); }
+:root .workspace-switcher { background: var(--surface-raised); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none; }
+:root .workspace-switcher button.active { background: var(--surface-active); color: var(--ink); box-shadow: none; }
+:root .conversation-item.selected { background: var(--surface-active); box-shadow: inset 2px 0 0 var(--accent); color: var(--ink); }
+:root .conversation-item small, :root .list-label, :root .sidebar .muted-text { color: var(--text-subtle); }
+:root .new-chat-button { background: var(--ink); color: var(--canvas); border-radius: var(--radius-sm); font-size: .87rem; font-weight: 650; }
+:root .new-chat-button:hover:not(:disabled) { background: var(--ink); opacity: .9; transform: none; }
+:root .account-trigger { background: var(--surface); border-color: var(--line); }
+:root .account-avatar, :root .profile-avatar, :root .notification-avatar, :root .group-avatar { background: var(--surface-active); border-color: var(--line); color: var(--ink); }
+:root .primary-button, :root .publish-post-button, :root .story-publish,
+:root .search-form button, :root .dm-start-form button, :root .dm-composer > button,
+:root .group-create-form button, :root .group-settings button, :root .group-members form button,
+:root .reply-form button, :root .video-replies form button, :root .memory-create-card footer button {
+  background: var(--ink); border-color: var(--ink); border-radius: var(--radius-sm); color: var(--canvas); font-weight: 650;
+}
+:root .primary-button:hover:not(:disabled), :root .publish-post-button:hover:not(:disabled), :root .story-publish:hover:not(:disabled) { box-shadow: none; opacity: .9; transform: none; }
+:root .secondary-button, :root .load-more-button, :root .conversation-actions button:not(.danger-button) { background: var(--surface); border-color: var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); }
+:root .composer, :root .home-composer { background: var(--surface); border-color: var(--line-strong); border-radius: var(--radius-md); box-shadow: none; }
+:root .composer:focus-within, :root .home-composer:focus-within, :root .post-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--focus-ring); }
+:root .composer textarea, :root .home-composer textarea { color: var(--ink); }
+:root .composer > button, :root .home-composer button:not(.voice-input-button) { background: var(--ink); color: var(--canvas); border-radius: var(--radius-sm); }
+:root .chat-attachment-picker, :root .chat-attachments > span { background: var(--surface-raised); border-color: var(--line); color: var(--muted); }
+:root .chat-attachments strong, :root .quick-actions button > svg { color: var(--ink); }
+:root .assistant-message .message-avatar, :root .news-brief-mark, :root .verified-badge, :root .dm-list-meta b { background: var(--ink); color: var(--canvas); }
+:root .assistant-status, :root .empty-state-icon, :root .memory-home-icon { background: var(--surface-raised); color: var(--muted); }
+:root .ai-home h1 { font-size: clamp(1.8rem, 3.8vw, 2.5rem); font-weight: 600; letter-spacing: -.04em; line-height: 1.15; }
+:root .empty-conversation h2, :root .no-conversation h2 { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.035em; }
+:root .quick-actions button { background: transparent; border-color: var(--line); border-radius: var(--radius-sm); color: var(--ink); }
+:root .quick-actions button:hover:not(:disabled) { background: var(--surface-hover); transform: none; }
+:root .ai-home-context-card, :root .memory-home-card { border-radius: var(--radius-md); box-shadow: none; }
+:root .post-composer, :root .social-post, :root .news-brief-card,
+:root .news-featured, :root .news-story-card, :root .person-card, :root .post-card,
+:root .explore-section, :root .explore-post-card, :root .search-filter-panel,
+:root .profile-form, :root .profile-reply-card, :root .story-composer, :root .trending-tags,
+:root .notification-list, :root .dm-layout {
+  background: var(--surface); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none;
+}
+:root .social-post:hover, :root .news-story-card:hover { border-color: var(--line-strong); box-shadow: none; transform: none; }
+:root .post-composer-footer .composer-tool, :root .image-picker { color: var(--muted); }
+:root .post-composer-footer .composer-tool { background: transparent; }
+:root .post-composer-footer .composer-tool.active { background: var(--surface-active); color: var(--ink); }
+:root .post-composer-footer .publish-post-button { background: var(--ink); color: var(--canvas); border-radius: var(--radius-sm); }
+:root .news-image-placeholder { background: var(--surface-active); color: var(--text-subtle); }
+:root .news-brief-card > header { background: var(--surface); }
+:root .news-brief-card small, :root .news-brief-card .eyebrow { color: var(--muted); }
+:root .news-brief-card > header button, :root .news-brief-story small { color: var(--ink); }
+:root .profile-cover { background: var(--surface-active); }
+:root .profile-tabs button.active { background: transparent; border-bottom-color: var(--ink); color: var(--ink); }
+:root .pinned-profile-post { border-color: var(--line-strong); box-shadow: inset 2px 0 0 var(--accent); }
+:root .ranking-note, :root .explore-featured { background: var(--surface-raised); border-color: var(--line); color: var(--ink); box-shadow: none; }
+:root .ranking-note p { color: var(--muted); }
+:root .search-form { background: var(--surface); border-color: var(--line); border-radius: var(--radius-md); box-shadow: none; }
+:root .dm-message.own .dm-bubble { background: var(--surface-active); color: var(--ink); }
+:root .app-dialog, :root .news-detail-dialog, :root .post-detail-dialog { border-radius: var(--radius-lg); box-shadow: var(--shadow-raised); }
+:root .account-menu, :root .post-menu { background: var(--surface-raised); border-color: var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-raised); }
+:root .account-menu button { color: var(--ink); }
+:root .news-chip.active { background: var(--surface-active); border-color: var(--line-strong); color: var(--ink); }
+
+:root .primary-navigation button .sidebar-label, :root .new-chat-button .sidebar-label { font-size: inherit; font-weight: inherit; text-align: left; }
+
+:root .profile-large-avatar { background-color: var(--surface-active); border-color: var(--surface); color: var(--ink); }
+:root .profile-tabs { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0; }
+:root .profile-tabs button { border-radius: 0; }
+:root .profile-tabs button.active { box-shadow: none; }
+:root .account-menu .danger-menu-item, :root .conversation-actions .danger-button { color: var(--danger); }
+
+:root .composer-mode { background: var(--surface-raised); border-color: var(--line); color: var(--ink); }
+:root .composer-mode button { color: var(--muted); }
+:root .notification-item.unread::before, :root .mark-read-button span { background: var(--accent); }

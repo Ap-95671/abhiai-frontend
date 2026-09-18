@@ -1316,7 +1316,7 @@ export default function Home() {
                   onChange={(event) => void changeConversationModel(event.target.value)}
                   value={selectedConversation.modelSelectionMode === "MANUAL" ? selectedConversation.preferredModelId ?? "AUTO" : "AUTO"}
                 >
-                  <option value="AUTO">✦ AbhiAI Auto · smart routing</option>
+                  <option value="AUTO">AbhiAI Auto · smart routing</option>
                   {models.map((model) => (
                     <option
                       disabled={model.status === "UNAVAILABLE" || model.status === "RATE_LIMITED" || model.status === "COMING_SOON" || !model.configured}
@@ -1369,7 +1369,7 @@ export default function Home() {
             <form className="composer" onSubmit={sendMessage}>
               {composerMode === "image" && (
                 <div className="composer-mode">
-                  <span><b>✦</b> Image generation</span>
+                  <span><AppIcon name="image" /> Image generation</span>
                   <button aria-label="Exit image generation mode" onClick={() => setComposerMode("chat")} type="button">×</button>
                 </div>
               )}

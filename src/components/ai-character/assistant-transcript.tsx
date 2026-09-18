@@ -15,7 +15,7 @@ export function AssistantTranscript({ messages, onPlay, speechSupported, toolRes
   return <div className={styles.transcriptWrap}>
     <div className={styles.transcript} ref={scroll} role="region" aria-label="Assistant conversation" tabIndex={0}
       onScroll={() => { const el = scroll.current; if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 70; setShowLatest(!follow.current); }}>
-      {!messages.length && <div className={styles.empty}><strong>A little curiosity goes a long way.</strong><p>Ask a question, think out loud, or explore an idea. Voice and text stay in the same conversation.</p></div>}
+      {!messages.length && <div className={styles.empty}><strong>Start a conversation</strong><p>Ask a question, think out loud, or explore an idea. Voice and text stay in the same conversation.</p></div>}
       {messages.map(message => <article key={message.id} className={styles.message} data-role={message.role}>
         <div className={styles.messageLabel}>{message.role === "USER" ? "You" : "AbhiAI"}
           {speechSupported && message.role === "ASSISTANT" && message.final && message.content && !message.interrupted &&

@@ -1,18 +1,16 @@
 .page {
-  --auth-accent: #7938ff;
-  --auth-accent-soft: #9a76ff;
-  --auth-bg: #020203;
-  --auth-border: #2a2b30;
-  --auth-field-border: #4a4b52;
-  --auth-illustration: #17181c;
-  --auth-muted: #8d8f97;
-  --auth-panel: #0a0b0d;
-  --auth-primary: #f5f5f6;
-  --auth-subtle: #c7c8cd;
+  --auth-accent: var(--accent);
+  --auth-accent-soft: var(--ink);
+  --auth-bg: var(--canvas);
+  --auth-border: var(--line);
+  --auth-field-border: var(--line-strong);
+  --auth-illustration: var(--surface-raised);
+  --auth-muted: var(--muted);
+  --auth-panel: var(--surface);
+  --auth-primary: var(--ink);
+  --auth-subtle: var(--muted);
   align-items: center;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(121, 56, 255, 0.13), transparent 28%),
-    var(--auth-bg);
+  background: var(--auth-bg);
   color: var(--auth-primary);
   display: flex;
   justify-content: center;
@@ -25,7 +23,7 @@
 .introOverlay {
   align-items: center;
   animation: introReveal 1.15s cubic-bezier(0.76, 0, 0.24, 1) forwards;
-  background: #6f24f6;
+  background: var(--canvas);
   display: flex;
   inset: 0;
   justify-content: center;
@@ -38,7 +36,7 @@
 .introLogo {
   animation: introLogo 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
   border-radius: 22px;
-  box-shadow: 0 22px 52px rgba(23, 5, 63, 0.32);
+  box-shadow: var(--shadow-soft);
   height: 84px;
   object-fit: cover;
   width: 84px;
@@ -74,8 +72,8 @@
 .authCard {
   background: var(--auth-panel);
   border: 1px solid var(--auth-border);
-  border-radius: 25px;
-  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(440px, 0.88fr);
   min-height: min(760px, calc(100dvh - 104px));
@@ -121,7 +119,7 @@
   background: #050506;
   border: 1px solid var(--auth-border);
   border-radius: 13px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-soft);
   display: flex;
   height: 46px;
   justify-content: center;
@@ -133,7 +131,7 @@
 .formLogo img { height: 100%; object-fit: cover; width: 100%; }
 
 .formContent h1 {
-  font-size: clamp(2.15rem, 3.4vw, 3.05rem);
+  font-size: clamp(1.85rem, 3vw, 2.4rem);
   font-weight: 610;
   letter-spacing: -0.052em;
   line-height: 1;
@@ -224,7 +222,7 @@
   padding: 8px 10px;
 }
 
-.privacyNote { background: rgba(121, 56, 255, 0.08); border: 1px solid rgba(154, 118, 255, 0.25); color: #bdb0f9; }
+.privacyNote { background: var(--surface-raised); border: 1px solid var(--line); color: var(--muted); }
 .privacyNote[hidden] { display: none; }
 .error { background: #1e0d11; border: 1px solid #5b252e; color: #ff8991; }
 
@@ -232,7 +230,7 @@
   align-items: center;
   background: var(--auth-primary);
   border: 1px solid var(--auth-primary);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   color: var(--auth-bg);
   display: flex;
   font-size: 0.74rem;
@@ -245,7 +243,7 @@
   transition: box-shadow 180ms ease, transform 180ms ease, opacity 180ms ease;
 }
 
-.submit:hover:not(:disabled) { box-shadow: 0 10px 25px rgba(121, 56, 255, 0.2); transform: translateY(-1px); }
+.submit:hover:not(:disabled) { opacity: .9; }
 .submit:disabled { cursor: wait; opacity: 0.62; }
 .submit b { font-size: 1rem; position: absolute; right: 17px; }
 .submitSpinner { animation: submitSpin 720ms linear infinite; border: 2px solid color-mix(in srgb, var(--auth-bg) 28%, transparent); border-radius: 50%; border-top-color: var(--auth-bg); height: 16px; position: absolute; right: 17px; width: 16px; }
@@ -731,19 +729,19 @@
 }
 
 :global([data-theme="light"]) .page {
-  --auth-bg: #f2f2f4;
-  --auth-border: #d5d6dc;
-  --auth-field-border: #aeb0b8;
-  --auth-illustration: #ededed;
-  --auth-muted: #6f7179;
-  --auth-panel: #fff;
-  --auth-primary: #18191d;
-  --auth-subtle: #484a52;
-  background: radial-gradient(circle at 14% 18%, rgba(121, 56, 255, 0.1), transparent 28%), var(--auth-bg);
+  --auth-bg: var(--canvas);
+  --auth-border: var(--line);
+  --auth-field-border: var(--line-strong);
+  --auth-illustration: var(--surface-raised);
+  --auth-muted: var(--muted);
+  --auth-panel: var(--surface);
+  --auth-primary: var(--ink);
+  --auth-subtle: var(--muted);
+  background: var(--auth-bg);
 }
 
-:global([data-theme="light"]) .authCard { box-shadow: 0 32px 90px rgba(38, 39, 47, 0.16); }
-:global([data-theme="light"]) .privacyNote { background: #f2edff; border-color: #d8cbff; color: #574399; }
+:global([data-theme="light"]) .authCard { box-shadow: none; }
+:global([data-theme="light"]) .privacyNote { background: var(--surface-raised); border: 1px solid var(--line); color: var(--muted); }
 :global([data-theme="light"]) .error { background: #fff0f1; border-color: #efbcc2; color: #b62838; }
 :global([data-theme="light"]) .submit { color: #fff; }
 
@@ -771,7 +769,7 @@
   .page { padding: 64px 12px 22px; }
   .utilityBar { left: 14px; right: 14px; top: 12px; }
   .back { font-size: 0.69rem; }
-  .authCard { border-radius: 20px; }
+  .authCard { border-radius: var(--radius-lg); }
   .illustrationPanel { min-height: 178px; }
   .characterScene { bottom: -1px; height: 200px; transform: translateX(-50%) scale(0.53); }
   .formPanel { min-height: 0; padding: 30px 22px 33px; }
@@ -833,3 +831,6 @@
   .passwordField button,
   .submit { transition: none; }
 }
+
+/* Keep personality in the character rig, not decorative rings. */
+.illustrationPanel::before, .illustrationPanel::after, .sceneShape { display: none; }
