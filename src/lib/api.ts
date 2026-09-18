@@ -1,3 +1,4 @@
+import type { AgentTask, AssistantSettings } from "@/components/ai-character/agent-types";
 import type { AbhiAIPageContext } from "@/components/ai-character/context-types";
 import type { AssistantEvent, AssistantToolResult } from "@/components/ai-character/tool-types";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
@@ -34,9 +35,12 @@ export type MessageCitation = {
   domain: string;
 };
 
-export type MemoryCategory = "PREFERENCE" | "INTEREST" | "ASSISTANT_SETTING" | "PROJECT_CONTEXT";
+export type MemoryCategory = "PREFERENCE" | "INTEREST" | "ASSISTANT_SETTING" | "PROJECT_CONTEXT" | "ONGOING_TASK" | "RECENT_GOAL" | "USER_DEFINED_FACT" | "WORKFLOW";
 export type UserMemory = {
   category?: MemoryCategory;
+  scope?: "GLOBAL"|"PROJECT"|"CONVERSATION"|"SESSION";
+  scopeKey?:string;
+  preferenceKey?:string;
   source?: string;
   id: string;
   content: string;
@@ -478,6 +482,19 @@ async function request<T>(
 
 export const api = {
 
+  assistantPreferences(accessToken: string): Promise<AssistantSettings> {
+    return request("/assistant/preferences", { signal: AbortSignal.timeout(15000) }, accessToken);
+  },
+  updateAssistantPreferences(accessToken: string, settings: AssistantSettings): Promise<AssistantSettings> {
+    return request("/assistant/preferences", { method:"PUT", body:JSON.stringify(settings), signal:AbortSignal.timeout(15000) }, accessToken);
+  },
+  assistantTasks(accessToken: string): Promise<AgentTask[]> { return request("/assistant/tasks", {}, accessToken); },
+  createAssistantTask(accessToken: string, body: {conversationId:string;goal:string;context:AbhiAIPageContext|null;sessionId:string}): Promise<AgentTask> {
+    return request("/assistant/tasks", {method:"POST",body:JSON.stringify(body),signal:AbortSignal.timeout(15000)},accessToken);
+  },
+  assistantTaskAction(accessToken: string,id:string,action:"advance"|"cancel"|"resume"|"confirm",body:object={},signal?:AbortSignal): Promise<AgentTask> {
+    return request(`/assistant/tasks/${id}/${action}`, {method:"POST",body:JSON.stringify(body),signal:signal??AbortSignal.timeout(15000)},accessToken);
+  },
   assistantConfig(accessToken: string): Promise<{ enabled: boolean; voiceAvailable: boolean }> {
     return request("/assistant/config", { signal: AbortSignal.timeout(15000) }, accessToken);
   },
@@ -1123,6 +1140,7 @@ export const api = {
     signal?: AbortSignal,
     options?: {
       assistantContext?: AbhiAIPageContext | null;
+      assistantSessionId?: string;
       onAssistantEvent?: (event: AssistantEvent) => void;
       attachmentIds?: string[];
       externalProcessingAllowed?: boolean;
@@ -1138,6 +1156,7 @@ export const api = {
       body: JSON.stringify({
         content,
         assistantContext: options?.assistantContext,
+        assistantSessionId: options?.assistantSessionId,
         attachmentIds: options?.attachmentIds ?? [],
         externalProcessingAllowed: options?.externalProcessingAllowed ?? false,
         webSearchAllowed: options?.webSearchAllowed ?? false,
@@ -1259,10 +1278,13 @@ export const api = {
     return request("/memory", { method: "PATCH", body: JSON.stringify({ enabled }) }, accessToken);
   },
 
-  createMemory(accessToken: string, content: string, category: MemoryCategory = "PREFERENCE"): Promise<UserMemory> {
-    return request("/memory/items", { method: "POST", body: JSON.stringify({ content, category }) }, accessToken);
+  createMemory(accessToken: string, content: string, category: MemoryCategory = "PREFERENCE", scope:UserMemory["scope"]="GLOBAL",scopeKey="",preferenceKey=""): Promise<UserMemory> {
+    return request("/memory/items", { method: "POST", body: JSON.stringify({ content, category,scope,scopeKey,preferenceKey }) }, accessToken);
   },
 
+  editMemory(accessToken:string,id:string,content:string):Promise<UserMemory> {
+    return request(`/memory/items/${id}`,{method:"PATCH",body:JSON.stringify({content})},accessToken);
+  },
   deleteMemory(accessToken: string, memoryId: string): Promise<void> {
     return request(`/memory/items/${encodeURIComponent(memoryId)}`, { method: "DELETE" }, accessToken);
   },

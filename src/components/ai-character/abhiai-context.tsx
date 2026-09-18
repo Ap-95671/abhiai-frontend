@@ -26,7 +26,7 @@ export function AbhiAIContextProvider({ children, base, userId, onOpenComposer }
     try { updateEnabled(localStorage.getItem(`abhiai.assistant.page-context.${userId}`) !== "off"); } catch { updateEnabled(true); }
   }); }, [userId]);
   const setEnabled = useCallback((value: boolean) => {
-    updateEnabled(value); setSelection({ scope: "", entity: "", text: "" });
+    updateEnabled(value); if(!value)setSelection({ scope: "", entity: "", text: "" });
     try { localStorage.setItem(`abhiai.assistant.page-context.${userId}`, value ? "on" : "off"); } catch {}
   }, [userId]);
   const register = useCallback((id: string, context: AbhiAIPageContext, priority: number) => {

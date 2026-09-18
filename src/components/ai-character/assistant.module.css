@@ -148,3 +148,32 @@
 }
 
 .avatar[data-animations="reduced"] .mouth { transform:scaleY(calc(1 + var(--mouth-open) * 2)); }
+
+.agentProgress { padding:12px; border:1px solid var(--line); border-radius:12px; margin-top:12px; font-size:13px; }
+.agentProgress ul,.agentProgress ol { padding-left:20px; }
+.agentProgress button,.taskHistory button,.privacyControls button { padding:7px 10px; border:1px solid var(--line); border-radius:8px; margin:4px; }
+.artifact { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.6; max-width:100%; }
+.confirmation { padding:10px; border:1px solid var(--accent); border-radius:10px; }
+.taskHistory { margin-top:12px; font-size:12px; }
+.taskHistory button { display:block; text-align:left; width:calc(100% - 8px); }
+.privacyControls { display:grid; gap:12px; border:1px solid var(--line); border-radius:12px; padding:14px; margin:12px 0; }
+.privacyControls label { display:block; }
+.privacyControls p { font-size:12px; }
+.taskToggle,.upload { display:block; font-size:12px; margin-bottom:8px; }
+.upload input { max-width:100%; font-size:12px; }
+.avatar[data-state="speaking"][data-mouth="rounded"] .mouth { rx:5px; }
+.avatar[data-state="speaking"][data-mouth="wide"] .mouth { rx:12px; }
+
+.inputTools { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.inputTools .taskToggle { margin:0; }
+.inputTools .upload { margin:0 0 0 auto; border:1px solid var(--line); border-radius:8px; padding:6px 10px; cursor:pointer; }
+.upload:focus-within { outline:2px solid var(--accent); }
+@media(max-height:450px) {
+  .stage { min-height:26px; padding:2px 12px; }
+  .stage .avatar { display:none; }
+  .transcriptWrap { min-height:32px; }
+  .header { padding:4px 12px; }
+  .contextBar { padding:2px 12px; }
+  .footer { padding:6px 12px; }
+  .inputTools { margin-bottom:4px; }
+}

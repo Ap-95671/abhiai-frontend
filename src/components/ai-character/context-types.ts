@@ -1,7 +1,7 @@
 export type PageType = "news" | "post" | "profile" | "feed" | "search" | "conversation" | "document" | "other";
 export type AbhiAIPageContext = {
   pageType: PageType; route?: string; entityId?: string; parentId?: string; title?: string;
-  selectedText?: string; externalProcessingAllowed?: boolean;
+  selectedText?: string; externalProcessingAllowed?: boolean; currentPage?:number; currentSection?:string;
 };
 export const contextLabels: Record<PageType, string> = {
   news: "News article", post: "Current post", profile: "Profile", feed: "Feed", search: "Search",
@@ -10,7 +10,7 @@ export const contextLabels: Record<PageType, string> = {
 export function boundedContext(context: AbhiAIPageContext): AbhiAIPageContext {
   return { pageType: context.pageType, route: context.route?.slice(0,240), entityId: context.entityId?.slice(0,160),
     parentId: context.parentId?.slice(0,160), title: context.title?.slice(0,240), selectedText: context.selectedText?.slice(0,2000),
-    externalProcessingAllowed: context.externalProcessingAllowed === true };
+    currentPage:context.currentPage, currentSection:context.currentSection?.slice(0,240), externalProcessingAllowed: context.externalProcessingAllowed === true };
 }
 /** A document selection belongs only to the chat that owns its attachment. */
 export function currentDocumentContext(page: AbhiAIPageContext, document: AbhiAIPageContext | null): AbhiAIPageContext {

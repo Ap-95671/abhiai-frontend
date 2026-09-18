@@ -21,6 +21,7 @@ export type AssistantMessage = {
   content: string;
   final: boolean;
   interrupted?: boolean;
+  attachments?: import("@/lib/api").ConversationAttachment[];
 };
 
 export function upsertMessage(messages: AssistantMessage[], message: AssistantMessage): AssistantMessage[] {

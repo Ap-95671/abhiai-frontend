@@ -3,7 +3,7 @@ import type { AssistantCharacterState, AssistantExpression, AnimationMode } from
 import styles from "./assistant.module.css";
 
 export function CharacterAvatar({ state, expression = "neutral", animations = "full", level = 0, small = false }: { state: AssistantCharacterState; expression?: AssistantExpression; animations?: AnimationMode; level?: number; small?: boolean }) {
-  return <div className={`${styles.avatar} ${small ? styles.smallAvatar : ""}`} data-state={state} data-expression={expression} data-animations={animations} aria-hidden="true"
+  return <div className={`${styles.avatar} ${small ? styles.smallAvatar : ""}`} data-mouth={level<0.06?"rest":level<0.3?"rounded":"wide"} data-state={state} data-expression={expression} data-animations={animations} aria-hidden="true"
     style={{ "--mouth-open": state === "speaking" && animations !== "off" ? Math.max(0, Math.min(1, level)) : 0 } as CSSProperties}>
     <svg viewBox="0 0 180 160" focusable="false">
       <ellipse className={styles.shadow} cx="90" cy="145" rx="40" ry="5" />

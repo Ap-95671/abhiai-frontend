@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AuthenticatedImage } from "@/components/authenticated-image";
 import { MessageContent } from "@/components/chat/message-content";
 import { AppIcon } from "@/components/ui/app-icon";
 import type { AssistantMessage } from "./assistant-state";
 import styles from "./assistant.module.css";
 
-export function AssistantTranscript({ messages, onPlay, speechSupported, toolResults }: { messages: AssistantMessage[]; toolResults?: ReactNode; speechSupported: boolean; onPlay(message: AssistantMessage): void }) {
+export function AssistantTranscript({ messages, onPlay, speechSupported, toolResults, token }: { messages: AssistantMessage[]; token:string; toolResults?: ReactNode; speechSupported: boolean; onPlay(message: AssistantMessage): void }) {
   const scroll = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const [showLatest, setShowLatest] = useState(false);
@@ -21,6 +22,7 @@ export function AssistantTranscript({ messages, onPlay, speechSupported, toolRes
           {speechSupported && message.role === "ASSISTANT" && message.final && message.content && !message.interrupted &&
             <button type="button" aria-label="Read this response aloud" title="Read aloud" onClick={() => onPlay(message)}><AppIcon name="speaker" /></button>}
         </div>
+        {message.attachments?.map(item=>item.kind==="IMAGE"?<AuthenticatedImage key={item.id} accessToken={token} mediaId={item.mediaId} alt={item.filename} className="chat-attachment-thumbnail"/>:<p key={item.id}>▤ {item.filename}</p>)}
         {message.content ? <MessageContent content={message.content} /> : <span className={styles.pending}>{message.role === "USER" ? "Transcribing…" : "AbhiAI is thinking…"}</span>}
       </article>)}
       {toolResults}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useAbhiAIContext } from "./abhiai-context";
 import { type AssistantEvent, type AssistantToolResult } from "./tool-types";
 import { validExpression, type AssistantExpression, type AnimationMode } from "./assistant-state";
-import { api } from "@/lib/api";
+import { api, type ConversationAttachment } from "@/lib/api";
 import { useSpeechPlayback } from "@/components/voice/use-speech-playback";
 import { transition, upsertMessage, type AssistantMessage, type VoiceConnectionState } from "./assistant-state";
 import { RealtimeVoice } from "./realtime-voice";
@@ -21,6 +21,9 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
   const [connection, setConnection] = useState<VoiceConnectionState>("disconnected");
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [conversationId, setConversationId] = useState<string>();
+  const [attachment,setAttachment]=useState<ConversationAttachment>();
+  const [uploading,setUploading]=useState(false);
+  const [background,setBackground]=useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [microphone, setMicrophone] = useState(false);
@@ -107,13 +110,13 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
   const initialize = useCallback(async (fresh = false) => {
     setLoading(true); setError(""); newTurn();
     try {
-      if (fresh) { endVoice(); await flush(); }
+      if (fresh) { endVoice(); await flush(); setAttachment(undefined); }
       const conversation = await api.openAssistant(token, fresh);
       if (!mounted.current) return;
       id.current = conversation.id; setConversationId(conversation.id);
       dirty.current.clear(); saved.current.clear(); setUnsaved(false);
       replace(conversation.messages.filter(message => message.role !== "SYSTEM").map(message => ({
-        id: message.id, role: message.role as "USER" | "ASSISTANT", content: message.content, final: true,
+        id: message.id, role: message.role as "USER" | "ASSISTANT", content: message.content, attachments: message.attachments, final: true,
       })));
       dispatch("settle");
     } catch { if (mounted.current) { setError("Your assistant conversation could not load. Please retry."); dispatch("fail"); } }
@@ -141,7 +144,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     if (!visible) { queuedText.current = null; textAbort.current?.abort(); endVoice(); }
   }, [visible, endVoice]);
   useEffect(() => {
-    const hide = () => { if (document.hidden) endVoice(); };
+    const hide = () => { setBackground(document.hidden); if (document.hidden) endVoice(); };
     const leave = () => endVoice();
     document.addEventListener("visibilitychange", hide);
     window.addEventListener("pagehide", leave);
@@ -172,7 +175,9 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     previousSpeech.current = speech.status;
   }, [speech.status, busy, microphone]);
 
-  async function send(content: string) {
+  const memorySession=useRef<string | undefined>(undefined);
+  async function send(content: string,sessionId?:string) {
+    if(sessionId)memorySession.current=sessionId;
     if (!id.current || !content.trim()) return false;
     if (sending.current) {
       if (!textAbort.current) return false;
@@ -181,11 +186,11 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     sending.current = true; setError("");
     let realtimeTurn = false;
     try {
-      if (voice.current?.connected) { realtimeTurn = true; voice.current.sendText(content.trim()); return true; }
+      if (!attachment && voice.current?.connected) { realtimeTurn = true; voice.current.sendText(content.trim()); return true; }
       endVoice();
       await flush();
       stopSpeech(); newTurn(); setBusy(true); setExpression("thinking"); dispatch("think");
-      const user: AssistantMessage = { id: crypto.randomUUID(), role: "USER", content: content.trim(), final: true };
+      const user: AssistantMessage = { id: crypto.randomUUID(), role: "USER", content: content.trim(), attachments:attachment?[attachment]:[], final: true };
       const reply: AssistantMessage = { id: crypto.randomUUID(), role: "ASSISTANT", content: "", final: false };
       const before = history.current;
       replace([...before, user, reply]);
@@ -196,11 +201,13 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
           if (controller.signal.aborted || !mounted.current) return;
           reply.content += chunk;
           replace(upsertMessage(history.current, { ...reply }));
-        }, controller.signal, { assistantContext: currentPage.current,
+        }, controller.signal, { attachmentIds: attachment?[attachment.id]:[], externalProcessingAllowed:!!attachment, assistantContext: currentPage.current, assistantSessionId:memorySession.current,
           onAssistantEvent: value => { if (!controller.signal.aborted && mounted.current) event(value); } });
         replace([...before, { ...user, id: exchange.userMessage.id }, {
           ...reply, id: exchange.assistantMessage.id, content: exchange.assistantMessage.content, final: true,
         }]);
+        setAttachment(undefined);
+        if(exchange.assistantMessage.fallbackUsed)setNotice(`A fallback provider answered: ${exchange.assistantMessage.provider??"configured text provider"}.`);
         if (autoSpeak && shown.current && !document.hidden) speech.play(exchange.assistantMessage.id, exchange.assistantMessage.content);
       } catch (failure) {
         // Losing the SSE completion event does not prove that the server transaction rolled back.
@@ -208,7 +215,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
         try {
           const persisted = await api.getConversation(token, id.current, AbortSignal.timeout(15000));
           replace(persisted.messages.filter(message => message.role !== "SYSTEM").map(message => ({
-            id: message.id, role: message.role as "USER" | "ASSISTANT", content: message.content, final: true,
+            id: message.id, role: message.role as "USER" | "ASSISTANT", content: message.content, attachments: message.attachments, final: true,
           })));
         } catch { replace(before); }
         throw failure;
@@ -220,6 +227,20 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
       if (next && mounted.current && shown.current) queueMicrotask(() => void send(next));
     }
   }
+  async function upload(file:File) {
+    if(!id.current || uploading || busy)return;
+    if(!window.confirm("Allow AbhiAI to upload this file and send it to the configured AI provider when you submit your question?"))return;
+    endVoice();setUploading(true);setError("");
+    const conversation=id.current;
+    try {
+      if(attachment)await api.deleteConversationAttachment(token,conversation,attachment.id);
+      const next=await api.uploadConversationAttachment(token,conversation,file);
+      if(next.processingStatus!=="READY")throw new Error(next.processingError??"Attachment is still processing.");
+      if(mounted.current && id.current===conversation)setAttachment(next);
+    }catch(failure){setError(failure instanceof Error?failure.message:"Upload failed.");}
+    finally {setUploading(false);}
+  }
+  async function removeAttachment(){if(!attachment || !id.current)return;try {await api.deleteConversationAttachment(token,id.current,attachment.id);setAttachment(undefined);}catch {setError("Attachment could not be removed.");}}
   async function toggleMicrophone() {
     setError(""); stopSpeech();
     if (microphone) { voice.current?.stopMicrophone(); return; }
@@ -248,7 +269,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
   function changeAnimations(mode: AnimationMode) {
     setAnimations(mode); try { localStorage.setItem(`abhiai.assistant.animations.${userId}`,mode); } catch {}
   }
-  return { expression, animations, changeAnimations, toolStatus, toolResults, notice, pageContext, character, connection, messages, conversationId, loading, busy, microphone, level, error, autoSpeak, unsaved,
+  return { attachment, uploading, upload, removeAttachment, expression, animations:background?"off" as const:animations, changeAnimations, toolStatus, toolResults, notice, pageContext, character, connection, messages, conversationId, loading, busy, microphone, level, error, autoSpeak, unsaved,
     speechSupported: speech.supported, send, toggleMicrophone, toggleAutoSpeak, interrupt, endVoice, initialize,
     retrySave: () => { setError(""); void flush().catch(() => {}); },
     enableAudio: () => voice.current?.enableAudio(),

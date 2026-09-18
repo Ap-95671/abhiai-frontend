@@ -17,7 +17,7 @@ const normal={...conversation,id:normalId,title:'Existing AI chat',messages:[]};
 
 async function setup(browser, viewport) {
   const context=await browser.newContext({viewport,reducedMotion:'reduce'});
-  const state={history:[],created:0,closed:0,textRequests:[],transcripts:[],sessionFailure:false,saveFailure:false};
+  const state={preferences:{mode:"STANDARD",pageContext:true,agentActions:false,proactive:false,projectKey:"",fallbackAllowed:false},tasks:[],history:[],created:0,closed:0,textRequests:[],transcripts:[],sessionFailure:false,saveFailure:false};
   await context.addInitScript(({userId,normalId})=>{
     localStorage.setItem('abhiai.access-token','mock-jwt');
     localStorage.setItem('abhiai.active-conversation-id',normalId);
@@ -50,6 +50,8 @@ async function setup(browser, viewport) {
     const req=route.request(), url=new URL(req.url()), p=url.pathname.replace(/^.*\/api\/v1/,'');
     const json=async(body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
     if(req.method()==='OPTIONS') return route.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'}});
+    if(p==='/assistant/preferences'){if(req.method()==='PUT')state.preferences=req.postDataJSON();return json(state.preferences);}
+    if(p==='/assistant/tasks')return json(state.tasks);
     if(p==='/assistant/config') return json({enabled:true,voiceAvailable:true});
     if(p==='/assistant/conversation') return json({...conversation,messages:state.history});
     if(p==='/assistant/sessions') {

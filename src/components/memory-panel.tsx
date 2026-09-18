@@ -3,12 +3,14 @@
 import { FormEvent, useCallback, useEffect, useState, useId } from "react";
 
 import { AppIcon } from "@/components/ui/app-icon";
-import { api, ApiError, MemorySettings, MemoryCategory } from "@/lib/api";
+import { api, ApiError, MemorySettings, MemoryCategory, type UserMemory } from "@/lib/api";
 
-export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: string; onUnauthorized: () => void }) {
+export function MemoryPanel({ accessToken, onUnauthorized, projectKey="",conversationId,sessionId }: { accessToken: string; onUnauthorized: () => void;projectKey?:string;conversationId?:string;sessionId?:string }) {
   const prefix = useId();
   const [settings, setSettings] = useState<MemorySettings | null>(null);
   const [category, setCategory] = useState<MemoryCategory>("PREFERENCE");
+  const [scope,setScope]=useState<UserMemory["scope"]>("GLOBAL");
+  const [preferenceKey,setPreferenceKey]=useState("");
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,8 +43,8 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
     if (!content || !settings) return;
     setSaving(true); setError("");
     try {
-      const memory = await api.createMemory(accessToken, content, category);
-      setSettings({ ...settings, memories: [memory, ...settings.memories] });
+      const memory = await api.createMemory(accessToken, content, category,scope,scope==="PROJECT"?projectKey:scope==="CONVERSATION"?conversationId:scope==="SESSION"?sessionId:"",preferenceKey);
+      setSettings({ ...settings, memories: [memory, ...settings.memories.filter(item=>item.id!==memory.id)] });
       setDraft(""); window.dispatchEvent(new Event("abhiai:memory-changed"));
     } catch (saveError) {
       if (saveError instanceof ApiError && saveError.status === 401) return onUnauthorized();
@@ -50,6 +52,12 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
     } finally { setSaving(false); }
   }
 
+  async function editMemory(memory:UserMemory) {
+    const text=window.prompt("Edit saved memory",memory.content);if(text===null)return;
+    setSaving(true);setError("");
+    try {const updated=await api.editMemory(accessToken,memory.id,text);setSettings(current=>current?{...current,memories:current.memories.map(m=>m.id===updated.id?updated:m)}:current);window.dispatchEvent(new Event("abhiai:memory-changed"));}
+    catch(failure){setError(failure instanceof Error?failure.message:"Memory edit failed.");}finally{setSaving(false);}
+  }
   async function removeMemory(id: string) {
     if (!settings || !window.confirm("Delete this saved memory?")) return;
     setSaving(true); setError("");
@@ -86,13 +94,15 @@ export function MemoryPanel({ accessToken, onUnauthorized }: { accessToken: stri
         <form className="memory-create-card" onSubmit={(event) => void addMemory(event)}>
           <label htmlFor={`${prefix}-new-memory`}>Add something you want AbhiAI to remember</label>
           <label htmlFor={`${prefix}-memory-category`}>Category</label><select id={`${prefix}-memory-category`} value={category} onChange={event=>setCategory(event.target.value as MemoryCategory)}>{(["PREFERENCE","INTEREST","ASSISTANT_SETTING","PROJECT_CONTEXT"] as const).map(value=><option key={value} value={value}>{value.toLowerCase().replaceAll("_"," ")}</option>)}</select>
+          <label>Scope<select value={scope} onChange={e=>setScope(e.target.value as UserMemory["scope"])}><option value="GLOBAL">Global</option><option value="PROJECT" disabled={!projectKey}>Project: {projectKey||"choose in assistant settings"}</option><option value="CONVERSATION" disabled={!conversationId}>This conversation</option><option value="SESSION" disabled={!sessionId}>This session (expires within 24 hours)</option></select></label>
+          <label>Preference name (optional)<input maxLength={80} value={preferenceKey} onChange={e=>setPreferenceKey(e.target.value)} placeholder="For example: response length"/></label><p>Using the same preference name in the same scope replaces its older value.</p>
           <textarea id={`${prefix}-new-memory`} maxLength={500} onChange={(event) => setDraft(event.target.value)} placeholder="For example: I prefer concise answers with practical examples." value={draft}/>
           <footer><span>{draft.length}/500 · Never save passwords, API keys, or highly sensitive information.</span><button disabled={saving || !draft.trim()} type="submit">Save memory</button></footer>
         </form>
 
         <section className="memory-list-card">
           <header><div><h2>Saved memories</h2><p>{settings.memories.length} of 50</p></div>{settings.memories.length > 0 && <button className="memory-clear" disabled={saving} onClick={() => void clearAll()} type="button">Clear all</button>}</header>
-          {settings.memories.length === 0 ? <div className="memory-empty"><AppIcon name="bookmark"/><h3>No saved memories</h3><p>Nothing from your conversations is remembered automatically.</p></div> : <ul>{settings.memories.map((memory) => <li key={memory.id}><span><small>{(memory.category ?? "PREFERENCE").toLowerCase().replaceAll("_"," ")}</small><br/>{memory.content}</span><button aria-label={`Delete memory: ${memory.content}`} disabled={saving} onClick={() => void removeMemory(memory.id)} type="button">Delete</button></li>)}</ul>}
+          {settings.memories.length === 0 ? <div className="memory-empty"><AppIcon name="bookmark"/><h3>No saved memories</h3><p>Nothing from your conversations is remembered automatically.</p></div> : <ul>{settings.memories.map((memory) => <li key={memory.id}><span><small>{(memory.category ?? "PREFERENCE").toLowerCase().replaceAll("_"," ")}</small><br/>{memory.scope && <small> · {memory.scope.toLowerCase()} {memory.scopeKey}</small>}<br/>{memory.content}</span><button type="button" disabled={saving} onClick={()=>void editMemory(memory)}>Edit</button><button aria-label={`Delete memory: ${memory.content}`} disabled={saving} onClick={() => void removeMemory(memory.id)} type="button">Delete</button></li>)}</ul>}
         </section>
       </>}
     </div>
