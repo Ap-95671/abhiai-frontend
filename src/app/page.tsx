@@ -10,7 +10,7 @@ import { AuthenticatedImage } from "@/components/authenticated-image";
 import { BrandIntro } from "@/components/branding/brand-intro";
 import { ThinkingIndicator } from "@/components/chat/thinking-indicator";
 import { MessageContent } from "@/components/chat/message-content";
-import { ToolMenu, UploadPurpose } from "@/components/chat/tool-menu";
+import { ToolMenu, SelectControl, UploadPurpose } from "@/components/chat/tool-menu";
 import { LandingPage } from "@/components/landing/landing-page";
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { FeedPanel } from "@/components/feed-panel";
@@ -27,6 +27,8 @@ import { CreatorDashboard } from "@/components/creator-dashboard";
 import { NewsPanel } from "@/components/news/news-panel";
 import { MemoryPanel } from "@/components/memory-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
+import { Toggle } from "@/components/ui/toggle";
+import { CharacterAvatar } from "@/components/ai-character/character-avatar";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { usePageContext, AssistantDocumentButton } from "@/components/ai-character/abhiai-context";
@@ -72,39 +74,23 @@ const socialNavigationGroups: Array<{
   label: string;
   items: Array<{ view: ActiveView; label: string; icon: AppIconName }>;
 }> = [
-  {
-    label: "Discover",
-    items: [
-      { view: "feed", label: "Feed", icon: "feed" },
-      { view: "explore", label: "Explore", icon: "explore" },
-      { view: "news", label: "News", icon: "globe" },
-    ],
-  },
-  {
-    label: "Connect",
-    items: [
-      { view: "communities", label: "Communities", icon: "community" },
-      { view: "messages", label: "Messages", icon: "message" },
-      { view: "notifications", label: "Notifications", icon: "bell" },
-    ],
-  },
-  {
-    label: "Publish",
-    items: [
-      { view: "articles", label: "Articles", icon: "article" },
-      { view: "creator", label: "Creator Studio", icon: "create" },
-      { view: "stories", label: "Stories", icon: "story" },
-      { view: "videos", label: "Videos", icon: "video" },
-    ],
-  },
-  {
-    label: "Library",
-    items: [
-      { view: "hashtags", label: "Tags", icon: "hash" },
-      { view: "search", label: "Search", icon: "search" },
-      { view: "profile", label: "Profile", icon: "profile" },
-    ],
-  },
+  { label: "Main", items: [
+    { view: "feed", label: "Feed", icon: "feed" },
+    { view: "explore", label: "Explore", icon: "explore" },
+    { view: "news", label: "News", icon: "globe" },
+    { view: "communities", label: "Communities", icon: "community" },
+    { view: "messages", label: "Messages", icon: "message" },
+    { view: "notifications", label: "Notifications", icon: "bell" },
+    { view: "profile", label: "Profile", icon: "profile" },
+  ] },
+  { label: "More", items: [
+    { view: "articles", label: "Articles", icon: "article" },
+    { view: "creator", label: "Creator Studio", icon: "create" },
+    { view: "stories", label: "Stories", icon: "story" },
+    { view: "videos", label: "Videos", icon: "video" },
+    { view: "hashtags", label: "Tags", icon: "hash" },
+    { view: "search", label: "Search", icon: "search" },
+  ] },
 ];
 
 function errorMessage(error: unknown) {
@@ -172,6 +158,7 @@ export default function Home() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [moreNavigationOpen, setMoreNavigationOpen] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [conversationDialog, setConversationDialog] = useState<"rename" | "delete" | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -1175,8 +1162,8 @@ export default function Home() {
             </button>
           ) : socialNavigationGroups.map((group) => (
             <section className="navigation-group" key={group.label}>
-              <p className="navigation-group-label sidebar-label">{group.label}</p>
-              <div className="navigation-group-items">
+              {group.label === "More" && <button aria-controls="social-more-navigation" aria-expanded={moreNavigationOpen} className={!moreNavigationOpen && group.items.some(item => item.view === activeView) ? "active" : ""} onClick={() => setMoreNavigationOpen(open => !open)} title="More" type="button"><AppIcon name="more" /><span className="sidebar-label">More</span><AppIcon name="chevron-down" /></button>}
+              <div className="navigation-group-items" hidden={group.label === "More" && !moreNavigationOpen} id={group.label === "More" ? "social-more-navigation" : undefined}>
                 {group.items.map((item) => (
                   <button
                     aria-current={activeView === item.view ? "page" : undefined}
@@ -1216,7 +1203,6 @@ export default function Home() {
               type="button"
             >
               <span>{conversation.title}</span>
-              <small>{formatDate(conversation.updatedAt)}</small>
             </button>
             <button aria-expanded={conversationMenuId === conversation.id} aria-haspopup="menu" aria-label={`Actions for ${conversation.title}`} className="conversation-more-button" onClick={() => setConversationMenuId((current) => current === conversation.id ? null : conversation.id)} type="button"><AppIcon name="more"/></button>
             {conversationMenuId === conversation.id && <div className="conversation-menu" role="menu"><button onClick={() => void openConversationAction(conversation, "rename")} role="menuitem" type="button">Rename</button><button className="danger-menu-item" onClick={() => void openConversationAction(conversation, "delete")} role="menuitem" type="button">Delete</button></div>}
@@ -1310,7 +1296,7 @@ export default function Home() {
               </div>
               <label className="model-selector">
                 <span>Model</span>
-                <select
+                <SelectControl
                   aria-label="AI model"
                   disabled={isChangingModel || isSending}
                   onChange={(event) => void changeConversationModel(event.target.value)}
@@ -1326,7 +1312,7 @@ export default function Home() {
                       {model.displayName} · {model.provider}{model.status === "COMING_SOON" ? " — Coming soon" : model.status === "RATE_LIMITED" ? " — Rate limited" : model.status === "UNAVAILABLE" ? " — Unavailable" : model.status === "DEGRADED" ? " — Degraded" : !model.configured ? " — Not configured" : ""}
                     </option>
                   ))}
-                </select>
+                </SelectControl>
               </label>
               <div className="conversation-actions">
                 <button onClick={() => { setRenameDraft(selectedConversation.title); setConversationDialog("rename"); }} type="button">Rename</button>
@@ -1339,9 +1325,7 @@ export default function Home() {
                 <div aria-label="Loading messages" className="message-skeletons" role="status"><i/><i/><i/></div>
               ) : sortedMessages.length === 0 ? (
                 <div className="empty-conversation">
-                  <span className="brand-mark">
-                    <Image alt="AbhiAI" height={56} src="/abhiai-logo.png" width={56} />
-                  </span>
+                  <span className="assistant-home-avatar" role="img" aria-label="AbhiAI assistant"><CharacterAvatar state="idle" animations="off" /></span>
                   <h2>What would you like to explore?</h2>
                   <p>Ask a question, brainstorm an idea, or start building something new.</p>
                 </div>
@@ -1456,21 +1440,14 @@ export default function Home() {
                   {!externalProcessingAllowed && <strong>Required</strong>}
                 </label>
               )}
-              <label>
-                <input
-                  checked={webSearchAllowed}
-                  onChange={(event) => setWebSearchAllowed(event.target.checked)}
-                  type="checkbox"
-                />
-                Allow web search for this message
-              </label>
+              <div className="chat-web-search"><Toggle checked={webSearchAllowed} label="Allow web search for this message" onCheckedChange={setWebSearchAllowed} /><span>Allow web search for this message</span></div>
             </div>
             <p className="composer-note">AbhiAI can make mistakes. Verify important information.</p>
           </>
         ) : (
           <div className="ai-home">
             <div className="ai-home-intro">
-              <span className="brand-mark ai-home-logo"><Image alt="AbhiAI" height={64} src="/abhiai-logo.png" width={64} /></span>
+              <span className="assistant-home-avatar" role="img" aria-label="AbhiAI assistant"><CharacterAvatar state="idle" animations="off" /></span>
               <p className="eyebrow">Your intelligence workspace</p>
               <h1>Think, create, and continue.</h1>
               <p>Start with smart routing or choose an available model. Your conversations stay organized in one private workspace.</p>
@@ -1485,7 +1462,7 @@ export default function Home() {
                 value={messageDraft}
               />
               <div>
-                <label className="home-model-control"><span>Model</span><select aria-label="Model for new conversation" onChange={(event) => setHomeModelId(event.target.value)} value={homeModelId}><option value="AUTO">AbhiAI Auto · smart routing</option>{models.filter((model) => model.configured && model.status !== "UNAVAILABLE" && model.status !== "COMING_SOON").map((model) => <option key={model.id} value={model.id}>{model.displayName} · {providerLabel(model.provider)}</option>)}</select></label>
+                <label className="home-model-control"><span>Model</span><SelectControl aria-label="Model for new conversation" onChange={(event) => setHomeModelId(event.target.value)} value={homeModelId}><option value="AUTO">AbhiAI Auto · smart routing</option>{models.filter((model) => model.configured && model.status !== "UNAVAILABLE" && model.status !== "COMING_SOON").map((model) => <option key={model.id} value={model.id}>{model.displayName} · {providerLabel(model.provider)}</option>)}</SelectControl></label>
                 <div className="home-composer-actions">
                   <VoiceInput disabled={isCreatingConversation} onChange={setMessageDraft} value={messageDraft} />
                   <button aria-label="Start chat" disabled={isCreatingConversation || !messageDraft.trim()} type="submit"><AppIcon name="send" /></button>
@@ -1493,9 +1470,9 @@ export default function Home() {
               </div>
             </form>
             <div aria-label="Quick actions" className="quick-actions">
-              <button disabled={isCreatingConversation} onClick={() => void startQuickAction("image", "Create an image of ")} type="button"><AppIcon name="image"/><span><strong>Create image</strong><small>Generate from a prompt</small></span></button>
-              <button disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Summarize and analyze this PDF: ")} type="button"><AppIcon name="article"/><span><strong>Analyze PDF</strong><small>Upload after opening chat</small></span></button>
-              <button disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Research the latest information about ", true)} type="button"><AppIcon name="search"/><span><strong>Research</strong><small>Use supported web search</small></span></button>
+              <button data-accent="amber" disabled={isCreatingConversation} onClick={() => void startQuickAction("image", "Create an image of ")} type="button"><AppIcon name="image"/><span><strong>Create image</strong><small>Generate from a prompt</small></span></button>
+              <button data-accent="violet" disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Summarize and analyze this PDF: ")} type="button"><AppIcon name="article"/><span><strong>Analyze PDF</strong><small>Upload after opening chat</small></span></button>
+              <button data-accent="teal" disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Research the latest information about ", true)} type="button"><AppIcon name="search"/><span><strong>Research</strong><small>Use supported web search</small></span></button>
             </div>
             <div className="ai-home-context-grid">
               <section aria-labelledby="recent-intelligence-title" className="ai-home-context-card">
@@ -1560,7 +1537,7 @@ function MessageBubble({
   return (
     <article data-assistant-context="conversation" className={isUser ? "message user-message" : "message assistant-message"}>
       <div className="message-avatar">
-        {isUser ? "You" : <Image alt="AbhiAI" height={32} src="/abhiai-logo.png" width={32} />}
+        {isUser ? "You" : <CharacterAvatar state="idle" animations="off" small />}
       </div>
       <div className="message-body">
         <div className="message-meta">

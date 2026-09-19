@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectControl } from "@/components/chat/tool-menu";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -227,8 +229,8 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
           <nav aria-label="News categories" className="news-chip-row">
             {categories.map(([value, label]) => <button aria-current={category === value ? "page" : undefined} className={category === value ? "active" : ""} key={value} onClick={() => setCategory(value)} type="button">{label}</button>)}
           </nav>
-          <label className="news-filter-select news-category-select"><span>Category</span><select aria-label="News category" onChange={(event) => setCategory(event.target.value)} value={category}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="news-filter-select"><span>Region</span><select aria-label="News region" onChange={(event) => setRegion(event.target.value)} value={region}>{regions.map(([value, label]) => <option key={value} value={value}>{label.replace("🌍 ", "")}</option>)}</select></label>
+          <label className="news-filter-select news-category-select"><span>Category</span><SelectControl aria-label="News category" onChange={(event) => setCategory(event.target.value)} value={category}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</SelectControl></label>
+          <label className="news-filter-select"><span>Region</span><SelectControl aria-label="News region" onChange={(event) => setRegion(event.target.value)} value={region}>{regions.map(([value, label]) => <option key={value} value={value}>{label.replace("🌍 ", "")}</option>)}</SelectControl></label>
         </div>
 
         {loading && articles.length === 0 && <div aria-label="Loading global news" className="news-page-skeleton" role="status"><span className="featured"/><span/><span/><span/><span/></div>}

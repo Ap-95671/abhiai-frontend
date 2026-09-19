@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectControl } from "@/components/chat/tool-menu";
+
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -169,14 +171,14 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
           <UserAvatar accessToken={accessToken} className="profile-avatar" displayName={profile?.displayName ?? "AbhiAI"} profileMediaId={profile?.profileMediaId} profilePicture={profile?.profilePicture}/>
           <textarea aria-label="Create a social post" maxLength={1000} onChange={(event) => setDraft(event.target.value)} placeholder="Share an idea, update, or question…" rows={3} value={draft} />
           {attachments.length > 0 && <div className="composer-image-list">{attachments.map((file,index)=><div key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button aria-label={`Remove ${file.name}`} onClick={()=>setAttachments((items)=>items.filter((_,i)=>i!==index))} type="button">×</button></div>)}</div>}
-          {pollEnabled && <div className="poll-composer">{pollChoices.map((choice, index) => <div key={index}><input aria-label={`Poll choice ${index + 1}`} maxLength={100} onChange={(event) => setPollChoices((items) => items.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Choice ${index + 1}`} required value={choice}/>{pollChoices.length > 2 && <button aria-label={`Remove poll choice ${index + 1}`} onClick={() => setPollChoices((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button">×</button>}</div>)}<div className="poll-composer-settings">{pollChoices.length < 4 && <button onClick={() => setPollChoices((items) => [...items, ""])} type="button">＋ Add choice</button>}<label>Duration<select onChange={(event) => setPollDuration(Number(event.target.value))} value={pollDuration}><option value={1}>1 hour</option><option value={24}>1 day</option><option value={72}>3 days</option><option value={168}>7 days</option></select></label></div></div>}
+          {pollEnabled && <div className="poll-composer">{pollChoices.map((choice, index) => <div key={index}><input aria-label={`Poll choice ${index + 1}`} maxLength={100} onChange={(event) => setPollChoices((items) => items.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Choice ${index + 1}`} required value={choice}/>{pollChoices.length > 2 && <button aria-label={`Remove poll choice ${index + 1}`} onClick={() => setPollChoices((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button">×</button>}</div>)}<div className="poll-composer-settings">{pollChoices.length < 4 && <button onClick={() => setPollChoices((items) => [...items, ""])} type="button">＋ Add choice</button>}<label>Duration<SelectControl onChange={(event) => setPollDuration(Number(event.target.value))} value={pollDuration}><option value={1}>1 hour</option><option value={24}>1 day</option><option value={72}>3 days</option><option value={168}>7 days</option></SelectControl></label></div></div>}
           <div className="post-composer-footer">
             <div className="composer-tools" aria-label="Post tools">
               <label className="image-picker" title="Add media"><AppIcon name="image"/><span>Media</span><input accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,application/pdf" disabled={attachments.length>=4||isPublishing} multiple onChange={(event)=>{const selected=Array.from(event.target.files ?? []);if([...attachments,...selected].length>4){setError("A post can contain at most 4 attachments.");return;}setAttachments((items)=>[...items,...selected]);event.target.value="";}} type="file"/></label>
               <button aria-pressed={pollEnabled} className={pollEnabled ? "composer-tool active" : "composer-tool"} onClick={() => setPollEnabled((enabled) => !enabled)} title="Add poll" type="button"><AppIcon name="poll"/><span>Poll</span></button>
-              <label className="visibility-control" title="Choose who can see this post"><AppIcon name="globe"/><select aria-label="Post visibility" onChange={(event) => setVisibility(event.target.value as PostVisibility)} value={visibility}>
+              <label className="visibility-control" title="Choose who can see this post"><AppIcon name="globe"/><SelectControl aria-label="Post visibility" onChange={(event) => setVisibility(event.target.value as PostVisibility)} value={visibility}>
                 <option value="PUBLIC">Public</option><option value="FOLLOWERS">Followers</option><option value="PRIVATE">Only me</option>
-              </select></label>
+              </SelectControl></label>
             </div>
             <span className={draft.length > 900 ? "composer-count near-limit" : "composer-count"}>{draft.length}/1000</span>
             <button className="publish-post-button" disabled={!draft.trim() || isPublishing} type="submit">{isPublishing ? "Publishing…" : "Post"}</button>

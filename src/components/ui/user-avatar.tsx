@@ -17,7 +17,9 @@ function initials(name: string) {
 
 export function UserAvatar({ accessToken, className = "", displayName, profileMediaId, profilePicture }: UserAvatarProps) {
   const [urlFailed, setUrlFailed] = useState(false);
-  const fallback = <span aria-label={`${displayName} avatar`} className={`${className} user-avatar-fallback`}>{initials(displayName)}</span>;
+  const tones = ["neutral", "amber", "teal", "violet"] as const;
+  const hash = Array.from(displayName.trim().toLowerCase()).reduce((value, char) => (value * 31 + char.codePointAt(0)!) >>> 0, 0);
+  const fallback = <span role="img" data-tone={tones[hash % tones.length]} aria-label={`${displayName} avatar`} className={`${className} user-avatar-fallback`}>{initials(displayName)}</span>;
   if (profileMediaId) return <AuthenticatedImage accessToken={accessToken} alt={`${displayName} profile picture`} className={`${className} user-avatar-image`} fallback={fallback} mediaId={profileMediaId} thumbnail/>;
   if (profilePicture && !urlFailed) {
     // eslint-disable-next-line @next/next/no-img-element

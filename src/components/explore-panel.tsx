@@ -60,7 +60,7 @@ export function ExplorePanel({
           <h1 id="explore-title">Explore what&apos;s happening</h1>
           <p>Fresh public conversations, topics, creators, and media from across AbhiAI.</p>
         </div>
-        <button className="secondary-button" disabled={isLoading} onClick={() => void loadExplore()} type="button">
+        <button className="secondary-button button-sm" disabled={isLoading} onClick={() => void loadExplore()} type="button">
           {isLoading ? "Refreshing…" : "Refresh"}
         </button>
       </header>

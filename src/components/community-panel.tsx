@@ -280,8 +280,8 @@ export function CommunityPanel({
           <h1 id="communities-title">Communities</h1>
           <p>Join focused spaces, exchange ideas, and build knowledge together.</p>
         </div>
-        <button className="primary-button" onClick={() => setShowCreate((current) => !current)} type="button">
-          {showCreate ? "Close" : "+ Create community"}
+        <button className="secondary-button button-sm" onClick={() => setShowCreate((current) => !current)} type="button">
+          <AppIcon name={showCreate ? "chevron-left" : "plus"} />{showCreate ? "Close" : "Create community"}
         </button>
       </header>
 
@@ -299,18 +299,18 @@ export function CommunityPanel({
             <label className={styles.wideField}>Description<textarea maxLength={500} onChange={(event) => setDescription(event.target.value)} placeholder="What should people discuss and build here?" required rows={3} value={description} /></label>
             <label>Icon URL <small>optional</small><input maxLength={2048} onChange={(event) => setIconUrl(event.target.value)} placeholder="https://…" type="url" value={iconUrl} /></label>
             <label>Banner URL <small>optional</small><input maxLength={2048} onChange={(event) => setBannerUrl(event.target.value)} placeholder="https://…" type="url" value={bannerUrl} /></label>
-            <div className={styles.createFooter}><span>◎ Public community</span><button className="primary-button" disabled={isBusy || !name.trim() || !slug} type="submit">{isBusy ? "Creating…" : "Create community"}</button></div>
+            <div className={styles.createFooter}><span><AppIcon name="globe" /> Public community</span><button className="primary-button" disabled={isBusy || !name.trim() || !slug} type="submit">{isBusy ? "Creating…" : "Create community"}</button></div>
           </form>
         )}
 
         <div className={styles.communityLayout}>
           <aside className={styles.directory} aria-label="Community directory">
-            <div className={styles.directoryHeading}><div><span>Directory</span><strong>{communityPage?.totalElements ?? communities.length} communities</strong></div><button aria-label="Refresh communities" disabled={isLoading} onClick={() => void loadCommunities()} type="button">↻</button></div>
+            <div className={styles.directoryHeading}><div><span>Directory</span><strong>{communityPage?.totalElements ?? communities.length} communities</strong></div><button aria-label="Refresh communities" disabled={isLoading} onClick={() => void loadCommunities()} type="button"><AppIcon name="repost" /></button></div>
             <div className={styles.filters} role="group" aria-label="Community filters">
               <button className={filter === "discover" ? styles.active : ""} onClick={() => setFilter("discover")} type="button">Discover</button>
               <button className={filter === "joined" ? styles.active : ""} onClick={() => setFilter("joined")} type="button">Joined</button>
             </div>
-            <label className={styles.searchField}><span aria-hidden="true">⌕</span><span className="sr-only">Search communities</span><input onChange={(event) => setSearch(event.target.value)} placeholder="Search communities" type="search" value={search} /></label>
+            <label className={styles.searchField}><AppIcon name="search" /><span className="sr-only">Search communities</span><input onChange={(event) => setSearch(event.target.value)} placeholder="Search communities" type="search" value={search} /></label>
 
             <div className={styles.communityList}>
               {isLoading && <p className={styles.listMessage}>Loading communities…</p>}
@@ -329,10 +329,10 @@ export function CommunityPanel({
           <main className={styles.communityMain}>
             {!selected ? (
               <div className={styles.welcomeState}>
-                <div className={styles.orbit} aria-hidden="true"><AppIcon name="community" /><i /><i /></div>
-                <p className="eyebrow">Shared interests, stronger ideas</p>
-                <h2>There is a community for what you are building.</h2>
-                <p>Browse the directory, join a space, and contribute to its conversation.</p>
+                <div className={styles.orbit} aria-hidden="true"><AppIcon name="community" /></div>
+                <p className="eyebrow">Community directory</p>
+                <h2>Find a space for your interests.</h2>
+                <p>Search the directory or create a community with a clear name and purpose.</p>
                 <button className="primary-button" onClick={() => setShowCreate(true)} type="button">Create your first community</button>
               </div>
             ) : (

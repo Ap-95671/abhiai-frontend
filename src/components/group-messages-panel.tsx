@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectControl } from "@/components/chat/tool-menu";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -364,9 +366,9 @@ export function GroupMessagesPanel({
               return <article key={member.user.id}>
                 <button onClick={() => onViewProfile(member.user.username)} type="button">{member.user.displayName}<small>@{member.user.username}</small></button>
                 <b>{member.role}</b>
-                {selected.currentUserRole === "OWNER" && !isSelf && <select aria-label={`Role for ${member.user.displayName}`} disabled={isBusy} onChange={(event) => void changeRole(member, event.target.value as GroupRole)} value={member.role}>
+                {selected.currentUserRole === "OWNER" && !isSelf && <SelectControl aria-label={`Role for ${member.user.displayName}`} disabled={isBusy} onChange={(event) => void changeRole(member, event.target.value as GroupRole)} value={member.role}>
                   <option value="MEMBER">Member</option><option value="ADMIN">Admin</option><option value="OWNER">Owner</option>
-                </select>}
+                </SelectControl>}
                 {actorCanRemove && !isSelf && <button className="danger-link" disabled={isBusy} onClick={() => void removeMember(member)} type="button">Remove</button>}
               </article>;
             })}

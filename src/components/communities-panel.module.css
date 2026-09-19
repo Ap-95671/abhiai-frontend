@@ -547,3 +547,13 @@
 :global(:root) .welcomeState h2 { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.035em; line-height: 1.2; }
 .orbit { height: 56px; width: 56px; transform: none; }
 .orbit svg, .spark svg { height: 24px; width: 24px; }
+
+:global(:root) .createPanel input, :global(:root) .createPanel textarea, :global(:root) .searchField, :global(:root) .reportButton { border-radius: var(--radius-sm); }
+:global(:root) .createPanel input, :global(:root) .joinButton { min-height: var(--control-height-md); }
+:global(:root) .reportButton, :global(:root) .directoryHeading button, :global(:root) .filters button { min-height: var(--control-height-sm); }
+:global(:root) .filters, :global(:root) .filters button, :global(:root) .communityPill, :global(:root) .publicPill { border-radius: var(--radius-pill); }
+:global(:root) .welcomeState { align-items: flex-start; text-align: left; padding: clamp(24px, 5vw, 48px); }
+:global(:root) .orbit { height: 60px; width: 60px; margin: 0 0 22px; }
+:global(:root) .welcomeState h2 { font-size: clamp(1.5rem, 3vw, 2rem); max-width: 430px; }
+:global(:root) .welcomeState > p { margin-left: 0; margin-right: 0; }
+.createFooter > span { align-items: center; display: inline-flex; gap: 6px; }.createFooter > span svg { width: 16px; height: 16px; }

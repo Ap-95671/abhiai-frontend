@@ -6,6 +6,10 @@ export type AppIconName =
   | "bell"
   | "chevron-left"
   | "chevron-right"
+  | "chevron-down"
+  | "document"
+  | "eye"
+  | "eye-off"
   | "community"
   | "create"
   | "explore"
@@ -46,6 +50,10 @@ const paths: Record<AppIconName, ReactNode> = {
   bell: <><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 8.5h18C21 16 18 16 18 9Z"/><path d="M9.5 21h5"/></>,
   "chevron-left": <path d="m15 18-6-6 6-6"/>,
   "chevron-right": <path d="m9 18 6-6-6-6"/>,
+  "chevron-down": <path d="m6 9 6 6 6-6"/>,
+  document: <><path d="M6 3h8l4 4v14H6zM14 3v4h4"/><path d="M9 12h6M9 16h6"/></>,
+  eye: <><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.75"/></>,
+  "eye-off": <><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6ZM4 4l16 16"/><circle cx="12" cy="12" r="2.75"/></>,
   community: <><circle cx="8" cy="8" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2.5 20c.4-4 2.3-6 5.5-6s5.1 2 5.5 6M14 14c4.4-.5 6.8 1.5 7.5 5"/></>,
   create: <><path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></>,
   explore: <><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></>,
@@ -81,10 +89,10 @@ const paths: Record<AppIconName, ReactNode> = {
   youtube: <><path d="M21 12c0 2.2-.2 4.2-.5 5.2a2.7 2.7 0 0 1-1.9 1.9c-1.5.4-6.6.4-6.6.4s-5.1 0-6.6-.4a2.7 2.7 0 0 1-1.9-1.9C3.2 16.2 3 14.2 3 12s.2-4.2.5-5.2a2.7 2.7 0 0 1 1.9-1.9C6.9 4.5 12 4.5 12 4.5s5.1 0 6.6.4a2.7 2.7 0 0 1 1.9 1.9c.3 1 .5 3 .5 5.2Z"/><path d="m10 9 5 3-5 3V9Z"/></>,
 };
 
-export function AppIcon({ filled = false, name, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean; name: AppIconName }) {
+export function AppIcon({ className = "", filled = false, name, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean; name: AppIconName }) {
   return (
-    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20" {...props}>
-      <g fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7">
+    <svg aria-hidden="true" className={`app-icon ${className}`} fill="none" height="20" viewBox="0 0 24 24" width="20" {...props}>
+      <g fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="var(--icon-stroke, 1.7)">
         {paths[name]}
       </g>
     </svg>

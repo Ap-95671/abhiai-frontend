@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectControl } from "@/components/chat/tool-menu";
+
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { AppIcon } from "@/components/ui/app-icon";
 import { useAssistantAgent } from "./use-assistant-agent";
@@ -86,9 +88,9 @@ export default function AiCharacterPanel({ token, userId, open, voiceAvailable, 
         <button type="button" aria-label="Use current page context" aria-pressed={!!assistant.pageContext?.enabled} onClick={()=>void updateSettings({pageContext:!assistant.pageContext?.enabled})}>{assistant.pageContext?.enabled ? "On" : "Off"}</button>
       </div>
       {settingsOpen ? <div className={styles.settings}>
-        <label>Character animations<select value={assistant.animations} onChange={event=>assistant.changeAnimations(event.target.value as "full" | "reduced" | "off")}><option value="full">Full</option><option value="reduced">Reduced</option><option value="off">Off</option></select></label>
+        <label>Character animations<SelectControl aria-label="Character animations" value={assistant.animations} onChange={event=>assistant.changeAnimations(event.target.value as "full" | "reduced" | "off")}><option value="full">Full</option><option value="reduced">Reduced</option><option value="off">Off</option></SelectControl></label>
         {agent.settings && <fieldset className={styles.privacyControls} disabled={agent.savingSettings}><legend>Assistant Privacy & controls</legend>
-          <label>Assistant mode<select value={agent.settings.mode} onChange={e=>void updateSettings({mode:e.target.value as AssistantSettings["mode"]})}>{["STANDARD","FRIENDLY","TUTOR","PROFESSIONAL","CREATIVE"].map(mode=><option key={mode}>{mode}</option>)}</select></label>
+          <label>Assistant mode<SelectControl aria-label="Assistant mode" value={agent.settings.mode} onChange={e=>void updateSettings({mode:e.target.value as AssistantSettings["mode"]})}>{["STANDARD","FRIENDLY","TUTOR","PROFESSIONAL","CREATIVE"].map(mode=><option key={mode}>{mode}</option>)}</SelectControl></label>
           <label>Project name<input maxLength={80} value={projectDraft} onChange={e=>setProjectDraft(e.target.value)}/></label>
           <button type="button" onClick={()=>void updateSettings({projectKey:projectDraft})}>Use this project</button>
           <p>Leave blank for general work. Project memories only apply to this exact project name.</p>

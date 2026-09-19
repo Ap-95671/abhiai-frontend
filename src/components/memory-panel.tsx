@@ -1,8 +1,11 @@
 "use client";
 
+import { SelectControl } from "@/components/chat/tool-menu";
+
 import { FormEvent, useCallback, useEffect, useState, useId } from "react";
 
 import { AppIcon } from "@/components/ui/app-icon";
+import { Toggle } from "@/components/ui/toggle";
 import { api, ApiError, MemorySettings, MemoryCategory, type UserMemory } from "@/lib/api";
 
 export function MemoryPanel({ accessToken, onUnauthorized, projectKey="",conversationId,sessionId }: { accessToken: string; onUnauthorized: () => void;projectKey?:string;conversationId?:string;sessionId?:string }) {
@@ -88,13 +91,13 @@ export function MemoryPanel({ accessToken, onUnauthorized, projectKey="",convers
       {settings && <>
         <section className="memory-control-card">
           <div><span className="memory-icon"><AppIcon name="ai"/></span><div><h2>Use saved memories in AI chats</h2><p>Off by default. When enabled, only the items listed below are added to relevant prompts. AbhiAI does not automatically create memories.</p></div></div>
-          <button aria-checked={settings.enabled} className={settings.enabled ? "memory-toggle enabled" : "memory-toggle"} disabled={saving} onClick={() => void toggleEnabled()} role="switch" type="button"><span/>{settings.enabled ? "On" : "Off"}</button>
+          <Toggle checked={settings.enabled} disabled={saving} label="Use saved memories in AI chats" onCheckedChange={() => void toggleEnabled()} />
         </section>
 
         <form className="memory-create-card" onSubmit={(event) => void addMemory(event)}>
           <label htmlFor={`${prefix}-new-memory`}>Add something you want AbhiAI to remember</label>
-          <label htmlFor={`${prefix}-memory-category`}>Category</label><select id={`${prefix}-memory-category`} value={category} onChange={event=>setCategory(event.target.value as MemoryCategory)}>{(["PREFERENCE","INTEREST","ASSISTANT_SETTING","PROJECT_CONTEXT"] as const).map(value=><option key={value} value={value}>{value.toLowerCase().replaceAll("_"," ")}</option>)}</select>
-          <label>Scope<select value={scope} onChange={e=>setScope(e.target.value as UserMemory["scope"])}><option value="GLOBAL">Global</option><option value="PROJECT" disabled={!projectKey}>Project: {projectKey||"choose in assistant settings"}</option><option value="CONVERSATION" disabled={!conversationId}>This conversation</option><option value="SESSION" disabled={!sessionId}>This session (expires within 24 hours)</option></select></label>
+          <label htmlFor={`${prefix}-memory-category`}>Category</label><SelectControl id={`${prefix}-memory-category`} value={category} onChange={event=>setCategory(event.target.value as MemoryCategory)}>{(["PREFERENCE","INTEREST","ASSISTANT_SETTING","PROJECT_CONTEXT"] as const).map(value=><option key={value} value={value}>{value.toLowerCase().replaceAll("_"," ")}</option>)}</SelectControl>
+          <label>Scope<SelectControl value={scope} onChange={e=>setScope(e.target.value as UserMemory["scope"])}><option value="GLOBAL">Global</option><option value="PROJECT" disabled={!projectKey}>Project: {projectKey||"choose in assistant settings"}</option><option value="CONVERSATION" disabled={!conversationId}>This conversation</option><option value="SESSION" disabled={!sessionId}>This session (expires within 24 hours)</option></SelectControl></label>
           <label>Preference name (optional)<input maxLength={80} value={preferenceKey} onChange={e=>setPreferenceKey(e.target.value)} placeholder="For example: response length"/></label><p>Using the same preference name in the same scope replaces its older value.</p>
           <textarea id={`${prefix}-new-memory`} maxLength={500} onChange={(event) => setDraft(event.target.value)} placeholder="For example: I prefer concise answers with practical examples." value={draft}/>
           <footer><span>{draft.length}/500 · Never save passwords, API keys, or highly sensitive information.</span><button disabled={saving || !draft.trim()} type="submit">Save memory</button></footer>

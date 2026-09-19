@@ -1,4 +1,6 @@
 "use client";
+
+import { SelectControl } from "@/components/chat/tool-menu";
 import { useState } from "react";
 import { api, type MemoryCategory } from "@/lib/api";
 import { useAbhiAIContext } from "./abhiai-context";
@@ -32,7 +34,7 @@ function ToolResult({ result, token, onNavigate }: { result: AssistantToolResult
     {result.kind === "forget" && result.cards.map(card=><button type="button" key={String(card.id)} disabled={saved} onClick={()=>{if(window.confirm(`Forget saved memory: ${card.title}?`))void api.deleteMemory(token,String(card.id)).then(()=>{setSaved(true);setStatus("Forgotten. This memory will no longer be retrieved.");window.dispatchEvent(new Event("abhiai:memory-changed"));}).catch(()=>setStatus("Could not forget this memory. Try settings."));}}>Forget: {card.title}</button>)}
     {result.kind === "artifact" && <><pre className={styles.artifact}>{result.draft}</pre><button type="button" onClick={()=>void navigator.clipboard.writeText(result.draft ?? "").then(()=>setStatus("Copied.")).catch(()=>setStatus("Select the text to copy it."))}>Copy result</button></>}
     {(result.kind === "draft" || result.kind === "memory") && <>
-      {result.kind === "memory" && <label>Memory category<select value={category} disabled={saved} onChange={e=>setCategory(e.target.value as MemoryCategory)}>{(["PREFERENCE","INTEREST","ASSISTANT_SETTING","PROJECT_CONTEXT"] as const).map(value=><option key={value} value={value}>{value.toLowerCase().replaceAll("_"," ")}</option>)}</select></label>}
+      {result.kind === "memory" && <label>Memory category<SelectControl value={category} disabled={saved} onChange={e=>setCategory(e.target.value as MemoryCategory)}>{(["PREFERENCE","INTEREST","ASSISTANT_SETTING","PROJECT_CONTEXT"] as const).map(value=><option key={value} value={value}>{value.toLowerCase().replaceAll("_"," ")}</option>)}</SelectControl></label>}
       <label>Review {result.kind === "draft" ? "post draft" : "suggested memory"}<textarea value={draft} maxLength={result.kind === "draft" ? 1000 : 500} rows={4} disabled={saved} onChange={e=>setDraft(e.target.value)}/></label>
       {result.kind === "draft" ? <button type="button" disabled={!draft.trim()} onClick={()=>{ context?.openComposer(draft); onNavigate(); }}>Edit in post composer</button>
         : <button type="button" disabled={saving || saved || !draft.trim()} onClick={()=>void save()}>{saved ? "Memory saved" : saving ? "Saving…" : "Save memory"}</button>}

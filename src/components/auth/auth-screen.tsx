@@ -249,6 +249,7 @@ export function AuthScreen(props: AuthScreenProps) {
         className={styles.authCard}
       >
         <aside className={styles.illustrationPanel}>
+          <p className={styles.stageCopy}>Your conversations, ideas and people.</p>
           {charactersEnabled && !introActive && (
             <AuthCharacters ref={characterScene} state={characterState} typingPulse={typingPulse} />
           )}

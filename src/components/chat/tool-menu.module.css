@@ -7,18 +7,18 @@
   color: var(--ink);
   display: flex;
   font-size: 1.2rem;
-  height: 36px;
+  height: var(--control-height-sm);
   justify-content: center;
   transition: background .16s ease, border-color .16s ease, transform .16s ease;
-  width: 36px;
+  width: var(--control-height-sm);
 }
 .trigger:hover:not(:disabled), .trigger[aria-expanded="true"] { background: var(--surface-hover); border-color: var(--line-strong);  }
 .menu {
-  background: var(--surface-raised);
+  background: var(--dropdown-surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   bottom: calc(100% + 12px);
-  box-shadow: var(--shadow-raised);
+  box-shadow: var(--shadow-floating);
   display: grid;
   gap: 4px;
   left: 0;
@@ -41,7 +41,7 @@
 }
 .item:hover:not(:disabled), .item:focus-visible { background: var(--surface-hover); }
 .item:disabled { color: var(--muted); }
-.icon { align-items: center; background: var(--surface-active); border-radius: 8px; color: var(--ink); display: flex; height: 28px; justify-content: center; width: 28px; }
+.icon { align-items: center; background: var(--surface-active); border-radius: var(--radius-sm); color: var(--ink); display: flex; height: 28px; justify-content: center; width: 28px; }
 .copy { display: grid; gap: 2px; }
 .copy strong { font-size: .8rem; }
 .copy small { color: var(--muted); font-size: .67rem; font-weight: 500; }
@@ -49,3 +49,14 @@
 @media (max-width: 520px) {
   .menu { bottom: calc(100% + 10px); left: -6px; min-width: min(245px, calc(100vw - 34px)); }
 }
+
+.trigger:focus-visible, .item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.selectRoot { display: inline-flex; min-width: 0; position: relative; vertical-align: middle; }
+:global(:root) .selectRoot > .selectTrigger[role="combobox"] { align-items: center; background: var(--control-bg); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); display: inline-flex; font-size: inherit; gap: var(--space-2); justify-content: space-between; min-height: var(--control-height-sm); padding: 6px var(--control-padding); text-align: left; letter-spacing: normal; text-transform: none; width: 100%; }
+.selectTrigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.selectTrigger svg { width: 16px; height: 16px; flex-shrink: 0; }
+:global(:root) .selectRoot > .selectTrigger[role="combobox"]:hover:not(:disabled) { background: var(--surface-hover); }.selectTrigger:focus-visible, .selectOption:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nativeSelect { position: absolute !important; height: 1px !important; width: 1px !important; clip-path: inset(50%); opacity: 0; pointer-events: none; padding: 0 !important; border: 0 !important; }
+.selectList { bottom: auto; display: block; overflow-y: auto; overscroll-behavior: contain; position: fixed; min-width: 0; z-index: 80; }
+:global(:root) .selectList .selectOption[role="option"] { align-items: center; background: transparent; border: 0; border-radius: var(--radius-sm); color: var(--ink); display: flex; gap: 10px; justify-content: space-between; min-height: var(--control-height-sm); padding: 8px 10px; text-align: left; letter-spacing: normal; text-transform: none; width: 100%; }
+:global(:root) .selectList .selectOption[role="option"]:hover:not(:disabled), :global(:root) .selectList .selectOption[role="option"]:focus-visible { background: var(--surface-hover); }:global(:root) .selectList .selectOption[role="option"][aria-selected="true"] { background: var(--accent-subtle); color: var(--accent); }:global(:root) .selectList .selectOption[role="option"]:disabled { color: var(--muted); }

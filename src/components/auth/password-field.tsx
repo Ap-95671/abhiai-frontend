@@ -1,6 +1,7 @@
 "use client";
 
 import { FocusEvent, useEffect, useState } from "react";
+import { AppIcon } from "@/components/ui/app-icon";
 
 import styles from "./auth-screen.module.css";
 
@@ -59,19 +60,9 @@ export function PasswordField({
           onMouseLeave={() => onVisibilityHoverChange(false)}
           type="button"
         >
-          <EyeIcon hidden={showPassword} />
+          <AppIcon name={showPassword ? "eye-off" : "eye"} />
         </button>
       </div>
     </div>
-  );
-}
-
-function EyeIcon({ hidden }: { hidden: boolean }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
-      <circle cx="12" cy="12" r="2.75" />
-      {hidden && <path className={styles.eyeSlash} d="m4 4 16 16" />}
-    </svg>
   );
 }

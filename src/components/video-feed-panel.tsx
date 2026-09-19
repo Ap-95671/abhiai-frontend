@@ -10,6 +10,7 @@ import {
   PostReply,
   PostSearchResult,
 } from "@/lib/api";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 type VideoFeedPanelProps = {
@@ -56,11 +57,7 @@ export function VideoFeedPanel({ accessToken, onUnauthorized, onViewProfile }: V
         {error && <p className="inline-error" role="alert">{error}</p>}
         {isLoading && posts.length === 0 && <div className="feed-loading">Loading videos…</div>}
         {!isLoading && posts.length === 0 && !error && (
-          <div className="feature-empty-state compact video-empty-state">
-            <span className="empty-state-icon" aria-hidden="true">▶</span>
-            <h2>Your video feed is ready</h2>
-            <p>Upload an MP4 or WebM from the Home feed to publish the first short video.</p>
-          </div>
+          <EmptyState variant="video" title="Your video feed is ready" description="Upload an MP4 or WebM from the Home feed to publish the first short video." />
         )}
         <div className="vertical-video-feed">
           {posts.map((post) => (

@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectControl } from "@/components/chat/tool-menu";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api, ApiError, CreatorAnalytics, CreatorDailyMetric } from "@/lib/api";
@@ -52,7 +54,7 @@ export function CreatorDashboard({ accessToken, onUnauthorized }: Props) {
   const trendLabel = useMemo(() => data ? `${shortDate(data.from)} – ${shortDate(data.to)}` : "Loading range", [data]);
 
   return <section aria-label="Creator analytics" className={styles.workspace}>
-    <header className={styles.header}><div><p className="eyebrow">Creator Studio</p><h1>Your impact, clearly measured.</h1><p>Understand reach, engagement, and audience growth from real activity on AbhiAI.</p></div><label>Time range<select aria-label="Analytics time range" onChange={(event) => setDays(Number(event.target.value))} value={days}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select></label></header>
+    <header className={styles.header}><div><p className="eyebrow">Creator Studio</p><h1>Your impact, clearly measured.</h1><p>Understand reach, engagement, and audience growth from real activity on AbhiAI.</p></div><label>Time range<SelectControl aria-label="Analytics time range" onChange={(event) => setDays(Number(event.target.value))} value={days}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></SelectControl></label></header>
     {error && <p className="form-error" role="alert">{error}</p>}
     {loading && !data && <div aria-label="Loading creator analytics" className={styles.loading} role="status"><span/><span/><span/><span/></div>}
     {data && <>

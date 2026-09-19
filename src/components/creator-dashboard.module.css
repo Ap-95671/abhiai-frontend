@@ -3,7 +3,7 @@
 .header h1 { font-size: clamp(1.6rem, 3vw, 2.15rem); letter-spacing: -.055em; margin: 6px 0 10px; }
 .header p { color: var(--muted); margin: 0; max-width: 650px; }
 .header label { color: var(--muted); display: grid; font-size: .72rem; font-weight: 750; gap: 6px; }
-.header select { background: var(--surface-raised); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--ink); padding: 10px 13px; }
+.header select { background: var(--surface-raised); border: 1px solid var(--line-strong); border-radius: var(--radius-pill); color: var(--ink); padding: 10px 13px; }
 .metrics { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); margin: 0 auto 20px; max-width: 1200px; opacity: 1; transition: opacity 180ms ease; }
 .metrics[aria-busy="true"] { opacity: .58; }
 .metrics article, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: none; }
@@ -20,8 +20,8 @@
 .legend i { border-radius: 4px; height: 9px; width: 9px; }
 .blue { background: var(--ink); }
 .violet { background: var(--accent); }
-.segmented { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px; display: flex; padding: 3px; }
-.segmented button { background: transparent; border: 0; border-radius: 7px; color: var(--muted); cursor: pointer; font-size: .72rem; font-weight: 720; padding: 7px 11px; text-transform: capitalize; }
+.segmented { background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-pill); display: flex; padding: 3px; }
+.segmented button { background: transparent; border: 0; border-radius: var(--radius-pill); color: var(--muted); cursor: pointer; font-size: .72rem; font-weight: 720; min-height: var(--control-height-sm); padding: 7px 11px; text-transform: capitalize; }
 .segmented button[aria-pressed="true"] { background: var(--ink); color: var(--canvas); }
 .chartWrap { margin-top: 20px; min-height: 260px; overflow-x: auto; }
 .chart { display: block; height: 280px; min-width: 640px; overflow: visible; width: 100%; }
@@ -44,7 +44,7 @@
 .list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .locations > div { display: grid; gap: 8px; grid-template-columns: 1fr auto; margin: 15px 0; }
 .locations span { display: grid; gap: 3px; }
-.locations i { background: var(--surface-raised); border-radius: 99px; grid-column: 1 / -1; height: 6px; overflow: hidden; }
+.locations i { background: var(--surface-raised); border-radius: var(--radius-pill); grid-column: 1 / -1; height: 6px; overflow: hidden; }
 .locations i b { background: var(--blue); display: block; height: 100%; }
 .empty { color: var(--muted); padding: 30px; text-align: center; }
 .loading { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); margin: 0 auto; max-width: 1200px; }

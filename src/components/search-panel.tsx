@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectControl } from "@/components/chat/tool-menu";
+
 import { FormEvent, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { NewsImage } from "@/components/news/news-image";
@@ -230,12 +232,12 @@ export function SearchPanel({
           <label>Author<input onChange={(event) => setAuthor(event.target.value)} placeholder="@username" value={author} /></label>
           <label>From<input onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} /></label>
           <label>To<input onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} /></label>
-          <label>Media<select onChange={(event) => setMediaFilter(event.target.value as typeof mediaFilter)} value={mediaFilter}><option value="any">Any</option><option value="with">With media</option><option value="without">Without media</option></select></label>
-          <label>Sort<select onChange={(event) => setSort(event.target.value as SearchSort)} value={sort}><option value="RELEVANCE">Relevance</option><option value="RECENT">Most recent</option><option value="POPULAR">Most popular</option></select></label>
+          <label>Media<SelectControl onChange={(event) => setMediaFilter(event.target.value as typeof mediaFilter)} value={mediaFilter}><option value="any">Any</option><option value="with">With media</option><option value="without">Without media</option></SelectControl></label>
+          <label>Sort<SelectControl onChange={(event) => setSort(event.target.value as SearchSort)} value={sort}><option value="RELEVANCE">Relevance</option><option value="RECENT">Most recent</option><option value="POPULAR">Most popular</option></SelectControl></label>
         </div>}
 
         {error && <p className="inline-error" role="alert">{error}</p>}
-        {!submittedQuery && !isSearching && <EmptyState description="Search for a person, an idea, or a topic you want to follow." icon="search" title="Explore the network" />}
+        {!submittedQuery && !isSearching && <EmptyState variant="task" description="Search for a person, an idea, or a topic you want to follow." icon="search" title="Explore the network" />}
         {submittedQuery && !isSearching && resultCount === 0 && !error && <EmptyState compact description="Try a different spelling or broader search filters." icon="search" title={`No ${kind === "all" ? "results" : kind} found for “${submittedQuery}”`} />}
 
         {resultCount > 0 && <div className="search-results" aria-live="polite">

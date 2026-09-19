@@ -2,14 +2,14 @@
   align-items: center;
   background: var(--control-bg);
   border: 1px solid var(--line-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   color: var(--ink);
   display: inline-flex;
   font-size: .78rem;
-  font-weight: 700;
+  font-weight: var(--control-weight);
   gap: 8px;
   justify-content: center;
-  min-height: 38px;
+  min-height: var(--control-height-sm);
   padding: 8px 11px;
 }
 
@@ -21,17 +21,17 @@
 .toggle svg { height: 18px; width: 18px; }
 
 .compact {
-  border-radius: 10px;
-  height: 38px;
-  min-height: 38px;
+  border-radius: var(--radius-sm);
+  height: var(--control-height-sm);
+  min-height: var(--control-height-sm);
   padding: 0;
-  width: 38px;
+  width: var(--control-height-sm);
 }
 
 .menuItem {
   background: transparent;
   border: 0;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-sm);
   justify-content: flex-start;
   width: 100%;
 }

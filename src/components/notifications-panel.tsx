@@ -135,7 +135,7 @@ export function NotificationsPanel({
           <p>Keep up with the people and posts connected to you.</p>
         </div>
         <button
-          className="secondary-button"
+          className="secondary-button button-sm"
           disabled={isMarkingAll || unreadOnPage === 0}
           onClick={() => void markAllRead()}
           type="button"
