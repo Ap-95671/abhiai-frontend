@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 
 import { api, ApiError, PageResponse, PostSearchResult, PostVisibility, UserProfile } from "@/lib/api";
 import { AppIcon } from "@/components/ui/app-icon";
-import { usePageContext, useAbhiAIContext, openAssistant } from "@/components/ai-character/abhiai-context";
+import { usePageContext, useAbhiAIContext } from "@/components/ai-character/abhiai-context";
 import { NewsBrief } from "@/components/news/news-brief";
 import { PostCard } from "@/components/social/post-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -34,7 +34,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
   const [pollChoices, setPollChoices] = useState(["", ""]);
   const [pollDuration, setPollDuration] = useState(24);
   const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
-  usePageContext(selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}` } : null);
+  usePageContext(selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}` } : null, 20);
   const assistantContext = useAbhiAIContext();
   const pendingDraft = assistantContext?.draft;
   const takeDraft = assistantContext?.takeDraft;
@@ -44,6 +44,11 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
     queueMicrotask(() => { if (active) { setDraft(current => current ? `${current}\n\n${pendingDraft}` : pendingDraft); takeDraft?.(); } });
     return () => { active = false; };
   }, [pendingDraft, takeDraft]);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("compose") === "video") {
+      document.querySelector<HTMLTextAreaElement>("#post-composer textarea")?.focus();
+    }
+  }, []);
   const postDetailClose = useRef<HTMLButtonElement | null>(null);
   const postDetailDialog = useRef<HTMLElement | null>(null);
   const postReturnFocus = useRef<HTMLElement | null>(null);
@@ -167,7 +172,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
       </header>
       <div className="workspace-content feed-hub">
         <div className="feed-workspace">
-        <form className="post-composer" onSubmit={publish}>
+        <form id="post-composer" className="post-composer" onSubmit={publish}>
           <UserAvatar accessToken={accessToken} className="profile-avatar" displayName={profile?.displayName ?? "AbhiAI"} profileMediaId={profile?.profileMediaId} profilePicture={profile?.profilePicture}/>
           <textarea aria-label="Create a social post" maxLength={1000} onChange={(event) => setDraft(event.target.value)} placeholder="Share an idea, update, or question…" rows={3} value={draft} />
           {attachments.length > 0 && <div className="composer-image-list">{attachments.map((file,index)=><div key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button aria-label={`Remove ${file.name}`} onClick={()=>setAttachments((items)=>items.filter((_,i)=>i!==index))} type="button">×</button></div>)}</div>}
@@ -194,7 +199,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
         </div>
         <NewsBrief accessToken={accessToken} onUnauthorized={onUnauthorized} />
       </div>
-      {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="post-detail-title" aria-modal={!assistantContext?.assistantOpen} className="post-detail-dialog" data-assistant-context="post" ref={postDetailDialog} role="dialog"><header><h2 id="post-detail-title">Post</h2><button className="post-assistant-action" type="button" onClick={openAssistant}>Talk about this post</button><button aria-label="Close post detail" onClick={closePost} ref={postDetailClose} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={profile?.id} detail onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={selectedPost}/></section></div>, document.body)}
+      {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="post-detail-title" aria-modal={!assistantContext?.assistantOpen} className="post-detail-dialog" data-assistant-context="post" ref={postDetailDialog} role="dialog"><header><h2 id="post-detail-title">Post</h2><button className="post-assistant-action" type="button" onClick={() => assistantContext?.talkAboutCurrent()}>Talk about this post</button><button aria-label="Close post detail" onClick={closePost} ref={postDetailClose} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={profile?.id} detail onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={selectedPost}/></section></div>, document.body)}
     </section>
   );
 }

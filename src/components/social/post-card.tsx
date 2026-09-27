@@ -48,6 +48,8 @@ export function PostCard(props: PostCardProps) {
 
 function PostCardContent({ accessToken, compact = false, currentUserId, detail = false, onDelete, onError, onOpen, onPin, onUnauthorized, onViewHashtag, onViewProfile, pinBusy = false, post }: PostCardProps) {
   const [liked, setLiked] = useState(false);
+  const [statusReady, setStatusReady] = useState(false);
+  const actionVersion = useRef(0);
   const [reposted, setReposted] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -78,17 +80,22 @@ function PostCardContent({ accessToken, compact = false, currentUserId, detail =
   }, [postMenuOpen]);
 
   useEffect(() => {
+    let active = true; const version = actionVersion.current;
+    setStatusReady(false);
     queueMicrotask(() => void Promise.all([
       api.getLikeStatus(accessToken, post.id),
       api.getRepostStatus(accessToken, post.id),
       api.getBookmarkStatus(accessToken, post.id),
     ]).then(([like, repost, bookmark]) => {
+      if (!active || version !== actionVersion.current) return;
+      setStatusReady(true);
       setLiked(like.liked);
       setReposted(repost.reposted);
       setBookmarked(bookmark.bookmarked);
     }).catch((statusError) => {
       if (statusError instanceof ApiError && statusError.status === 401) onUnauthorized();
     }));
+    return () => { active = false; };
   }, [accessToken, onUnauthorized, post.id]);
 
   useEffect(() => {
@@ -124,6 +131,8 @@ function PostCardContent({ accessToken, compact = false, currentUserId, detail =
   }
 
   async function toggle(kind: "like" | "repost" | "bookmark") {
+    if (!statusReady || busy) return;
+    actionVersion.current++;
     setBusy(kind);
     onError("");
     const previousLiked = liked;
@@ -232,11 +241,11 @@ function PostCardContent({ accessToken, compact = false, currentUserId, detail =
       {post.media?.length > 0 && <div className={`post-media-grid count-${post.media.length}`}>{post.media.map((media) => <PostAttachment accessToken={accessToken} asset={media} key={media.id}/>)}</div>}
       {poll && <div className="post-poll" aria-label="Poll">{poll.choices.map((choice) => { const percent = poll.totalVotes ? Math.round(choice.voteCount * 100 / poll.totalVotes) : 0; return <button className={poll.selectedChoiceId === choice.id ? "selected" : ""} disabled={busy === "poll" || poll.expired || Boolean(poll.selectedChoiceId)} key={choice.id} onClick={() => void vote(choice.id)} type="button"><span className="poll-fill" style={{ width: `${percent}%` }}/><strong>{choice.text}</strong><small>{poll.selectedChoiceId || poll.expired ? `${percent}%` : "Vote"}</small></button>; })}<p>{poll.totalVotes} {poll.totalVotes === 1 ? "vote" : "votes"} · {poll.expired ? "Ended" : `Ends ${pollTimeLeft(poll.expiresAt)}`}</p></div>}
       <div className="social-actions">
-        <button aria-label={`${liked ? "Unlike" : "Like"} post`} aria-pressed={liked} className={liked ? "selected like" : ""} disabled={busy === "like"} onClick={() => void toggle("like")} title="Like" type="button"><AppIcon filled={liked} name="heart"/><span>Like <small>{likeCount}</small></span></button>
+        <button aria-label={`${liked ? "Unlike" : "Like"} post`} aria-pressed={liked} className={liked ? "selected like" : ""} disabled={!statusReady || !!busy} onClick={() => void toggle("like")} title="Like" type="button"><AppIcon filled={liked} name="heart"/><span>Like <small>{likeCount}</small></span></button>
         <button aria-label="View comments" aria-pressed={showReplies} className={showReplies ? "selected comment" : ""} onClick={() => void openReplies()} title="Comment" type="button"><AppIcon name="reply"/><span>Comment <small>{replyCount}</small></span></button>
-        <button aria-label={`${reposted ? "Undo repost" : "Repost"}`} aria-pressed={reposted} className={reposted ? "selected repost" : ""} disabled={busy === "repost"} onClick={() => void toggle("repost")} title="Repost" type="button"><AppIcon name="repost"/><span>Repost <small>{repostCount}</small></span></button>
+        <button aria-label={`${reposted ? "Undo repost" : "Repost"}`} aria-pressed={reposted} className={reposted ? "selected repost" : ""} disabled={!statusReady || !!busy} onClick={() => void toggle("repost")} title="Repost" type="button"><AppIcon name="repost"/><span>Repost <small>{repostCount}</small></span></button>
         <button aria-label="Share post" onClick={() => void sharePost()} title="Share" type="button"><AppIcon name="share"/><span>{shareStatus === "copied" ? "Copied" : "Share"}</span></button>
-        <button aria-label={`${bookmarked ? "Remove bookmark" : "Bookmark post"}`} aria-pressed={bookmarked} className={bookmarked ? "selected bookmark" : ""} disabled={busy === "bookmark"} onClick={() => void toggle("bookmark")} title="Bookmark" type="button"><AppIcon filled={bookmarked} name="bookmark"/><span>Save</span></button>
+        <button aria-label={`${bookmarked ? "Remove bookmark" : "Bookmark post"}`} aria-pressed={bookmarked} className={bookmarked ? "selected bookmark" : ""} disabled={!statusReady || !!busy} onClick={() => void toggle("bookmark")} title="Bookmark" type="button"><AppIcon filled={bookmarked} name="bookmark"/><span>Save</span></button>
       </div>
       {showReplies && <div className="replies-panel"><form className="reply-form" onSubmit={reply}><input aria-label="Write a reply" maxLength={1000} onChange={(event) => setReplyDraft(event.target.value)} placeholder="Write a reply…" value={replyDraft}/><button disabled={!replyDraft.trim() || busy === "reply"} type="submit">Reply</button></form>{replies.length === 0 ? <p className="no-replies">No replies yet.</p> : replies.map((item) => <div className="reply-item" key={item.id}><UserAvatar accessToken={accessToken} className="reply-avatar" displayName={item.author.displayName} profileMediaId={item.author.profileMediaId} profilePicture={item.author.profilePicture}/><div><strong>{item.author.displayName}</strong><span>@{item.author.username} · {relativeDate(item.createdAt)}</span>{currentUserId !== item.author.id && <ReportButton accessToken={accessToken} onUnauthorized={onUnauthorized} targetContext="POST_REPLY" targetId={item.id} targetType="COMMENT"/>}<p>{item.textContent}</p></div></div>)}</div>}
     </article>

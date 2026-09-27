@@ -83,3 +83,7 @@
 :global(:root) .prose, :global(:root) .comments article p, :global(:root) .editor label { color: var(--ink); }
 :global(:root) .hero { border-color: var(--line); border-radius: var(--radius-md); }
 :global(:root) .actions button { border-radius: var(--radius-sm); }
+
+.preview { max-width:720px; margin:28px auto; padding:clamp(22px,4vw,40px); border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); }
+.preview h2 { font-size:clamp(1.4rem,3vw,2rem); line-height:1.2; letter-spacing:-.03em; }
+.preview p { color:var(--muted); line-height:1.65; }.preview > div { border-top:1px solid var(--line); margin:24px 0; padding-top:20px; }

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 import { AuthCharacters, AuthFocusTarget, CharacterAnimationState } from "./auth-characters";
@@ -13,6 +14,8 @@ export type AuthScreenMode = "login" | "register";
 
 type AuthScreenProps = {
   authError: string;
+  credentialFailures: number;
+  success: boolean;
   displayName: string;
   email: string;
   isAuthenticating: boolean;
@@ -74,8 +77,8 @@ export function AuthScreen(props: AuthScreenProps) {
   }, []);
 
   useEffect(() => {
-    const startTimer = window.setTimeout(() => setErrorReaction(Boolean(props.authError)), 0);
-    const finishTimer = props.authError
+    const startTimer = window.setTimeout(() => setErrorReaction(props.credentialFailures > 0), 0);
+    const finishTimer = props.credentialFailures
       ? window.setTimeout(() => setErrorReaction(false), 1550)
       : undefined;
 
@@ -83,7 +86,7 @@ export function AuthScreen(props: AuthScreenProps) {
       window.clearTimeout(startTimer);
       if (finishTimer !== undefined) window.clearTimeout(finishTimer);
     };
-  }, [props.authError]);
+  }, [props.credentialFailures]);
 
   useEffect(() => {
     if (
@@ -209,7 +212,7 @@ export function AuthScreen(props: AuthScreenProps) {
   }
 
   const isLogin = props.mode === "login";
-  const characterState: CharacterAnimationState = !characterEntranceComplete
+  const characterState: CharacterAnimationState = props.success ? "success" : !characterEntranceComplete
     ? "entrance"
     : passwordVisible
       ? "password-visible"
@@ -251,7 +254,7 @@ export function AuthScreen(props: AuthScreenProps) {
         <aside className={styles.illustrationPanel}>
           <p className={styles.stageCopy}>Your conversations, ideas and people.</p>
           {charactersEnabled && !introActive && (
-            <AuthCharacters ref={characterScene} state={characterState} typingPulse={typingPulse} />
+            <AuthCharacters ref={characterScene} state={characterState} typingPulse={typingPulse} failures={props.credentialFailures} />
           )}
         </aside>
 
@@ -320,10 +323,10 @@ export function AuthScreen(props: AuthScreenProps) {
                 </button>
               </div>
 
-              {props.authError && <p className={styles.error} role="alert">{props.authError}</p>}
+              {props.authError && <p className={styles.error} role="alert"><AppIcon name="warning"/>{props.authError}</p>}
 
-              <button aria-busy={props.isAuthenticating} className={styles.submit} disabled={props.isAuthenticating} type="submit">
-                <span>{props.isAuthenticating ? "Connecting…" : isLogin ? "Log in" : "Create account"}</span>
+              <button aria-busy={props.isAuthenticating} className={styles.submit} disabled={props.isAuthenticating || props.success} type="submit">
+                <span>{props.success ? "Welcome back" : props.isAuthenticating ? "Connecting…" : isLogin ? "Log in" : "Create account"}</span>
                 {props.isAuthenticating ? <i aria-hidden="true" className={styles.submitSpinner}/> : <b aria-hidden="true">→</b>}
               </button>
             </form>

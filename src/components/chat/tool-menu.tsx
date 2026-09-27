@@ -2,9 +2,20 @@
 
 import { Children, isValidElement, type SelectHTMLAttributes, type ReactElement, ChangeEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { createPortal } from "react-dom";
 import { AppIcon } from "@/components/ui/app-icon";
 
 import styles from "./tool-menu.module.css";
+
+export function useMenuPresence(open: boolean) {
+  const [retained, setRetained] = useState(false);
+  useEffect(() => {
+    if (open) { setRetained(true); return; }
+    const timer = setTimeout(() => setRetained(false), 160);
+    return () => clearTimeout(timer);
+  }, [open]);
+  return open || retained;
+}
 
 export type UploadPurpose = "image" | "document" | "pdf";
 
@@ -16,6 +27,7 @@ type ToolMenuProps = {
 
 export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMenuProps) {
   const [open, setOpen] = useState(false);
+  const present = useMenuPresence(open);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -96,6 +108,7 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
         aria-label="Open AI tools"
         className={styles.trigger}
         disabled={disabled}
+        onPointerDown={event => { if (open) event.preventDefault(); }}
         onClick={() => { initialFocus.current = "first"; setOpen((current) => !current); }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -109,8 +122,8 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
       >
         <AppIcon name="plus" />
       </button>
-      {open && (
-        <div aria-label="AI tools" className={styles.menu} id={menuId} onKeyDown={handleMenuKeys} ref={menuRef} role="menu">
+      {present && (
+        <div data-open={open} inert={!open} aria-hidden={!open} aria-label="AI tools" className={styles.menu} id={menuId} onKeyDown={handleMenuKeys} ref={menuRef} role="menu">
           <ToolItem detail="JPEG, PNG, or WebP · up to 5 MB" icon={<AppIcon name="image" />} label="Upload image" onClick={() => selectFile(imageInputRef.current)} />
           <ToolItem detail="Extract text or OCR · up to 10 MB" icon={<AppIcon name="document" />} label="Upload PDF" onClick={() => selectFile(pdfInputRef.current)} />
           <ToolItem detail="UTF-8 plain text · up to 10 MB" icon={<AppIcon name="article" />} label="Upload text file" onClick={() => selectFile(textInputRef.current)} />
@@ -147,6 +160,7 @@ export function SelectControl({ children, className = "", id, disabled, ...props
   const root = useRef<HTMLSpanElement>(null);
   const list = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
+  const present = useMenuPresence(open);
   const [placement, setPlacement] = useState({ left: 0, top: 0, width: 240, maxHeight: 280 });
   const options = Children.toArray(children).filter(isValidElement).map(child => {
     const option = child as ReactElement<{ value?: string | number; disabled?: boolean; children?: ReactNode }>;
@@ -163,8 +177,10 @@ export function SelectControl({ children, className = "", id, disabled, ...props
     const width = Math.min(Math.max(bounds.width, 260), innerWidth - 24);
     const below = innerHeight - bounds.bottom - 16;
     const above = bounds.top - 16;
-    const height = Math.min(280, Math.max(below, above));
-    setPlacement({ left: Math.max(12, Math.min(bounds.left, innerWidth - width - 12)), top: below >= Math.min(200, above) ? bounds.bottom + 6 : Math.max(12, bounds.top - height - 6), width, maxHeight: height });
+    const desiredHeight = Math.min(280, options.length * 40 + 14);
+    const down = below >= Math.min(desiredHeight, above);
+    const height = Math.max(0, Math.min(desiredHeight, down ? below : above));
+    setPlacement({ left: Math.max(12, Math.min(bounds.left, innerWidth - width - 12)), top: down ? bounds.bottom + 6 : Math.max(12, bounds.top - height - 6), width, maxHeight: height });
     setOpen(true);
   }
   useEffect(() => {
@@ -172,11 +188,13 @@ export function SelectControl({ children, className = "", id, disabled, ...props
     const current = list.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]:not(:disabled)')
       ?? list.current?.querySelector<HTMLButtonElement>('[role="option"]:not(:disabled)');
     current?.focus();
-    const dismiss = (event: Event) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const dismiss = (event: Event) => { if (!root.current?.contains(event.target as Node) && !list.current?.contains(event.target as Node)) setOpen(false); };
     const reposition = () => setOpen(false);
     document.addEventListener("pointerdown", dismiss);
     window.addEventListener("resize", reposition);
-    return () => { document.removeEventListener("pointerdown", dismiss); window.removeEventListener("resize", reposition); };
+    const scroll = (event: Event) => { if (!list.current?.contains(event.target as Node)) reposition(); };
+    window.addEventListener("scroll", scroll, true);
+    return () => { document.removeEventListener("pointerdown", dismiss); window.removeEventListener("resize", reposition); window.removeEventListener("scroll", scroll, true); };
   }, [open]);
   function choose(next: string) {
     const element = native.current;
@@ -186,13 +204,13 @@ export function SelectControl({ children, className = "", id, disabled, ...props
     close();
   }
   return <span className={`${styles.selectRoot} ${className}`} ref={root} onBlur={event => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !list.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
   }}>
-    <button aria-label={label} aria-labelledby={props["aria-labelledby"]} aria-controls={open ? listId : undefined} aria-expanded={open} aria-haspopup="listbox" aria-required={props.required} className={styles.selectTrigger} disabled={disabled} id={id} onClick={() => open ? close() : show()} onKeyDown={event => {
+    <button aria-label={label} aria-labelledby={props["aria-labelledby"]} aria-controls={open ? listId : undefined} aria-expanded={open} aria-haspopup="listbox" aria-required={props.required} className={styles.selectTrigger} disabled={disabled} id={id} onPointerDown={event => { if (open) event.preventDefault(); }} onClick={event => { event.preventDefault(); open ? close() : show(); }} onKeyDown={event => {
       if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) { event.preventDefault(); show(); }
     }} ref={trigger} role="combobox" type="button"><span>{selected?.label ?? value}</span><AppIcon name="chevron-down" /></button>
     <select {...props} aria-hidden="true" aria-label={undefined} className={styles.nativeSelect} disabled={disabled} ref={native} tabIndex={-1}>{children}</select>
-    {open && <span aria-label={label ?? "Options"} aria-labelledby={props["aria-labelledby"]} className={`${styles.menu} ${styles.selectList}`} id={listId} ref={list} role="listbox" style={placement} onKeyDown={event => {
+    {present && createPortal(<span data-open={open} inert={!open} aria-hidden={!open} aria-label={label ?? "Options"} aria-labelledby={props["aria-labelledby"]} className={`${styles.menu} ${styles.selectList}`} id={listId} ref={list} role="listbox" style={placement} onKeyDown={event => {
       if (event.key === "Escape" || event.key === "Tab") { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); } close(); return; }
       const items = Array.from(list.current?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled)') ?? []);
       if (!items.length) return;
@@ -205,6 +223,43 @@ export function SelectControl({ children, className = "", id, disabled, ...props
       else if (event.key.length === 1 && event.key !== " ") next = items.findIndex((item, index) => index > current && item.textContent?.toLowerCase().startsWith(event.key.toLowerCase()));
       else return;
       event.preventDefault(); items[next]?.focus();
-    }}>{options.map(option => <button aria-selected={option.value === value} className={styles.selectOption} disabled={option.disabled} key={option.value} onClick={() => choose(option.value)} role="option" tabIndex={-1} type="button">{option.label}<span aria-hidden="true">{option.value === value ? "✓" : ""}</span></button>)}</span>}
+    }}>{options.map(option => <button aria-selected={option.value === value} className={styles.selectOption} disabled={option.disabled} key={option.value} onClick={event => { event.preventDefault(); choose(option.value); }} role="option" tabIndex={-1} type="button">{option.label}<span aria-hidden="true">{option.value === value ? "✓" : ""}</span></button>)}</span>, root.current?.closest("dialog, [role=dialog]") ?? document.body)}
+  </span>;
+}
+
+/** Overflow actions share the tools-menu surface; native popover supplies light-dismiss. */
+export function ActionMenu({ label, items }: { label: string; items: { label: string; icon?: ReactNode; destructive?: boolean; disabled?: boolean; onSelect(): void }[] }) {
+  const id = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [placement, setPlacement] = useState({ left: 0, top: 0, width: 240, maxHeight: 280 });
+  const close = () => { panel.current?.hidePopover(); trigger.current?.focus(); };
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: Event) => { if (!panel.current?.contains(event.target as Node)) panel.current?.hidePopover(); };
+    window.addEventListener("resize", dismiss); window.addEventListener("scroll", dismiss, true);
+    return () => { window.removeEventListener("resize", dismiss); window.removeEventListener("scroll", dismiss, true); };
+  }, [open]);
+  return <span className={styles.selectRoot}>
+    <button ref={trigger} className={styles.trigger} aria-label={label} aria-haspopup="menu" aria-expanded={open} popoverTarget={id} type="button" onClick={() => {
+      const rect = trigger.current!.getBoundingClientRect();
+      const width = Math.min(240, innerWidth - 24), below = innerHeight - rect.bottom - 18, above = rect.top - 18;
+      const down = below >= Math.min(items.length * 44 + 14, above);
+      const maxHeight = Math.min(280, down ? below : above);
+      setPlacement({ left: Math.max(12, Math.min(rect.right - width, innerWidth - width - 12)), top: down ? rect.bottom + 6 : Math.max(12, rect.top - Math.min(maxHeight, items.length * 44 + 14) - 6), width, maxHeight });
+    }}><AppIcon name="more"/></button>
+    <div ref={panel} id={id} popover="auto" role="menu" aria-label={label} className={`${styles.menu} ${styles.actionMenu}`} style={placement} onToggle={event => {
+      const opened = event.newState === "open"; setOpen(opened);
+      if (opened) panel.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    }} onKeyDown={event => {
+      if(event.key === "Tab") close();
+      if(event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
+      const buttons = Array.from(panel.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault(); buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+      }
+    }}>{items.map(item => <button key={item.label} className={`${styles.item} ${item.destructive ? styles.destructive : ""}`} disabled={item.disabled} role="menuitem" type="button" onClick={() => { close(); item.onSelect(); }}>{item.icon}<span>{item.label}</span></button>)}</div>
   </span>;
 }

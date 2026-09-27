@@ -1,11 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
+import { ActionMenu } from "./chat/tool-menu";
+import { AppIcon } from "./ui/app-icon";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { api, ApiError, PageResponse, PostSearchResult, ProfileReply, ProfileUpdate, UserProfile } from "@/lib/api";
-import { usePageContext, useAbhiAIContext, openAssistant } from "@/components/ai-character/abhiai-context";
+import { usePageContext, useAbhiAIContext } from "@/components/ai-character/abhiai-context";
 import { AuthenticatedImage } from "@/components/authenticated-image";
 import { ReportButton } from "@/components/report-button";
 import { PostCard } from "@/components/social/post-card";
@@ -24,7 +26,8 @@ type ProfileTab = "posts" | "replies" | "media" | "likes";
 function compact(value: number) { return new Intl.NumberFormat(undefined, { notation: "compact" }).format(value); }
 
 export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHashtag, onViewProfile }: ProfilePanelProps) {
-  const assistantOpen = useAbhiAIContext()?.assistantOpen;
+  const assistantContext = useAbhiAIContext();
+  const assistantOpen = assistantContext?.assistantOpen;
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentUserId, setCurrentUserId] = useState("");
   const [following, setFollowing] = useState(false);
@@ -45,20 +48,24 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [contentError, setContentError] = useState("");
   const contentRequestId = useRef(0);
+  const profileRequestId = useRef(0);
+  const [reportOpen, setReportOpen] = useState(false);
   const [lightbox, setLightbox] = useState<"profile" | "cover" | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
   usePageContext(!isLoading && profile && (!username || username.toLowerCase() === profile.username.toLowerCase())
     ? selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}` }
-      : { pageType: "profile", entityId: profile.username, title: profile.displayName } : null);
+      : { pageType: "profile", entityId: profile.username, title: profile.displayName } : null, selectedPost ? 20 : 10);
   const postDialogRef = useRef<HTMLElement | null>(null);
   const postCloseRef = useRef<HTMLButtonElement | null>(null);
   const postReturnFocus = useRef<HTMLElement | null>(null);
 
   const loadProfile = useCallback(async () => {
+    const request = ++profileRequestId.current;
     setIsLoading(true); setError("");
     try {
       const current = await api.getCurrentProfile(accessToken);
       const viewed = !username || username.toLowerCase() === current.username.toLowerCase() ? current : await api.getProfile(accessToken, username);
+      if (request !== profileRequestId.current) return;
       setCurrentUserId(current.id); setProfile(viewed);
       if (viewed.id !== current.id) void api.recordProfileView(accessToken, viewed.username).catch(() => undefined);
       setForm({ username: viewed.username, displayName: viewed.displayName, bio: viewed.bio ?? "", profilePicture: viewed.profilePicture ?? "", coverPicture: viewed.coverPicture ?? "", profileMediaId: viewed.profileMediaId, coverMediaId: viewed.coverMediaId, location: viewed.location ?? "", website: viewed.website ?? "", dateOfBirth: viewed.dateOfBirth, showLikesOnProfile: viewed.showLikesOnProfile });
@@ -66,16 +73,24 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
         const [followStatus, blockStatus] = await Promise.all([
           api.getFollowStatus(accessToken, viewed.id), api.getBlockStatus(accessToken, viewed.id),
         ]);
+        if (request !== profileRequestId.current) return;
         setFollowing(followStatus.following); setBlockedByMe(blockStatus.blockedByMe);
-        const mutes = await api.getMutes(accessToken); setMuteId(mutes.find((item) => item.type === "USER" && item.userId === viewed.id)?.id ?? "");
-      }
+        const mutes = await api.getMutes(accessToken);
+        if (request !== profileRequestId.current) return;
+        setMuteId(mutes.find((item) => item.type === "USER" && item.userId === viewed.id)?.id ?? "");
+      } else { setFollowing(false); setBlockedByMe(false); setMuteId(""); }
     } catch (loadError) {
+      if (request !== profileRequestId.current) return;
       if (loadError instanceof ApiError && loadError.status === 401) return onUnauthorized();
       setError(loadError instanceof Error ? loadError.message : "The profile could not be loaded.");
-    } finally { setIsLoading(false); }
+    } finally { if (request === profileRequestId.current) setIsLoading(false); }
   }, [accessToken, onUnauthorized, username]);
 
-  useEffect(() => { queueMicrotask(() => void loadProfile()); }, [loadProfile]);
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => { if (!active) return; setSelectedPost(null); setReportOpen(false); setLightbox(null); void loadProfile(); });
+    return () => { active = false; profileRequestId.current++; };
+  }, [loadProfile]);
   useEffect(()=>()=>{if(profilePreview)URL.revokeObjectURL(profilePreview);},[profilePreview]);
   useEffect(()=>()=>{if(coverPreview)URL.revokeObjectURL(coverPreview);},[coverPreview]);
 
@@ -117,6 +132,8 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
   useEffect(() => {
     let active = true;
     const sync = async () => {
+      if (!active) return;
+      const location = window.location.href;
       const match = window.location.hash.match(/^#post-(.+)$/);
       if (!match) { setSelectedPost(null); return; }
       const id = decodeURIComponent(match[1]);
@@ -124,7 +141,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
       if (loaded) setSelectedPost(loaded);
       else try {
         const fetched = await api.getPost(accessToken, id);
-        if (active) setSelectedPost(fetched);
+        if (active && window.location.href === location) setSelectedPost(fetched);
       } catch (postError) {
         if (postError instanceof ApiError && postError.status === 401) onUnauthorized();
       }
@@ -133,7 +150,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
     queueMicrotask(handlePopState);
     window.addEventListener("popstate", handlePopState);
     return () => { active = false; window.removeEventListener("popstate", handlePopState); };
-  }, [accessToken, onUnauthorized, postPage]);
+  }, [accessToken, onUnauthorized, postPage, username]);
 
   useEffect(() => {
     if (!selectedPost) return;
@@ -240,7 +257,18 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
     <div className="profile-page">
       <div className="profile-hero">
         <div className="profile-large-avatar">{profile.profileMediaId || profile.profilePicture ? <button aria-label={`View ${profile.displayName}'s profile photo`} className="profile-avatar-button" onClick={() => setLightbox("profile")} type="button">{profileImage}</button> : profileImage}</div>
-        {ownProfile ? <div className="profile-actions"><button className="secondary-button" onClick={() => setEditing(!editing)} type="button">{editing ? "Cancel" : "Edit profile"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void togglePrivacy()} type="button">{profile.accountPrivacy === "PRIVATE" ? "Make public" : "Make private"}</button></div> : <div className="profile-actions"><button className={following ? "secondary-button" : "primary-button"} disabled={isSaving || blockedByMe} onClick={() => void toggleFollow()} type="button">{following ? "Following" : "Follow"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void toggleMute()} type="button">{muteId ? "Unmute" : "Mute"}</button><button className="secondary-button" disabled={isSaving} onClick={() => void toggleBlock()} type="button">{blockedByMe ? "Unblock" : "Block"}</button><ReportButton accessToken={accessToken} className="secondary-button" onUnauthorized={onUnauthorized} targetId={profile.id} targetType="USER"/></div>}
+        <div className="profile-actions">
+          {ownProfile ? <button className="secondary-button" onClick={() => setEditing(!editing)} type="button">{editing ? "Cancel" : "Edit profile"}</button>
+            : <button className={following ? "secondary-button" : "primary-button"} disabled={isSaving || blockedByMe} onClick={() => void toggleFollow()} type="button">{following ? "Following" : "Follow"}</button>}
+          <ActionMenu label="Profile options" items={ownProfile ? [
+            { label: profile.accountPrivacy === "PRIVATE" ? "Make public" : "Make private", disabled:isSaving, onSelect:() => void togglePrivacy() },
+          ] : [
+            { label:muteId ? "Unmute" : "Mute", disabled:isSaving, onSelect:() => void toggleMute() },
+            { label:blockedByMe ? "Unblock" : "Block", destructive:true, disabled:isSaving, onSelect:() => void toggleBlock() },
+            { label:"Report", icon:<AppIcon name="warning"/>, onSelect:() => setReportOpen(true) },
+          ]}/>
+          {!ownProfile && <ReportButton key={profile.id} accessToken={accessToken} onUnauthorized={onUnauthorized} targetId={profile.id} targetType="USER" hideTrigger open={reportOpen} onOpenChange={setReportOpen}/>}
+        </div>
       </div>
       <h1 id="profile-title">{profile.displayName}{profile.verifiedStatus !== "NONE" && <span className="verified-badge">✓</span>}</h1>
       <p className="profile-username">@{profile.username}</p>
@@ -276,7 +304,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
           </>)}
       </div>}
     </div>
-    {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="profile-post-detail-title" aria-modal={!assistantOpen} className="post-detail-dialog" data-assistant-context="post" ref={postDialogRef} role="dialog"><header><h2 id="profile-post-detail-title">Post</h2><button className="post-assistant-action" type="button" onClick={openAssistant}>Talk about this post</button><button aria-label="Close post detail" onClick={closePost} ref={postCloseRef} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={currentUserId} detail onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={selectedPost}/></section></div>, document.body)}
+    {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="profile-post-detail-title" aria-modal={!assistantOpen} className="post-detail-dialog" data-assistant-context="post" ref={postDialogRef} role="dialog"><header><h2 id="profile-post-detail-title">Post</h2><button className="post-assistant-action" type="button" onClick={() => assistantContext?.talkAboutCurrent()}>Talk about this post</button><button aria-label="Close post detail" onClick={closePost} ref={postCloseRef} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={currentUserId} detail onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={selectedPost}/></section></div>, document.body)}
     <ImageLightbox onClose={() => setLightbox(null)} open={lightbox === "cover"} title={`${profile.displayName}'s cover photo`}>
       {profile.coverMediaId ? <AuthenticatedImage accessToken={accessToken} alt={`${profile.displayName} cover`} mediaId={profile.coverMediaId}/> : profile.coverPicture ? <img alt={`${profile.displayName} cover`} src={profile.coverPicture}/> : null}
     </ImageLightbox>

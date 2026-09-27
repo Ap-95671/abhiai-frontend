@@ -49,6 +49,13 @@ export function ExplorePanel({
   }, [accessToken, onUnauthorized]);
 
   useEffect(() => {
+    let last = Date.now();
+    const refresh = () => { if (!document.hidden && Date.now() - last > 30000) { last = Date.now(); void loadExplore(); } };
+    window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [loadExplore]);
+
+  useEffect(() => {
     queueMicrotask(() => void loadExplore());
   }, [loadExplore]);
 
@@ -60,9 +67,6 @@ export function ExplorePanel({
           <h1 id="explore-title">Explore what&apos;s happening</h1>
           <p>Fresh public conversations, topics, creators, and media from across AbhiAI.</p>
         </div>
-        <button className="secondary-button button-sm" disabled={isLoading} onClick={() => void loadExplore()} type="button">
-          {isLoading ? "Refreshing…" : "Refresh"}
-        </button>
       </header>
 
       <div className="workspace-content explore-workspace">

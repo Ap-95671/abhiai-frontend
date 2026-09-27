@@ -154,6 +154,13 @@ export function CommunityPanel({
   }, [accessToken, handleError]);
 
   useEffect(() => {
+    let last = Date.now();
+    const refresh = () => { if (!document.hidden && Date.now() - last > 30000) { last = Date.now(); void loadCommunities(); } };
+    window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [loadCommunities]);
+
+  useEffect(() => {
     let active = true;
     void Promise.all([
       api.getCommunities(accessToken),
@@ -305,7 +312,7 @@ export function CommunityPanel({
 
         <div className={styles.communityLayout}>
           <aside className={styles.directory} aria-label="Community directory">
-            <div className={styles.directoryHeading}><div><span>Directory</span><strong>{communityPage?.totalElements ?? communities.length} communities</strong></div><button aria-label="Refresh communities" disabled={isLoading} onClick={() => void loadCommunities()} type="button"><AppIcon name="repost" /></button></div>
+            <div className={styles.directoryHeading}><div><span>Directory</span><strong>{communityPage?.totalElements ?? communities.length} communities</strong></div></div>
             <div className={styles.filters} role="group" aria-label="Community filters">
               <button className={filter === "discover" ? styles.active : ""} onClick={() => setFilter("discover")} type="button">Discover</button>
               <button className={filter === "joined" ? styles.active : ""} onClick={() => setFilter("joined")} type="button">Joined</button>

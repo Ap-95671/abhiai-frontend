@@ -10,7 +10,7 @@ import { AuthenticatedImage } from "@/components/authenticated-image";
 import { BrandIntro } from "@/components/branding/brand-intro";
 import { ThinkingIndicator } from "@/components/chat/thinking-indicator";
 import { MessageContent } from "@/components/chat/message-content";
-import { ToolMenu, SelectControl, UploadPurpose } from "@/components/chat/tool-menu";
+import { useMenuPresence, ToolMenu, SelectControl, UploadPurpose } from "@/components/chat/tool-menu";
 import { LandingPage } from "@/components/landing/landing-page";
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { FeedPanel } from "@/components/feed-panel";
@@ -148,6 +148,8 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [credentialFailures, setCredentialFailures] = useState(0);
+  const [authSuccess, setAuthSuccess] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [activeView, setActiveView] = useState<ActiveView>("chat");
@@ -158,6 +160,7 @@ export default function Home() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuPresent = useMenuPresence(accountMenuOpen);
   const [moreNavigationOpen, setMoreNavigationOpen] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [conversationDialog, setConversationDialog] = useState<"rename" | "delete" | null>(null);
@@ -203,7 +206,7 @@ export default function Home() {
   useAssistantSession(sessionResolved, accessToken, currentUser?.id, mobileSidebarOpen || accountMenuOpen || !!conversationDialog);
   usePageContext(accessToken ? { pageType: activeView === "chat" ? "conversation" : activeView === "news" ? "news" : activeView === "feed" ? "feed" : activeView === "search" ? "search" : "other",
     route: pathname, entityId: activeView === "chat" ? selectedConversation?.id : undefined,
-    title: activeView === "chat" ? selectedConversation?.title : undefined } : null, 1);
+    title: activeView === "chat" ? selectedConversation?.title ?? "New conversation" : activeView, currentSection: activeView } : null, 1);
 
 
   useEffect(() => {
@@ -382,6 +385,7 @@ export default function Home() {
   useEffect(() => {
     if (!sessionResolved) return;
     queueMicrotask(() => {
+      if (pathname !== "/login") setAuthSuccess(false);
       if (accessToken) {
         if (pathname === "/" || pathname === "/login") {
           router.replace("/chat");
@@ -608,6 +612,7 @@ export default function Home() {
   async function handleAuthentication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthError("");
+    setAuthSuccess(false);
     setIsAuthenticating(true);
 
     try {
@@ -623,6 +628,8 @@ export default function Home() {
         window.sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, session.accessToken);
         window.localStorage.removeItem(TOKEN_STORAGE_KEY);
       }
+      setAuthSuccess(true);
+      setCredentialFailures(0);
       setAccessToken(session.accessToken);
       setPassword("");
       const requestedPath = new URLSearchParams(window.location.search).get("next");
@@ -631,7 +638,20 @@ export default function Home() {
         : "/chat";
       router.replace(safeRequestedPath);
     } catch (error) {
-      setAuthError(errorMessage(error));
+      if (error instanceof ApiError && error.status === 401) {
+        setAuthError("The email or password you entered is incorrect.");
+        setCredentialFailures(count => count + 1);
+      } else if (error instanceof TypeError || (error instanceof ApiError && error.status === 0)) {
+        setAuthError("We couldn't log you in. Check your connection and try again.");
+      } else if (error instanceof ApiError && error.status === 409) {
+        setAuthError("An account already uses this email. Log in instead.");
+      } else if (error instanceof ApiError && error.status === 429) {
+        setAuthError("Too many attempts. Please wait a moment and try again.");
+      } else if (error instanceof ApiError && error.status === 400) {
+        setAuthError("Check your details and try again. Your password must meet the account requirements.");
+      } else {
+        setAuthError("AbhiAI is having trouble connecting right now. Please try again.");
+      }
     } finally {
       setIsAuthenticating(false);
     }
@@ -1065,11 +1085,13 @@ export default function Home() {
     );
   }
 
-  if (!accessToken) {
+  if (!accessToken || (authSuccess && pathname === "/login")) {
     return (
       <>
         <AuthScreen
           authError={authError}
+          credentialFailures={credentialFailures}
+          success={authSuccess && !!accessToken}
           displayName={displayName}
           email={email}
           isAuthenticating={isAuthenticating}
@@ -1079,12 +1101,12 @@ export default function Home() {
             router.push("/");
           }}
           onDisplayNameChange={setDisplayName}
-          onEmailChange={setEmail}
+          onEmailChange={value => { setEmail(value); if (value.trim() !== email.trim()) setCredentialFailures(0); }}
           onModeChange={(mode) => {
             setAuthError("");
-            setAuthMode(mode);
+            setAuthMode(mode); setCredentialFailures(0); setAuthSuccess(false);
           }}
-          onPasswordChange={setPassword}
+          onPasswordChange={value => { setPassword(value); if (Math.abs(value.length - password.length) > 1 || (!value && password)) setCredentialFailures(0); }}
           onRememberMeChange={setRememberMe}
           onSubmit={handleAuthentication}
           password={password}
@@ -1107,7 +1129,7 @@ export default function Home() {
       >
         <AppIcon name={mobileSidebarOpen ? "chevron-left" : "menu"} />
       </button>
-      {mobileSidebarOpen && <button aria-label="Close navigation" className="sidebar-scrim" onClick={() => setMobileSidebarOpen(false)} type="button" />}
+      {mobileSidebarOpen && !accountMenuOpen && <button aria-label="Close navigation" className="sidebar-scrim" onClick={() => setMobileSidebarOpen(false)} type="button" />}
       <aside aria-label={socialWorkspace ? "Social navigation" : "AI navigation"} className={`${socialWorkspace ? "sidebar social-sidebar" : "sidebar"}${mobileSidebarOpen ? " mobile-open" : ""}`} id="app-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand-row">
@@ -1205,7 +1227,7 @@ export default function Home() {
               <span>{conversation.title}</span>
             </button>
             <button aria-expanded={conversationMenuId === conversation.id} aria-haspopup="menu" aria-label={`Actions for ${conversation.title}`} className="conversation-more-button" onClick={() => setConversationMenuId((current) => current === conversation.id ? null : conversation.id)} type="button"><AppIcon name="more"/></button>
-            {conversationMenuId === conversation.id && <div className="conversation-menu" role="menu"><button onClick={() => void openConversationAction(conversation, "rename")} role="menuitem" type="button">Rename</button><button className="danger-menu-item" onClick={() => void openConversationAction(conversation, "delete")} role="menuitem" type="button">Delete</button></div>}
+            {conversationMenuId === conversation.id && <div className="conversation-menu" role="menu"><button onClick={() => void openConversationAction(conversation, "rename")} role="menuitem" type="button"><AppIcon name="create"/> Rename</button><button className="danger-menu-item" onClick={() => void openConversationAction(conversation, "delete")} role="menuitem" type="button"><AppIcon name="trash"/> Delete</button></div>}
             </div>
             ))}
           </div>)}
@@ -1315,8 +1337,8 @@ export default function Home() {
                 </SelectControl>
               </label>
               <div className="conversation-actions">
-                <button onClick={() => { setRenameDraft(selectedConversation.title); setConversationDialog("rename"); }} type="button">Rename</button>
-                <button className="danger-button" onClick={() => setConversationDialog("delete")} type="button">Delete</button>
+                <button onClick={() => { setRenameDraft(selectedConversation.title); setConversationDialog("rename"); }} type="button"><AppIcon name="create"/> Rename</button>
+                <button className="danger-button" onClick={() => setConversationDialog("delete")} type="button"><AppIcon name="trash"/> Delete</button>
               </div>
             </header>
 
@@ -1498,14 +1520,14 @@ export default function Home() {
               <button className="secondary-button" onClick={() => setConversationDialog(null)} type="button">Cancel</button>
               {conversationDialog === "rename"
                 ? <button className="primary-button" disabled={!renameDraft.trim() || renameDraft.trim() === selectedConversation.title} type="submit">Save name</button>
-                : <button className="dialog-danger-button" onClick={() => void deleteConversation()} type="button">Delete</button>}
+                : <button className="dialog-danger-button" onClick={() => void deleteConversation()} type="button"><AppIcon name="trash"/> Delete</button>}
             </div>
           </form>
         </div>
       )}
     </main>
-    {accountMenuOpen && accountMenuStyle && createPortal(
-      <div className="account-menu account-menu-portal" ref={accountMenuRef} role="menu" style={accountMenuStyle}>
+    {accountMenuPresent && accountMenuStyle && createPortal(
+      <div data-open={accountMenuOpen} aria-hidden={!accountMenuOpen} inert={!accountMenuOpen} className="account-menu account-menu-portal" ref={accountMenuRef} role="menu" style={accountMenuStyle}>
         <button onClick={() => { viewProfile(); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
         <button onClick={() => { navigateWorkspace("memory"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="ai"/> Memory & privacy</button>
         <ThemeToggle menuItem />

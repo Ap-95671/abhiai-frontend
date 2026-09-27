@@ -43,6 +43,11 @@ export function useAssistantAgent(token:string,userId:string,visible:boolean,onC
       } else setSuggestion(undefined);
     } catch {if(mounted.current)setError("Assistant task controls could not load. Text and voice remain available.");}
   },[token,userId]);
+  useEffect(() => {
+    const refresh = () => { void load(); };
+    window.addEventListener("abhiai:context-enabled", refresh);
+    return () => window.removeEventListener("abhiai:context-enabled", refresh);
+  }, [load]);
   const remember=useCallback((value:AgentTask)=>{
     if(!mounted.current)return;
     setTask(value);setTasks(items=>[value,...items.filter(t=>t.id!==value.id)].slice(0,20));

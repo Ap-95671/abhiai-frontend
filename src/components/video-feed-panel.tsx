@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { usePageContext } from "./ai-character/abhiai-context";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
@@ -57,7 +59,7 @@ export function VideoFeedPanel({ accessToken, onUnauthorized, onViewProfile }: V
         {error && <p className="inline-error" role="alert">{error}</p>}
         {isLoading && posts.length === 0 && <div className="feed-loading">Loading videos…</div>}
         {!isLoading && posts.length === 0 && !error && (
-          <EmptyState variant="video" title="Your video feed is ready" description="Upload an MP4 or WebM from the Home feed to publish the first short video." />
+          <EmptyState action={<Link className="secondary-button" href="/social?compose=video#post-composer">Create a video post</Link>} variant="video" title="Your video feed is ready" description="Choose a clip in the feed composer, add a caption, and preview it before sharing. Supports MP4 and WebM." />
         )}
         <div className="vertical-video-feed">
           {posts.map((post) => (
@@ -88,8 +90,19 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
   onViewProfile: (username: string) => void;
   post: PostSearchResult;
 }) {
+  const surface = useRef<HTMLElement>(null);
+  const [focused, setFocused] = useState(false);
+  usePageContext(focused ? { pageType: "video", entityId: post.id, title: `Video by @${post.author.username}` } : null, 10);
+  useEffect(() => {
+    if (!surface.current) return;
+    const observer = new IntersectionObserver(([entry]) => setFocused(entry.intersectionRatio >= 0.6), { threshold: [0, 0.6] });
+    observer.observe(surface.current);
+    return () => observer.disconnect();
+  }, []);
   const video = post.media.find((asset) => asset.kind === "VIDEO");
   const [liked, setLiked] = useState(false);
+  const [statusReady, setStatusReady] = useState(false);
+  const actionVersion = useRef(0);
   const [reposted, setReposted] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -102,17 +115,22 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
   const [busy, setBusy] = useState("");
 
   useEffect(() => {
+    let active = true; const version = actionVersion.current;
+    setStatusReady(false);
     queueMicrotask(() => void Promise.all([
       api.getLikeStatus(accessToken, post.id),
       api.getRepostStatus(accessToken, post.id),
       api.getBookmarkStatus(accessToken, post.id),
     ]).then(([like, repost, bookmark]) => {
+      if (!active || version !== actionVersion.current) return;
+      setStatusReady(true);
       setLiked(like.liked);
       setReposted(repost.reposted);
       setBookmarked(bookmark.bookmarked);
     }).catch((statusError: unknown) => {
       if (statusError instanceof ApiError && statusError.status === 401) onUnauthorized();
     }));
+    return () => { active = false; };
   }, [accessToken, onUnauthorized, post.id]);
 
   async function recordView() {
@@ -125,6 +143,8 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
   }
 
   async function toggle(kind: "like" | "repost" | "bookmark") {
+    if (!statusReady || busy) return;
+    actionVersion.current++;
     setBusy(kind);
     onError("");
     try {
@@ -182,7 +202,7 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
   if (!video) return null;
 
   return (
-    <article className="video-post">
+    <article className="video-post" ref={surface}>
       <VideoPlayer accessToken={accessToken} asset={video} onViewed={recordView} />
       <div className="video-gradient" aria-hidden="true" />
       <div className="video-caption">
@@ -194,10 +214,10 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
         <span className="video-views">{viewCount.toLocaleString()} views</span>
       </div>
       <div className="video-actions" aria-label="Video actions">
-        <button className={liked ? "selected" : ""} disabled={busy === "like"} onClick={() => void toggle("like")} type="button"><span>♡</span><small>{likeCount}</small></button>
+        <button className={liked ? "selected" : ""} aria-pressed={liked} disabled={!statusReady || !!busy} onClick={() => void toggle("like")} type="button"><span>♡</span><small>{likeCount}</small></button>
         <button className={showReplies ? "selected" : ""} onClick={() => void toggleReplies()} type="button"><span>↩</span><small>{replyCount}</small></button>
-        <button className={reposted ? "selected" : ""} disabled={busy === "repost"} onClick={() => void toggle("repost")} type="button"><span>↻</span><small>{repostCount}</small></button>
-        <button aria-label="Save video" className={bookmarked ? "selected" : ""} disabled={busy === "bookmark"} onClick={() => void toggle("bookmark")} type="button"><span>♢</span><small>Save</small></button>
+        <button className={reposted ? "selected" : ""} disabled={!statusReady || !!busy} onClick={() => void toggle("repost")} type="button"><span>↻</span><small>{repostCount}</small></button>
+        <button aria-label="Save video" className={bookmarked ? "selected" : ""} disabled={!statusReady || !!busy} onClick={() => void toggle("bookmark")} type="button"><span>♢</span><small>Save</small></button>
       </div>
       {showReplies && (
         <div className="video-replies">

@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { api } from "@/lib/api";
 import { boundedContext, currentDocumentContext, selectedContextText, type AbhiAIPageContext } from "./context-types";
 
 type Entry = { context: AbhiAIPageContext; priority: number; scope: string };
@@ -8,11 +9,11 @@ type ContextState = {
   page: AbhiAIPageContext | null; enabled: boolean; setEnabled(value: boolean): void;
   register(id: string, context: AbhiAIPageContext, priority: number): () => void;
   draft: string; takeDraft(): void; openComposer(text: string): void; selectDocument(context: AbhiAIPageContext): void;
-  clearSelection(): void;
+  contextError: string; talkAboutCurrent(): void; clearSelection(): void;
 };
 const Context = createContext<ContextState | null>(null);
-export function AbhiAIContextProvider({ children, base, userId, onOpenComposer }: {
-  children: ReactNode; base: AbhiAIPageContext; userId: string; onOpenComposer(): void;
+export function AbhiAIContextProvider({ children, base, userId, token, onOpenComposer }: {
+  children: ReactNode; base: AbhiAIPageContext; userId: string; token?: string; onOpenComposer(): void;
 }) {
   const scope = `${base.route}:${base.pageType}:${base.entityId ?? ""}`;
   const [assistantOpen,setAssistantOpen] = useState(false);
@@ -20,6 +21,7 @@ export function AbhiAIContextProvider({ children, base, userId, onOpenComposer }
   const [enabled, updateEnabled] = useState(false);
   const [selection, setSelection] = useState({ scope: "", entity: "", text: "" });
   const [documentContext, setDocumentContext] = useState<Entry | null>(null);
+  const [contextError, setContextError] = useState("");
   const [draft, setDraft] = useState("");
   const takeDraft = useCallback(() => setDraft(""), []);
   useEffect(() => { queueMicrotask(() => {
@@ -34,7 +36,9 @@ export function AbhiAIContextProvider({ children, base, userId, onOpenComposer }
     return () => setEntries(current => { const next = { ...current }; delete next[id]; return next; });
   }, [scope]);
   const candidates = Object.values(entries).filter(entry => entry.scope === scope);
-  const registered = candidates.sort((a,b) => b.priority-a.priority)[0]?.context ?? base;
+  const focused = candidates.sort((a,b) => b.priority-a.priority)[0]?.context;
+  const registered = { ...base, ...focused, route: focused?.route ?? base.route,
+    currentSection: focused?.currentSection ?? base.currentSection };
   const current = currentDocumentContext(registered, documentContext?.scope === scope ? documentContext.context : null);
   const entity = `${current.pageType}:${current.entityId ?? ""}`;
   useEffect(() => {
@@ -50,6 +54,18 @@ export function AbhiAIContextProvider({ children, base, userId, onOpenComposer }
   return <Context.Provider value={{ assistantOpen, setAssistantOpen, page, enabled, setEnabled, register, draft, takeDraft,
     openComposer: text => { setDraft(text.slice(0,1000)); onOpenComposer(); },
     selectDocument: context => { setDocumentContext({ context: boundedContext(context), priority: 30, scope }); openAssistant(); },
+    contextError,
+    talkAboutCurrent: () => {
+      setContextError("");
+      void (async () => {
+        try {
+          if (token) { const prefs = await api.assistantPreferences(token); if (!prefs.pageContext) await api.updateAssistantPreferences(token, { ...prefs, pageContext: true }); }
+          setEnabled(true);
+          window.dispatchEvent(new Event("abhiai:context-enabled"));
+        } catch { setContextError("Page context could not be enabled. Retry the page context control in Assistant settings."); }
+        openAssistant();
+      })();
+    },
     clearSelection: () => { setSelection({ scope: "", entity: "", text: "" }); setDocumentContext(null); },
   }}>{children}</Context.Provider>;
 }

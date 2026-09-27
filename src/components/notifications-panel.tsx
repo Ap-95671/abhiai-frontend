@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, PageResponse, SocialNotification } from "@/lib/api";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -57,26 +57,31 @@ export function NotificationsPanel({
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
+  const requestVersion = useRef(0);
   const loadNotifications = useCallback(async (nextPage: number, append: boolean) => {
+    const version = ++requestVersion.current;
     setIsLoading(true);
     setError("");
     try {
       const result = await api.getNotifications(accessToken, nextPage, 20, filter === "unread");
-      setNotifications((current) => append ? [...current, ...result.content] : result.content);
+      if (version !== requestVersion.current) return;
+      setNotifications((current) => Array.from(new Map((append ? [...current, ...result.content] : result.content).map(item => [item.id, item])).values()));
       setPage(result);
     } catch (loadError) {
+      if (version !== requestVersion.current) return;
       if (loadError instanceof ApiError && loadError.status === 401) {
         onUnauthorized();
         return;
       }
       setError(loadError instanceof Error ? loadError.message : "Notifications could not be loaded.");
     } finally {
-      setIsLoading(false);
+      if (version === requestVersion.current) setIsLoading(false);
     }
   }, [accessToken, filter, onUnauthorized]);
 
   useEffect(() => {
     queueMicrotask(() => void loadNotifications(0, false));
+    return () => { requestVersion.current++; };
   }, [loadNotifications]);
 
   async function markRead(notification: SocialNotification) {

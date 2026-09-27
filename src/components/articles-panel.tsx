@@ -69,7 +69,7 @@ export function ArticlesPanel({accessToken,onUnauthorized,onViewProfile}:Props){
       {article.coverImageUrl?<img src={article.coverImageUrl} alt=""/>:<div className={styles.placeholder}>A</div>}
       <div><p className="eyebrow">{date(article.publishedAt)}</p><h2>{article.title}</h2><p>{article.summary}</p><button className={styles.author} onClick={()=>onViewProfile(article.author.username)} type="button">By {article.author.displayName}</button><footer><span>♥ {article.likeCount} · 💬 {article.commentCount} · ↗ {article.shareCount}</span><button onClick={()=>void open(article)} type="button">Read article →</button></footer></div>
     </article>)}</div>
-    {loading&&<p className={styles.empty}>Loading articles…</p>}{!loading&&!articles.length&&<p className={styles.empty}>No articles yet. Publish the first one.</p>}
+    {loading&&<p className={styles.empty}>Loading articles…</p>}{!loading&&!articles.length&&<article className={styles.preview}><span className="eyebrow">Preview · Example article</span><h2>From a rough idea to a useful guide</h2><p>A clear title, a short introduction, and room for your full story. Share a tutorial, a question worth exploring, or something you learned.</p><div><strong>Your perspective belongs here.</strong><p>Published articles will include the author, reading content, and a space for discussion.</p></div><button className="secondary-button" type="button" onClick={() => setWriting(true)}>Write your first article</button></article>}
     {!last&&<button className={styles.more} onClick={()=>void load(page+1,true)} type="button">Load more</button>}
   </section>;
 }

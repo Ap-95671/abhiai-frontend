@@ -1,6 +1,8 @@
 import type { ReactNode, SVGProps } from "react";
 
 export type AppIconName =
+  | "trash"
+  | "warning"
   | "ai"
   | "article"
   | "bell"
@@ -45,6 +47,8 @@ export type AppIconName =
   | "youtube";
 
 const paths: Record<AppIconName, ReactNode> = {
+  trash: <><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></>,
+  warning: <><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5M12 17v.1"/></>,
   ai: <><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h6"/></>,
   article: <><path d="M6 3.5h9.5L19 7v13.5H6z"/><path d="M15.5 3.5V7H19M9 11h7M9 14h7M9 17h5"/></>,
   bell: <><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 8.5h18C21 16 18 16 18 9Z"/><path d="M9.5 21h5"/></>,

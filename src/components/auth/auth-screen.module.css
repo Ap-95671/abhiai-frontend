@@ -819,15 +819,33 @@
 /* Keep personality in the character rig, not decorative rings. */
 .illustrationPanel::before, .illustrationPanel::after, .sceneShape { display: none; }
 
-/* Auth composition: the original four characters share a simple two-tone stage. */
-.illustrationPanel { position: relative; overflow: visible; z-index: 2; }
+/* Existing four-character rig, contained on its two-tone stage. */
+.illustrationPanel { position: relative; overflow: hidden; z-index: 1; container-type:inline-size; }
 .illustrationPanel::before { display: none; }
 .illustrationPanel::after { display: block; background: var(--surface-active); border: 0; border-radius: 0; inset: 72% 0 0; height: auto; width: auto; z-index: 0; }
-.stageCopy { position: absolute; left: 42px; right: 36px; top: 38px; max-width: 320px; margin: 0; color: var(--ink); font-size: clamp(1.5rem, 2.4vw, 2.2rem); letter-spacing: -.035em; line-height: 1.25; z-index: 1; }
-.sceneShape { display: none; }
-.characterScene { left: 0; width: 100%; transform: none; bottom: -10px; }
-.purpleSlot { left: 10%; }.darkSlot { left: 44%; }.orangeSlot { left: 7%; width: 210px; height: 170px; }.yellowSlot { left: auto; right: -20px; }
-.orangeCharacter .leftEye { left: 72px; }.orangeCharacter .rightEye { right: 72px; }
-.formPanel { position: relative; z-index: 1; }
-@media (max-width: 1100px) and (min-width: 781px) { .purpleSlot { left: 4%; }.darkSlot { left: 43%; }.yellowSlot { right: -12px; }.orangeSlot { left: 0; width: 180px; }.orangeCharacter .leftEye { left: 57px; }.orangeCharacter .rightEye { right: 57px; } }
-@media (max-width: 780px) { .illustrationPanel { overflow: hidden; }.stageCopy { display: none; }.characterScene { left: 50%; width: 620px; transform: translateX(-50%) scale(.66); }.purpleSlot { left: 19%; }.darkSlot { left: 43%; }.orangeSlot { left: 12%; width: 210px; }.yellowSlot { left: 62%; right: auto; } }
+.stageCopy { position: absolute; left: 36px; right: 36px; top: 38px; max-width: 320px; margin: 0; color: var(--ink); font-size: clamp(1.5rem, 2.4vw, 2.2rem); letter-spacing: -.035em; line-height: 1.25; z-index: 1; }
+.sceneShape { display:none; }
+.characterScene { left:50%; width:480px; height:340px; bottom:0; transform:translateX(-50%) scale(.9); transform-origin:center bottom; }
+.purpleSlot { left:70px; }.darkSlot { left:235px; }.orangeSlot { left:30px; width:210px; height:170px; }.yellowSlot { left:345px; right:auto; }
+.orangeCharacter .leftEye { left:72px; }.orangeCharacter .rightEye { right:72px; }
+.formPanel { position:relative; z-index:1; }
+@container (max-width:470px) { .characterScene { transform:translateX(-50%) scale(.72); } }
+@container (max-width:370px) { .characterScene { transform:translateX(-50%) scale(.6); } }
+@media (max-width:780px) { .stageCopy { display:none; }.characterScene { height:300px; transform:translateX(-50%) scale(.66); } }
+.error { display:flex; align-items:flex-start; gap:9px; }.error svg { width:18px; height:18px; flex-shrink:0; }
+.fieldLabel input:-webkit-autofill,
+.fieldLabel input:-webkit-autofill:hover,
+.fieldLabel input:-webkit-autofill:focus,
+.passwordField input:-webkit-autofill,
+.passwordField input:-webkit-autofill:hover,
+.passwordField input:-webkit-autofill:focus { -webkit-box-shadow:0 0 0 1000px var(--input-bg) inset; -webkit-text-fill-color:var(--ink); caret-color:var(--ink); }
+.stateSuccess .characterEye { animation:none; transform:scaleY(.7); }
+.stateSuccess .characterMouth { border-radius:0 0 20px 20px; transform:translateX(-50%) scale(1.2); }
+.stateSuccess .characterUpperBody { transform:translateY(-3px); transition:transform 160ms ease; }
+.stateError[data-repeated-failure="true"] .characterUpperBody { transform:translateY(5px) rotate(-2deg); }
+.stateError[data-repeated-failure="true"] .characterMouth { width:14px; }
+/* Email gaze stays subtle; password privacy poses retain precedence. */
+.stateEmail .characterEye i, .stateEmailTyping .characterEye i { animation:none; }
+.stateEmailTyping.typingPulseEven .characterEye i { transform:translate3d(3px,1px,0); }
+.stateEmailTyping.typingPulseOdd .characterEye i { transform:translate3d(2px,1px,0); }
+@media (prefers-reduced-motion:reduce) { .stateSuccess .characterUpperBody { transition:none; } }

@@ -22,6 +22,9 @@ export type VoiceCallbacks = {
   tool?(name: string, args: Record<string,string>, signal: AbortSignal): Promise<AssistantToolResult>;
   event?(event: AssistantEvent): void;
   newTurn?(): void;
+  audio?(data: string, mimeType: string): boolean;
+  audioEnd?(): void;
+  audioInterrupt?(): void;
 };
 
 /** One disposable Gemini Live socket. Permanent provider credentials never enter this class. */
@@ -148,6 +151,7 @@ export class RealtimeVoice {
     this.responseTimer = this.later(() => this.fail("Gemini Live did not finish responding. Reconnect or continue by text."), 60000);
   }
   private stopAudio() {
+    this.callbacks.audioInterrupt?.();
     this.sources.forEach(source => { source.onended = null; source.stop(); source.disconnect(); });
     this.sources.clear(); this.playAt = 0; this.callbacks.level(0);
   }
@@ -177,6 +181,7 @@ export class RealtimeVoice {
     if (!this.context || !this.autoSpeak || this.suppressOutput) return;
     const rate = Number(/rate=(\d+)/.exec(mimeType)?.[1] ?? 24000);
     if (rate < 8000 || rate > 48000 || !mimeType.startsWith("audio/pcm")) throw new Error("Unsupported audio");
+    if (this.callbacks.audio?.(data,mimeType)) return;
     const samples = decodePcm(data);
     if (!samples.length) return;
     const buffer = this.context.createBuffer(1, samples.length, rate); buffer.copyToChannel(samples, 0);
@@ -270,6 +275,7 @@ export class RealtimeVoice {
       if (!this.sources.size) this.callbacks.character("think");
     }
     if (content.turnComplete) {
+      this.callbacks.audioEnd?.();
       this.clear(this.responseTimer); this.turnDone = true; this.generating = false;
       this.suppressOutput = false; this.finishTurn(); this.activity();
     }

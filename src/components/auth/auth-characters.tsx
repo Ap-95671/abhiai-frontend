@@ -16,11 +16,13 @@ export type CharacterAnimationState =
   | "password-visible"
   | "eye-hover"
   | "submitting"
-  | "error";
+  | "error"
+  | "success";
 
 type AuthCharactersProps = {
   state: CharacterAnimationState;
   typingPulse: number;
+  failures: number;
 };
 
 const stateClass: Record<CharacterAnimationState, string> = {
@@ -34,10 +36,11 @@ const stateClass: Record<CharacterAnimationState, string> = {
   "eye-hover": styles.stateEyeHover,
   submitting: styles.stateSubmitting,
   error: styles.stateError,
+  success: styles.stateSuccess,
 };
 
 export const AuthCharacters = forwardRef<HTMLDivElement, AuthCharactersProps>(function AuthCharacters(
-  { state, typingPulse },
+  { state, typingPulse, failures },
   ref,
 ) {
   const typingClass = typingPulse === 0
@@ -51,6 +54,7 @@ export const AuthCharacters = forwardRef<HTMLDivElement, AuthCharactersProps>(fu
       aria-hidden="true"
       className={`${styles.characterScene} ${stateClass[state]} ${typingClass}`}
       data-character-state={state}
+      data-repeated-failure={failures > 1}
       data-typing-pulse={typingPulse}
       ref={ref}
     >

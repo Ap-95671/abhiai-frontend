@@ -56,3 +56,6 @@
 @media (max-width: 850px) { .metrics, .loading { grid-template-columns: repeat(2, 1fr); } .columns { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .workspace { padding: 20px 14px 100px; } .header, .panelHead { flex-direction: column; } .metrics { grid-template-columns: 1fr 1fr; } .metrics strong { font-size: 1.5rem; } .panel { padding: 18px; } .chartControls { align-items: start; justify-items: start; width: 100%; } .legend { font-size: .68rem; } }
 @media (prefers-reduced-motion: reduce) { .loading span { animation: none; } }
+
+.chartTooltip { min-height:20px; margin:8px 0 0; color:var(--muted); font-size:.78rem; }
+.chart:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }

@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- blob-backed local previews cannot use next/image */
 "use client";
+import { usePageContext } from "./ai-character/abhiai-context";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -30,13 +31,15 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
   const [draft, setDraft] = useState("");
   const [background, setBackground] = useState(BACKGROUNDS[0]);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [storyMode, setStoryMode] = useState<"text" | "image" | "video">("text");
+  const [storyMode, setStoryMode] = useState<"text" | "image" | "video">("image");
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState("");
 
   const selected = selectedIndex === null ? null : stories[selectedIndex] ?? null;
+  usePageContext(selected ? { pageType: "story", entityId: selected.id, title: `Story by @${selected.author.username}` } : { pageType: "other", title: "Stories" }, selected ? 20 : 5);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -95,6 +98,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if ((storyMode === "text" ? !draft.trim() : !mediaFile) || isPublishing) return;
+    if (!reviewing) { setReviewing(true); return; }
     setIsPublishing(true);
     setError("");
     let uploadedId = "";
@@ -104,7 +108,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
       setStories((current) => [story, ...current]);
       setDraft("");
       setMediaFile(null);
-      setStoryMode("text");
+      setStoryMode("image"); setReviewing(false);
     } catch (publishError) {
       if (uploadedId) await api.deleteMedia(accessToken, uploadedId).catch(() => undefined);
       if (publishError instanceof ApiError && publishError.status === 401) return onUnauthorized();
@@ -146,23 +150,26 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
         <div><p className="eyebrow">24-hour moments</p><h1 id="stories-title">Stories</h1><p>Share something lightweight with the AbhiAI community.</p></div>
       </header>
       <div className="workspace-content stories-workspace">
-        <form className="story-composer" onSubmit={publish}>
+        <form className={`story-composer${reviewing ? " story-reviewing" : ""}`} onSubmit={publish}>
+          <h2 className="story-composer-title">{reviewing ? "Review your story" : "Create a story"}</h2>
           <div className="story-composer-preview" style={{ background }}>
-            {mediaPreviewUrl && storyMode === "image" ? <img alt="Story preview" src={mediaPreviewUrl}/> : mediaPreviewUrl && storyMode === "video" ? <video aria-label="Story video preview" muted playsInline src={mediaPreviewUrl}/> : <p>{draft || "Your story preview"}</p>}
+            <span className="story-preview-label">Preview</span>
+            {mediaPreviewUrl && storyMode === "image" ? <img alt="Story preview" src={mediaPreviewUrl}/> : mediaPreviewUrl && storyMode === "video" ? <video aria-label="Story video preview" controls muted playsInline src={mediaPreviewUrl}/> : <p>{draft || (storyMode === "text" ? "Start with a few words" : "Choose a photo or video")}</p>}
           </div>
           <div className="story-composer-fields">
             <div aria-label="Story type" className="story-type-picker" role="group">
-              {(["text", "image", "video"] as const).map((mode) => <button aria-pressed={storyMode === mode} key={mode} onClick={() => { setStoryMode(mode); setMediaFile(null); }} type="button">{mode}</button>)}
+              {(["image", "video", "text"] as const).map((mode) => <button aria-pressed={storyMode === mode} key={mode} onClick={() => { setStoryMode(mode); setMediaFile(null); setReviewing(false); }} type="button">{mode}</button>)}
             </div>
-            <textarea maxLength={500} onChange={(event) => setDraft(event.target.value)} placeholder="Add text or a caption…" rows={3} value={draft} />
+            <textarea maxLength={500} onChange={(event) => { setDraft(event.target.value); setReviewing(false); }} placeholder="Add text or a caption…" rows={3} value={draft} />
             {storyMode === "text" && <div className="story-color-picker" aria-label="Story background color">
-              {BACKGROUNDS.map((color) => <button aria-label={`Use ${color}`} className={background === color ? "selected" : ""} key={color} onClick={() => setBackground(color)} style={{ background: color }} type="button" />)}
+              {BACKGROUNDS.map((color) => <button aria-label={`Use ${color}`} className={background === color ? "selected" : ""} key={color} onClick={() => { setBackground(color); setReviewing(false); }} style={{ background: color }} type="button" />)}
             </div>}
             <div className="story-composer-actions">
-              {storyMode !== "text" && <label className="image-picker">＋ Choose {storyMode}<input accept={storyMode === "image" ? "image/jpeg,image/png,image/gif,image/webp" : "video/mp4,video/webm"} disabled={isPublishing} onChange={(event) => { setMediaFile(event.target.files?.[0] ?? null); event.target.value = ""; }} type="file" /></label>}
-              {mediaFile && <button className="story-remove-media" onClick={() => setMediaFile(null)} type="button">Remove {mediaFile.name}</button>}
+              {storyMode !== "text" && <label className="image-picker">＋ Choose {storyMode}<input accept={storyMode === "image" ? "image/jpeg,image/png,image/gif,image/webp" : "video/mp4,video/webm"} disabled={isPublishing} onChange={(event) => { setMediaFile(event.target.files?.[0] ?? null); setReviewing(false); event.target.value = ""; }} type="file" /></label>}
+              {mediaFile && <button className="story-remove-media" onClick={() => { setMediaFile(null); setReviewing(false); }} type="button">Remove {mediaFile.name}</button>}
               <span>{draft.length}/500</span>
-              <button className="story-publish" disabled={(storyMode === "text" ? !draft.trim() : !mediaFile) || isPublishing} type="submit">{isPublishing ? "Sharing…" : "Share story"}</button>
+              {reviewing && <button type="button" onClick={() => setReviewing(false)}>Back to editing</button>}
+              <button className="story-publish" disabled={(storyMode === "text" ? !draft.trim() : !mediaFile) || isPublishing} type="submit">{isPublishing ? "Sharing…" : reviewing ? "Share story" : "Review story"}</button>
             </div>
           </div>
         </form>

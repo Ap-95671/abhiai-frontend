@@ -7,10 +7,12 @@ import { validExpression, type AssistantExpression, type AnimationMode } from ".
 import { api, type ConversationAttachment } from "@/lib/api";
 import { useSpeechPlayback } from "@/components/voice/use-speech-playback";
 import { transition, upsertMessage, type AssistantMessage, type VoiceConnectionState } from "./assistant-state";
+import type { AvatarPlayback } from "./astra-live-avatar";
 import { RealtimeVoice } from "./realtime-voice";
 
 export function useAiCharacter(token: string, visible: boolean, userId: string) {
   const pageContext = useAbhiAIContext();
+  const avatar = useRef<AvatarPlayback | null>(null);
   const currentPage = useRef(pageContext?.page ?? null);
   const [expression,setExpression] = useState<AssistantExpression>("neutral");
   const [animations,setAnimations] = useState<AnimationMode>("full");
@@ -104,6 +106,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     void flush().catch(() => {});
   }, [flush, replace]);
   const endVoice = useCallback(() => {
+    avatar.current?.interrupt();
     voice.current?.close(); voice.current = null;
     finalizeVoice(); stopSpeech();
   }, [finalizeVoice, stopSpeech]);
@@ -175,6 +178,10 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
     previousSpeech.current = speech.status;
   }, [speech.status, busy, microphone]);
 
+  async function speakReply(messageId: string, content: string) {
+    if (avatar.current && await avatar.current.speak(messageId)) return;
+    if (mounted.current && shown.current && !document.hidden) speech.play(messageId, content);
+  }
   const memorySession=useRef<string | undefined>(undefined);
   async function send(content: string,sessionId?:string) {
     if(sessionId)memorySession.current=sessionId;
@@ -208,7 +215,7 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
         }]);
         setAttachment(undefined);
         if(exchange.assistantMessage.fallbackUsed)setNotice(`A fallback provider answered: ${exchange.assistantMessage.provider??"configured text provider"}.`);
-        if (autoSpeak && shown.current && !document.hidden) speech.play(exchange.assistantMessage.id, exchange.assistantMessage.content);
+        if (autoSpeak && shown.current && !document.hidden) void speakReply(exchange.assistantMessage.id, exchange.assistantMessage.content);
       } catch (failure) {
         // Losing the SSE completion event does not prove that the server transaction rolled back.
         // Refresh authoritative history before the user decides whether to resend the retained draft.
@@ -254,6 +261,9 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
         if (state === "disconnected" || state === "expired") finalizeVoice();
       }, character: dispatch, microphone: setMicrophone, busy: setBusy,
       event, newTurn,
+      audio: (data,mime) => avatar.current?.audio(data,mime) ?? false,
+      audioEnd: () => avatar.current?.finishAudio(),
+      audioInterrupt: () => avatar.current?.interrupt(),
       tool: (name,args,signal) => api.assistantTool(token,{ conversationId: id.current!, name, arguments: args, context: currentPage.current },signal),
       message: receive, level: setLevel, error: message => { setError(message); dispatch("fail"); },
     });
@@ -262,17 +272,17 @@ export function useAiCharacter(token: string, visible: boolean, userId: string) 
   }
   function toggleAutoSpeak() {
     const next = !autoSpeak; setAutoSpeak(next); voice.current?.setAutoSpeak(next);
-    if (!next) stopSpeech();
+    if (!next) { stopSpeech(); avatar.current?.interrupt(); }
     try { localStorage.setItem(`abhiai.assistant.auto-speak.${userId}`, next ? "on" : "off"); } catch {}
   }
-  function interrupt() { textAbort.current?.abort(); stopSpeech(); voice.current?.interrupt(); dispatch(microphone ? "listen" : "settle"); }
+  function interrupt() { avatar.current?.interrupt(); textAbort.current?.abort(); stopSpeech(); voice.current?.interrupt(); dispatch(microphone ? "listen" : "settle"); }
   function changeAnimations(mode: AnimationMode) {
     setAnimations(mode); try { localStorage.setItem(`abhiai.assistant.animations.${userId}`,mode); } catch {}
   }
-  return { attachment, uploading, upload, removeAttachment, expression, animations:background?"off" as const:animations, changeAnimations, toolStatus, toolResults, notice, pageContext, character, connection, messages, conversationId, loading, busy, microphone, level, error, autoSpeak, unsaved,
+  return { avatar, attachment, uploading, upload, removeAttachment, expression, animations:background?"off" as const:animations, changeAnimations, toolStatus, toolResults, notice, pageContext, character, connection, messages, conversationId, loading, busy, microphone, level, error, autoSpeak, unsaved,
     speechSupported: speech.supported, send, toggleMicrophone, toggleAutoSpeak, interrupt, endVoice, initialize,
     retrySave: () => { setError(""); void flush().catch(() => {}); },
     enableAudio: () => voice.current?.enableAudio(),
-    play: (message: AssistantMessage) => { voice.current?.stopMicrophone(); voice.current?.interrupt(); speech.play(message.id, message.content); },
+    play: (message: AssistantMessage) => { voice.current?.stopMicrophone(); voice.current?.interrupt(); void speakReply(message.id, message.content); },
   };
 }

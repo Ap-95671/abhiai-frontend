@@ -12,7 +12,7 @@ export function AssistantWorkspace({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   return <SessionBridge.Provider value={setSession}>
-    <AbhiAIContextProvider key={session?.userId ?? "guest"} userId={session?.userId ?? "guest"}
+    <AbhiAIContextProvider key={session?.userId ?? "guest"} userId={session?.userId ?? "guest"} token={session?.token}
       base={{ pageType:"other",route:pathname }} onOpenComposer={()=>router.push("/social")}>
       {children}
       {session && <AiCharacterLauncher token={session.token} userId={session.userId} obstructed={session.obstructed}/>}

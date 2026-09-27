@@ -2,7 +2,7 @@
 
 import { SelectControl } from "@/components/chat/tool-menu";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useId } from "react";
 
 import { api, ApiError, CreatorAnalytics, CreatorDailyMetric } from "@/lib/api";
 import styles from "./creator-dashboard.module.css";
@@ -23,6 +23,9 @@ function chartPoints(items: CreatorDailyMetric[], key: "impressions" | "profileV
 }
 
 function AnalyticsChart({ data, type }: { data: CreatorAnalytics; type: ChartType }) {
+  const [active, setActive] = useState<number | null>(null);
+  const tooltipId = useId();
+  const activeIndex = active === null ? null : Math.min(active, data.daily.length - 1);
   const max = Math.max(1, ...data.daily.flatMap((item) => [item.impressions, item.profileViews]));
   const impressions = chartPoints(data.daily, "impressions", max);
   const profiles = chartPoints(data.daily, "profileViews", max);
@@ -33,13 +36,19 @@ function AnalyticsChart({ data, type }: { data: CreatorAnalytics; type: ChartTyp
   if (!data.daily.length) return <p className={styles.empty}>Daily analytics appear after your content receives activity.</p>;
 
   return <div className={styles.chartWrap}>
-    <svg aria-label={`${type} chart of impressions and profile views`} className={styles.chart} role="img" viewBox="0 0 760 260">
+    <svg aria-label={`${type} chart of impressions and profile views`} className={styles.chart} role="img" tabIndex={0} aria-describedby={tooltipId} viewBox="0 0 760 260"
+      onPointerMove={event => { const rect=event.currentTarget.getBoundingClientRect(); const x=(event.clientX-rect.left)/rect.width*760; setActive(Math.max(0,Math.min(data.daily.length-1,Math.round((x-24)/712*(data.daily.length-1))))); }}
+      onPointerLeave={() => setActive(null)} onFocus={() => setActive(0)} onBlur={() => setActive(null)}
+      onKeyDown={event => { if(event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); setActive(Math.max(0,Math.min(data.daily.length-1,(activeIndex??0)+(event.key === "ArrowRight"?1:-1)))); } }}>
       {[0, 1, 2, 3, 4].map((index) => { const y = 32 + index * 47.5; return <g className={styles.gridLine} key={index}><line x1="24" x2="736" y1={y} y2={y}/><text x="18" y={y + 4}>{compact(Math.round(max * (1 - index / 4)))}</text></g>; })}
       {type === "bar" && impressions.map((point, index) => { const width = Math.max(5, Math.min(20, 610 / data.daily.length)); const profile = profiles[index]; return <g key={point.item.date}><rect className={styles.impressionBar} height={222 - point.y} rx="3" width={width / 2} x={point.x - width / 2} y={point.y}><title>{`${shortDate(point.item.date)}: ${point.value} impressions`}</title></rect><rect className={styles.profileBar} height={222 - profile.y} rx="3" width={width / 2} x={point.x} y={profile.y}><title>{`${shortDate(profile.item.date)}: ${profile.value} profile views`}</title></rect></g>; })}
       {type === "area" && <><path className={styles.impressionArea} d={area(impressions)}/><path className={styles.profileArea} d={area(profiles)}/></>}
-      {type !== "bar" && <><path className={styles.impressionLine} d={line(impressions)}/><path className={styles.profileLine} d={line(profiles)}/>{impressions.map((point, index) => <g key={point.item.date}><circle className={styles.impressionPoint} cx={point.x} cy={point.y} r="4"><title>{`${shortDate(point.item.date)}: ${point.value} impressions`}</title></circle><circle className={styles.profilePoint} cx={profiles[index].x} cy={profiles[index].y} r="4"><title>{`${shortDate(point.item.date)}: ${profiles[index].value} profile views`}</title></circle></g>)}</>}
+      {type !== "bar" && <><path className={styles.impressionLine} d={line(impressions)}/><path className={styles.profileLine} d={line(profiles)}/>{activeIndex !== null && impressions[activeIndex] && <g><circle className={styles.impressionPoint} cx={impressions[activeIndex].x} cy={impressions[activeIndex].y} r="4"/><circle className={styles.profilePoint} cx={profiles[activeIndex].x} cy={profiles[activeIndex].y} r="4"/></g>}</>}
       {data.daily.map((item, index) => (index % labelStep === 0 || index === data.daily.length - 1) && <text className={styles.axisLabel} key={item.date} textAnchor="middle" x={impressions[index].x} y="250">{shortDate(item.date)}</text>)}
     </svg>
+    <p id={tooltipId} className={styles.chartTooltip} aria-live="polite">{activeIndex !== null && data.daily[activeIndex]
+      ? `${shortDate(data.daily[activeIndex].date)} · ${data.daily[activeIndex].impressions} impressions · ${data.daily[activeIndex].profileViews} profile views`
+      : "Hover or use the arrow keys to explore daily values."}</p>
   </div>;
 }
 

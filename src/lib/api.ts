@@ -498,6 +498,15 @@ export const api = {
   assistantConfig(accessToken: string): Promise<{ enabled: boolean; voiceAvailable: boolean }> {
     return request("/assistant/config", { signal: AbortSignal.timeout(15000) }, accessToken);
   },
+  createLiveAvatar(accessToken: string, body: { id: string; conversationId: string }): Promise<{ id: string; livekitUrl: string; livekitToken: string; wsUrl: string }> {
+    return request("/assistant/liveavatar/sessions", { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(60000) }, accessToken);
+  },
+  closeLiveAvatar(accessToken: string, id: string): Promise<void> {
+    return request(`/assistant/liveavatar/sessions/${id}`, { method: "DELETE", keepalive: true }, accessToken);
+  },
+  liveAvatarSpeech(accessToken: string, conversationId: string, messageId: string, signal: AbortSignal): Promise<{ data: string; mimeType: string }> {
+    return request("/assistant/liveavatar/speech", { method: "POST", body: JSON.stringify({ conversationId, messageId }), signal }, accessToken);
+  },
   openAssistant(accessToken: string, fresh = false): Promise<ConversationDetail> {
     return request("/assistant/conversation", { method: "POST", body: JSON.stringify({ fresh }), signal: AbortSignal.timeout(15000) }, accessToken);
   },
