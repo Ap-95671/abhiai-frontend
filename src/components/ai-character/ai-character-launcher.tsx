@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
+import { AppIcon } from "@/components/ui/app-icon";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useAbhiAIContext } from "./abhiai-context";
@@ -10,6 +12,8 @@ import styles from "./assistant.module.css";
 const Panel = dynamic(() => import("./ai-character-panel"), { ssr: false, loading: () => <span className={styles.loading} role="status">Opening AbhiAI Assistant…</span> });
 
 export function AiCharacterLauncher({ token, userId, obstructed }: { token: string; userId: string; obstructed: boolean }) {
+  const pathname = usePathname();
+  const chatPage = pathname === "/chat" || pathname === "/";
   const [config, setConfig] = useState<{ enabled: boolean; voiceAvailable: boolean }>();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -48,10 +52,10 @@ export function AiCharacterLauncher({ token, userId, obstructed }: { token: stri
   }, [config?.enabled]);
   if (!config?.enabled) return null;
   return <>
-    <button ref={button} className={styles.launcher} hidden={open || obstructed} type="button" title="Talk to AbhiAI"
+    <button ref={button} className={`${styles.launcher}${chatPage ? ` ${styles.chatLauncher}` : ""}`} hidden={open || obstructed} type="button" title="Talk to AbhiAI"
       aria-label="Talk to AbhiAI" aria-haspopup="dialog" aria-expanded={open}
       onClick={() => { setLoaded(true); setOpen(true); }}>
-      <CharacterAvatar state="idle" small /><span>Talk to AbhiAI</span>
+      {chatPage ? <AppIcon name="microphone" /> : <CharacterAvatar state="idle" small />}<span>Talk to AbhiAI</span>
     </button>
     {loaded && <Panel token={token} userId={userId} open={open} voiceAvailable={config.voiceAvailable} onDismiss={() => { setOpen(false); requestAnimationFrame(() => button.current?.focus()); }} />}
   </>;

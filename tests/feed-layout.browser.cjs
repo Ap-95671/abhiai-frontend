@@ -1,0 +1,87 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Focused Feed browser acceptance check. */
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const origin = process.env.ASSISTANT_TEST_URL || 'http://127.0.0.1:3100';
+const output = '/tmp/abhiai-feed-qa';
+fs.mkdirSync(output, { recursive: true });
+const date = new Date().toISOString();
+const author = { id: 'author', username: 'maya', displayName: 'Maya Shah', profilePicture: null, profileMediaId: null };
+const profile = { ...author, id: 'viewer', username: 'testuser', displayName: 'Test User', postCount: 2 };
+const media = { id: 'image', originalFilename: 'test-landscape.svg', contentType: 'image/svg+xml', kind: 'IMAGE', byteSize: 1000, thumbnailAvailable: true, processingStatus: 'COMPLETED' };
+const post = { id: 'post-one', author, textContent: 'Making room for a little more time outside. #weekend', visibility: 'PUBLIC', replyCount: 2, likeCount: 12, repostCount: 3, media: [media], createdAt: date, updatedAt: date, poll: null };
+const story = { id: 'story-one', author, type: 'TEXT', textContent: 'A small moment from today.', backgroundColor: '#222422', media: null, viewCount: 2, reactionCount: 0, viewedByCurrentUser: false, currentUserReaction: null, expiresAt: new Date(Date.now() + 86400000).toISOString(), createdAt: date };
+const paged = content => ({ content, page: 0, size: 20, last: true, first: true, totalElements: content.length, totalPages: 1 });
+const landscape = '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="960" height="540" fill="#d4dedb"/><path d="M0 420 270 110 530 410 730 220 960 430V540H0" fill="#778f84"/><path d="M0 500 320 300 610 470 800 355 960 475V540H0" fill="#3e6556"/></svg>';
+(async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
+  try {
+    for (const width of [1440, 768, 390]) for (const theme of ['light', 'dark']) {
+      const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
+      await context.addInitScript(theme => { localStorage.setItem('abhiai.access-token', 'test-token'); localStorage.setItem('abhiai.theme', theme); }, theme);
+      const mutations = [];
+      await context.route('**/api/v1/**', async route => {
+        const req = route.request(), url = new URL(req.url()), p = url.pathname.replace(/^.*\/api\/v1/, '');
+        const json = body => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+        if (req.method() === 'OPTIONS') return route.fulfill({ status: 204 });
+        if (req.method() !== 'GET') mutations.push(p);
+        if (p === '/users/me') return json(profile);
+        if (p === '/assistant/config') return json({ enabled: false, voiceAvailable: false });
+        if (p === '/assistant/preferences') return json({ mode: 'STANDARD', pageContext: false, agentActions: false, proactive: false });
+        if (p === '/assistant/tasks' || p === '/models' || p === '/conversations') return json([]);
+        if (p === '/notifications/unread-count') return json({ unreadCount: 0 });
+        if (p === '/feed') return json(paged([post, { ...post, id: 'post-two', textContent: 'What are you working on this week?', media: [] }]));
+        if (p === '/stories/feed') return json(paged([story, { ...story, id: 'story-two', author: { ...author, id: 'author-two', displayName: 'Arun Mehta' }, viewedByCurrentUser: true }]));
+        if (p.endsWith('/views')) return json({ viewCount: 3, counted: true });
+        if (p === '/communities') return json(paged(['Photography', 'Design & making', 'Weekend outdoors'].map((name, i) => ({ id: `c${i}`, name, slug: `community-${i}`, memberCount: 100 + i, iconUrl: null }))));
+        if (p === '/news/top') return json({ ...paged(['New ideas for greener cities', 'A closer look at open research', 'The week in science'].map((title, i) => ({ id: `news-${i}`, title, category: 'science', sourceName: 'Test source', publishedAt: date, imageUrl: null, relatedStoryCount: 1 }))), updatedAt: date, stale: false });
+        if (p.startsWith('/media/')) return route.fulfill({ contentType: 'image/svg+xml', body: landscape });
+        if (p.endsWith('/replies')) return json(req.method() === 'POST' ? { id: 'reply-new', author: profile, textContent: req.postDataJSON().textContent, createdAt: date } : paged([]));
+        if (p === '/posts' && req.method() === 'POST') return json({ ...post, id: 'new-post', author: profile, textContent: req.postDataJSON().textContent, media: [] });
+        if (p.endsWith('/likes/status')) return json({ liked: false });
+        if (p.endsWith('/reposts/status')) return json({ reposted: false });
+        if (p.endsWith('/bookmarks/status')) return json({ bookmarked: false });
+        if (req.method() !== 'GET') return route.fulfill({ status: 204 });
+        return json(paged([]));
+      });
+      const page = await context.newPage(), errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      await page.goto(origin + '/social', { waitUntil: 'domcontentloaded' });
+      const composer = page.getByLabel('Create a social post', { exact: true });
+      await composer.waitFor();
+      await page.locator('.post-media-image').first().waitFor();
+      await page.getByText('Photography', { exact: true }).waitFor();
+      assert(await composer.evaluate(el => el.offsetHeight <= 44), 'composer starts compact');
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no page overflow');
+      const feed = await page.locator('.feed-workspace').boundingBox(), rail = await page.locator('.feed-discovery').boundingBox();
+      assert(width === 1440 ? rail.x > feed.x + feed.width : rail.y > feed.y, 'responsive discovery layout');
+      await page.screenshot({ path: `${output}/feed-${width}-${theme}.png` });
+      const first = page.locator('.social-post').first();
+      await first.getByRole('button', { name: 'Like post', exact: true }).click();
+      await first.getByRole('button', { name: 'Unlike post', exact: true }).waitFor();
+      await first.getByRole('button', { name: 'Repost', exact: true }).click();
+      await first.getByRole('button', { name: 'Undo repost', exact: true }).waitFor();
+      await first.getByRole('button', { name: 'Bookmark post', exact: true }).click();
+      await first.getByRole('button', { name: 'Remove bookmark', exact: true }).waitFor();
+      await first.getByRole('button', { name: 'View comments', exact: true }).click();
+      await first.getByLabel('Write a reply').fill('That looks peaceful.');
+      await first.getByRole('button', { name: 'Reply', exact: true }).click();
+      await first.getByText('That looks peaceful.', { exact: true }).waitFor();
+      await page.getByRole('button', { name: "View Maya Shah's story (unseen)", exact: true }).click();
+      await page.getByRole('dialog', { name: "Maya Shah's story" }).waitFor();
+      await page.getByRole('button', { name: 'Close story', exact: true }).click();
+      assert(mutations.includes('/stories/story-one/views'));
+      await page.getByRole('button', { name: 'Your story', exact: true }).click();
+      await page.getByRole('heading', { name: 'Create a story', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Your story', exact: true }).click();
+      await composer.fill('A new update from the Feed.');
+      assert(await composer.evaluate(el => el.offsetHeight >= 88));
+      await page.getByRole('button', { name: 'Post', exact: true }).click();
+      await page.getByText('A new update from the Feed.', { exact: true }).waitFor();
+      assert(mutations.includes('/posts'));
+      assert.deepEqual(errors, []);
+      console.log('Passed Feed layout and interactions:', width, theme);
+      await context.close();
+    }
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

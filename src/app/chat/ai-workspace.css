@@ -1,0 +1,116 @@
+/* AI route only: reuse the app's theme, controls, radii, and responsive drawer. */
+:root .ai-chat-workspace { grid-template-columns: 256px minmax(0, 1fr); padding: 12px 12px 12px 0; background: var(--canvas); --accent: var(--ink); --focus-ring: color-mix(in srgb, var(--ink) 10%, transparent); }
+:root .ai-chat-workspace.sidebar-is-collapsed { grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr); }
+:root .ai-chat-workspace > .sidebar { background: var(--canvas); border: 0; padding: 12px 16px 4px; }
+:root .ai-chat-workspace .sidebar-header { gap: 24px; }
+:root .ai-chat-workspace .new-chat-button { justify-content: center; min-height: 44px; border-radius: var(--radius-md); }
+:root .ai-chat-workspace .workspace-switcher { margin-top: 16px; }
+:root .ai-chat-workspace .primary-navigation { gap: 4px; margin-top: 16px; padding-bottom: 16px; border-color: var(--line); }
+:root .ai-chat-workspace .primary-navigation button.active { background: var(--surface-hover); border-color: transparent; box-shadow: none; }
+:root .ai-chat-workspace .conversation-list { margin-top: 18px; gap: 4px; }
+:root .ai-chat-workspace .list-label { font-size: .68rem; letter-spacing: .04em; font-weight: 550; }
+:root .ai-chat-workspace .conversation-group-label { color: var(--text-subtle); font-size: .68rem; margin: 16px 9px 6px; }
+:root .ai-chat-workspace .conversation-item { min-height: 36px; padding: 8px 34px 8px 10px; border-radius: var(--radius-sm); }
+:root .ai-chat-workspace .conversation-item span { font-size: .79rem; font-weight: 450; }
+:root .ai-chat-workspace .conversation-item.selected { background: var(--surface-hover); border-color: transparent; box-shadow: none; }
+:root .ai-chat-workspace .account-control { border-top: 1px solid var(--line); padding-top: 12px; }
+:root .ai-chat-workspace:not(.sidebar-is-collapsed) .account-copy { display: grid; gap: 3px; min-width: 0; }
+:root .ai-chat-workspace .account-trigger { border-color: transparent; background: transparent; }
+:root .ai-chat-workspace > .chat-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); position: relative; }
+:root .ai-chat-workspace .chat-header { align-items: center; flex-wrap: nowrap; min-height: 76px; padding: 18px 24px; gap: 16px; border-bottom: 0; background: transparent; }
+:root .ai-chat-workspace .model-selector { align-items: center; flex-direction: row; flex: 0 1 auto; gap: 8px; margin: 0; order: 0; min-width: 0; width: auto; }
+:root .ai-chat-workspace .model-selector > svg { color: var(--muted); width: 22px; height: 22px; flex-shrink: 0; }
+:root .ai-chat-workspace .model-selector > span { max-width: 300px; min-width: 0; }
+:root .ai-chat-workspace .model-selector [role="combobox"] { background: transparent; border-color: transparent; font-size: .82rem; }
+:root .ai-chat-workspace .conversation-actions { display: flex; gap: 4px; flex-shrink: 0; margin-left: auto; }
+:root .ai-chat-workspace .conversation-actions > span > button { display: inline-flex; align-items: center; justify-content: center; background: transparent; border-color: transparent; color: var(--muted); width: 34px; min-height: 34px; padding: 7px; }
+:root .ai-chat-workspace .conversation-actions > span > button:hover { background: var(--surface-hover); color: var(--ink); }
+:root .ai-chat-workspace .conversation-actions > span > button svg { width: 17px; height: 17px; }
+:root .ai-chat-workspace .ai-conversation-body { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
+:root .ai-chat-workspace .messages { align-content: start; width: 100%; max-width: 880px; padding: 28px 32px; }
+:root .ai-chat-workspace .ai-conversation-empty { overflow-y: auto; padding: clamp(24px, 9vh, 100px) 32px 32px; }
+:root .ai-chat-workspace .ai-conversation-empty .messages { display: block; overflow: visible; flex: 0 0 auto; padding: 0; margin: 0 auto 32px; }
+:root .ai-chat-workspace .ai-welcome { text-align: center; display: flex; flex-direction: column; align-items: center; }
+:root .ai-chat-workspace .ai-welcome-mark { display: grid; place-items: center; width: 60px; height: 60px; margin-bottom: 16px; border-radius: var(--radius-pill); background: var(--surface-subtle); border: 1px solid var(--line); box-shadow: 0 0 32px color-mix(in srgb, var(--ink) 4%, transparent); }
+:root .ai-chat-workspace .ai-welcome-mark img { width: 38px; height: 38px; object-fit: contain; border-radius: var(--radius-md); }
+:root .ai-chat-workspace .ai-welcome h2 { font-size: clamp(1.8rem, 3vw, 2.5rem); font-weight: 500; letter-spacing: -.045em; line-height: 1.18; margin: 0; }
+:root .ai-chat-workspace .ai-welcome-description { color: var(--text-subtle); font-size: .84rem; line-height: 1.5; margin: 10px 0 0; }
+:root .ai-chat-workspace .composer { width: calc(100% - 64px); max-width: 864px; padding: 14px; gap: 10px; background: var(--surface); border-color: var(--line-strong); }
+:root .ai-chat-workspace .composer textarea { flex: 0 0 100%; width: 100%; min-height: 48px; padding: 4px; font-size: .95rem; line-height: 1.6; order: 0; }
+:root .ai-chat-workspace .ai-composer-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; width: 100%; }
+:root .ai-chat-workspace .ai-composer-send { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; min-width: 0; }
+:root .ai-chat-workspace .ai-composer-send > button { display: inline-flex; align-items: center; justify-content: center; background: var(--ink); color: var(--canvas); border: 0; border-radius: var(--radius-pill); width: 38px; height: 38px; flex-shrink: 0; }
+:root .ai-chat-workspace .ai-composer-send > button svg { width: 18px; height: 18px; }
+:root .ai-chat-workspace .voice-input-button { border-radius: var(--radius-pill); background: var(--surface-raised); color: var(--ink); border-color: var(--line); width: 38px; height: 38px; }
+:root .ai-chat-workspace .ai-web-search { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 10px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: .75rem; }
+:root .ai-chat-workspace .ai-web-search svg { width: 16px; height: 16px; }
+:root .ai-chat-workspace .ai-web-search:hover { background: var(--surface-hover); }
+:root .ai-chat-workspace .ai-web-search[aria-pressed="true"] { background: var(--surface-active); border-color: var(--line-strong); color: var(--ink); }
+:root .ai-chat-workspace .ai-composer-send > button:disabled,
+:root .ai-chat-workspace .home-composer-actions > button:disabled { background: var(--surface-raised); color: var(--text-subtle); border: 1px solid var(--line); opacity: 1; }
+:root .ai-chat-workspace .home-composer-actions > button { border-radius: var(--radius-pill); width: 38px; height: 38px; }
+:root .ai-chat-workspace .home-composer textarea { min-height: 48px; font-size: .95rem; }
+:root .ai-chat-workspace .primary-navigation:empty { display: none; }
+:root .ai-chat-workspace .ai-memory-link { display: flex; align-items: center; gap: 9px; flex-shrink: 0; margin-top: 12px; min-height: 36px; padding: 8px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-subtle); font-size: .75rem; text-align: left; }
+:root .ai-chat-workspace .ai-memory-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+:root .ai-chat-workspace .ai-memory-link:hover { background: var(--surface-hover); color: var(--ink); }
+:root .ai-chat-workspace .composer:focus-within,
+:root .ai-chat-workspace .home-composer:focus-within { border-color: var(--line-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
+:root .ai-chat-workspace button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+:root [role="listbox"][aria-label="AI model"] button:focus-visible { outline-color: var(--ink); }
+:root .ai-chat-workspace .chat-consent-controls { flex-wrap: wrap; max-width: 864px; width: calc(100% - 64px); margin: 6px auto 0; }
+:root .ai-chat-workspace .chat-consent-controls:empty { display: none; }
+:root .ai-chat-workspace .composer-note { color: var(--text-subtle); font-size: .6rem; line-height: 1.5; text-align: center; padding: 0 12px; margin: 12px 0 20px; }
+:root .ai-chat-workspace .ai-conversation-empty .composer,
+:root .ai-chat-workspace .ai-conversation-empty .chat-consent-controls { width: 100%; }
+:root .ai-chat-workspace .quick-actions { max-width: 800px; margin: 16px auto 0; gap: 12px; flex-shrink: 0; }
+:root .ai-chat-workspace .quick-actions button { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; min-height: 108px; padding: 14px 18px; border-radius: var(--radius-md); background: transparent; }
+:root .ai-chat-workspace .quick-actions button > svg { padding: 0; background: transparent; color: var(--ink); width: 18px; height: 18px; }
+:root .ai-chat-workspace .quick-actions button > svg:first-child { grid-column: 1 / -1; }
+:root .ai-chat-workspace .quick-actions strong { color: var(--ink); font-size: .8rem; font-weight: 600; }
+:root .ai-chat-workspace .quick-actions small { font-size: .7rem; color: var(--muted); line-height: 1.5; }
+:root .ai-chat-workspace .ai-home { max-width: 928px; padding: clamp(24px, 9vh, 100px) 32px 32px; }
+:root .ai-chat-workspace .home-composer { margin-top: 32px; padding: 16px; flex-shrink: 0; }
+:root .ai-chat-workspace .home-composer > div { border: 0; }
+:root .ai-chat-workspace .ai-home-hint { color: var(--text-subtle); font-size: .7rem; }
+:root .ai-chat-workspace .ai-home-loading { justify-content: center; }
+@media (min-width: 721px) {
+  :root .ai-chat-workspace.sidebar-is-collapsed > .sidebar { padding-inline: 10px; }
+}
+@media (max-width: 1020px) and (min-width: 721px) {
+  :root .ai-chat-workspace { grid-template-columns: 220px minmax(0, 1fr); }
+  :root .ai-chat-workspace .chat-header { padding-inline: 16px; }
+  :root .ai-chat-workspace .ai-conversation-empty, :root .ai-chat-workspace .ai-home { padding: 40px 24px 24px; }
+  :root .ai-chat-workspace .quick-actions { gap: 8px; }
+  :root .ai-chat-workspace .quick-actions button { padding: 12px; }
+}
+@media (max-width: 720px) {
+  :root .ai-chat-workspace, :root .ai-chat-workspace.sidebar-is-collapsed { grid-template-columns: minmax(0, 1fr); padding: 0; }
+  :root .ai-chat-workspace > .sidebar { background: var(--surface); border-right: 1px solid var(--line); padding: 62px 16px 16px; }
+  :root .ai-chat-workspace > .chat-panel { border: 0; border-radius: 0; }
+  :root .ai-chat-workspace .chat-header { min-height: 64px; gap: 4px; padding: 12px 12px 12px 60px; }
+  :root .ai-chat-workspace .model-selector { flex: 1; width: 0; gap: 0; }
+  :root .ai-chat-workspace .model-selector > svg { display: none; }
+  :root .ai-chat-workspace .model-selector > span { max-width: 100%; }
+  :root .ai-chat-workspace .model-selector [role="combobox"] { padding: 6px; }
+  :root .ai-chat-workspace .model-selector [role="combobox"] > span { font-size: .72rem; }
+  :root .ai-chat-workspace .conversation-actions { gap: 0; }
+  :root .ai-chat-workspace .conversation-actions > span > button { width: 30px; }
+  :root .ai-chat-workspace .ai-conversation-empty, :root .ai-chat-workspace .ai-home { padding: 32px 16px 24px; }
+  :root .ai-chat-workspace .ai-conversation-empty .messages { margin-bottom: 24px; }
+  :root .ai-chat-workspace .ai-welcome-mark { width: 52px; height: 52px; margin-bottom: 14px; }
+  :root .ai-chat-workspace .ai-welcome-mark img { width: 34px; height: 34px; }
+  :root .ai-chat-workspace .ai-welcome h2 { font-size: clamp(1.6rem, 6.6vw, 2rem); }
+  :root .ai-chat-workspace .ai-welcome-description { font-size: .76rem; }
+  :root .ai-chat-workspace .composer { width: calc(100% - 24px); padding: 12px; }
+  :root .ai-chat-workspace .messages { padding: 20px 16px; }
+  :root .ai-chat-workspace .chat-consent-controls { width: calc(100% - 24px); }
+  :root .ai-chat-workspace .quick-actions { grid-template-columns: 1fr; gap: 8px; }
+  :root .ai-chat-workspace .quick-actions button { grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: center; min-height: 68px; padding: 10px 16px; }
+  :root .ai-chat-workspace .quick-actions button > svg:first-child { grid-column: auto; }
+  :root .ai-chat-workspace .ai-composer-toolbar { gap: 8px; }
+  :root .ai-chat-workspace .ai-composer-send:has(.listening) { flex: 1 1 100%; }
+  :root .ai-chat-workspace .ai-composer-send .voice-input.listening { min-width: 0; flex: 1; }
+  :root .ai-chat-workspace .voice-listening { flex-wrap: wrap; }
+  :root .ai-chat-workspace .composer-note { margin-bottom: max(12px, env(safe-area-inset-bottom)); }
+}

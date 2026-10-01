@@ -148,11 +148,11 @@ function ToolItem({ detail, disabled = false, icon, label, onClick }: { detail: 
 }
 
 
-type SelectControlProps = SelectHTMLAttributes<HTMLSelectElement>;
+type SelectControlProps = SelectHTMLAttributes<HTMLSelectElement> & { optionDescriptions?: Record<string, string> };
 
 // Select presentation extends the existing tools-menu panel and icon primitives.
 // The native select retains the form value and original React change handler.
-export function SelectControl({ children, className = "", id, disabled, ...props }: SelectControlProps) {
+export function SelectControl({ children, className = "", id, disabled, optionDescriptions, ...props }: SelectControlProps) {
   const generatedId = useId();
   const listId = `${generatedId}-choices`;
   const native = useRef<HTMLSelectElement>(null);
@@ -223,7 +223,7 @@ export function SelectControl({ children, className = "", id, disabled, ...props
       else if (event.key.length === 1 && event.key !== " ") next = items.findIndex((item, index) => index > current && item.textContent?.toLowerCase().startsWith(event.key.toLowerCase()));
       else return;
       event.preventDefault(); items[next]?.focus();
-    }}>{options.map(option => <button aria-selected={option.value === value} className={styles.selectOption} disabled={option.disabled} key={option.value} onClick={event => { event.preventDefault(); choose(option.value); }} role="option" tabIndex={-1} type="button">{option.label}<span aria-hidden="true">{option.value === value ? "✓" : ""}</span></button>)}</span>, root.current?.closest("dialog, [role=dialog]") ?? document.body)}
+    }}>{options.map(option => <button aria-selected={option.value === value} className={styles.selectOption} disabled={option.disabled} key={option.value} onClick={event => { event.preventDefault(); choose(option.value); }} role="option" tabIndex={-1} type="button">{optionDescriptions?.[option.value] ? <span className={styles.optionCopy}>{option.label}<small>{optionDescriptions[option.value]}</small></span> : option.label}<span aria-hidden="true">{option.value === value ? "✓" : ""}</span></button>)}</span>, root.current?.closest("dialog, [role=dialog]") ?? document.body)}
   </span>;
 }
 

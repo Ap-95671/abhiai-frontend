@@ -10,7 +10,7 @@ import { AuthenticatedImage } from "@/components/authenticated-image";
 import { BrandIntro } from "@/components/branding/brand-intro";
 import { ThinkingIndicator } from "@/components/chat/thinking-indicator";
 import { MessageContent } from "@/components/chat/message-content";
-import { useMenuPresence, ToolMenu, SelectControl, UploadPurpose } from "@/components/chat/tool-menu";
+import { useMenuPresence, ToolMenu, SelectControl, ActionMenu, UploadPurpose } from "@/components/chat/tool-menu";
 import { LandingPage } from "@/components/landing/landing-page";
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { FeedPanel } from "@/components/feed-panel";
@@ -27,8 +27,8 @@ import { CreatorDashboard } from "@/components/creator-dashboard";
 import { NewsPanel } from "@/components/news/news-panel";
 import { MemoryPanel } from "@/components/memory-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
-import { Toggle } from "@/components/ui/toggle";
 import { CharacterAvatar } from "@/components/ai-character/character-avatar";
+import "./chat/ai-workspace.css";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { usePageContext, AssistantDocumentButton } from "@/components/ai-character/abhiai-context";
@@ -100,15 +100,6 @@ function errorMessage(error: unknown) {
   return error instanceof ApiError || error instanceof Error
     ? error.message
     : "Something went wrong. Please try again.";
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
 }
 
 function formatFileSize(bytes: number) {
@@ -1118,7 +1109,7 @@ export default function Home() {
 
   return (
     <>
-    <main className={sidebarCollapsed ? "app-shell sidebar-is-collapsed" : "app-shell"}>
+    <main className={`app-shell${sidebarCollapsed ? " sidebar-is-collapsed" : ""}${!socialWorkspace && activeView === "chat" ? " ai-chat-workspace" : ""}`}>
       <button
         aria-controls="app-sidebar"
         aria-expanded={mobileSidebarOpen}
@@ -1179,7 +1170,7 @@ export default function Home() {
 
         <nav className="primary-navigation" aria-label="Workspace">
           {!socialWorkspace ? (
-            <button aria-current="page" className="active" onClick={() => navigateWorkspace("chat", "chat")} title="AI Chat" type="button">
+            activeView !== "chat" && <button aria-current="page" className="active" onClick={() => navigateWorkspace("chat", "chat")} title="AI Chat" type="button">
               <AppIcon name="ai" /> <span className="sidebar-label">AI Chat</span>
             </button>
           ) : socialNavigationGroups.map((group) => (
@@ -1209,7 +1200,7 @@ export default function Home() {
         </nav>
 
         <nav className={!socialWorkspace ? "conversation-list" : "conversation-list hidden"} aria-label="Conversations">
-          <p className="list-label">Recent chats</p>
+          {conversationGroups.some(group => group.label !== "Older") && <p className="list-label">Recent chats</p>}
           {isLoadingConversations && <div aria-label="Loading conversations" className="conversation-skeletons" role="status"><i/><i/><i/></div>}
           {!isLoadingConversations && conversations.length === 0 && (
             <p className="muted-text">Start a new chat to begin.</p>
@@ -1233,6 +1224,7 @@ export default function Home() {
           </div>)}
         </nav>
 
+        {!socialWorkspace && activeView === "chat" && <button className="ai-memory-link" onClick={() => navigateWorkspace("memory")} title="Memory & privacy" type="button"><AppIcon name="bookmark" /><span className="sidebar-label">Memory & privacy</span></button>}
         <div className="account-control" ref={accountControlRef}>
           <button
             aria-label="Open account menu"
@@ -1303,28 +1295,19 @@ export default function Home() {
       ) : socialWorkspace ? (
         <FeedPanel accessToken={accessToken} onUnauthorized={handleSessionExpired} onViewHashtag={viewHashtag} onViewProfile={viewProfile} />
       ) : (
-      <section className="chat-panel">
-        {!conversationStateResolved ? (
-          <div aria-label="Loading your AI workspace" className="ai-home ai-home-loading" role="status">
-            <span className="brand-mark ai-home-logo"><Image alt="" height={64} src="/abhiai-logo.png" width={64} /></span>
-            <p>Restoring your workspace…</p>
-          </div>
-        ) : selectedConversation ? (
-          <>
+      <section className="chat-panel" aria-label="AbhiAI workspace">
+        {conversationStateResolved && (
             <header className="chat-header">
-              <div>
-                <p className="eyebrow">Conversation</p>
-                <h1>{selectedConversation.title}</h1>
-              </div>
               <label className="model-selector">
-                <span>Model</span>
+                <AppIcon name="ai" />
                 <SelectControl
                   aria-label="AI model"
+                  optionDescriptions={{ AUTO: "Smart routing" }}
                   disabled={isChangingModel || isSending}
-                  onChange={(event) => void changeConversationModel(event.target.value)}
-                  value={selectedConversation.modelSelectionMode === "MANUAL" ? selectedConversation.preferredModelId ?? "AUTO" : "AUTO"}
+                  onChange={(event) => selectedConversation ? void changeConversationModel(event.target.value) : setHomeModelId(event.target.value)}
+                  value={selectedConversation ? selectedConversation.modelSelectionMode === "MANUAL" ? selectedConversation.preferredModelId ?? "AUTO" : "AUTO" : homeModelId}
                 >
-                  <option value="AUTO">AbhiAI Auto · smart routing</option>
+                  <option value="AUTO">AbhiAI Auto</option>
                   {models.map((model) => (
                     <option
                       disabled={model.status === "UNAVAILABLE" || model.status === "RATE_LIMITED" || model.status === "COMING_SOON" || !model.configured}
@@ -1336,21 +1319,28 @@ export default function Home() {
                   ))}
                 </SelectControl>
               </label>
-              <div className="conversation-actions">
-                <button onClick={() => { setRenameDraft(selectedConversation.title); setConversationDialog("rename"); }} type="button"><AppIcon name="create"/> Rename</button>
-                <button className="danger-button" onClick={() => setConversationDialog("delete")} type="button"><AppIcon name="trash"/> Delete</button>
-              </div>
+              {selectedConversation && <div className="conversation-actions">
+                <ActionMenu label="Conversation options" items={[
+                  { label: "Rename", icon: <AppIcon name="create" />, onSelect: () => { setRenameDraft(selectedConversation.title); setConversationDialog("rename"); } },
+                  { label: "Delete", icon: <AppIcon name="trash" />, destructive: true, onSelect: () => setConversationDialog("delete") },
+                ]} />
+              </div>}
             </header>
 
+        )}
+        {!conversationStateResolved ? (
+          <div aria-label="Loading your AI workspace" className="ai-home ai-home-loading" role="status">
+            <span className="brand-mark ai-home-logo"><Image alt="" height={64} src="/abhiai-logo.png" width={64} /></span>
+            <p>Restoring your workspace…</p>
+          </div>
+        ) : selectedConversation ? (
+          <>
+            <div className={`ai-conversation-body${!isLoadingHistory && sortedMessages.length === 0 ? " ai-conversation-empty" : ""}`}>
             <div className="messages" aria-live="polite" onScroll={handleMessageScroll} ref={messagesRef}>
               {isLoadingHistory ? (
                 <div aria-label="Loading messages" className="message-skeletons" role="status"><i/><i/><i/></div>
               ) : sortedMessages.length === 0 ? (
-                <div className="empty-conversation">
-                  <span className="assistant-home-avatar" role="img" aria-label="AbhiAI assistant"><CharacterAvatar state="idle" animations="off" /></span>
-                  <h2>What would you like to explore?</h2>
-                  <p>Ask a question, brainstorm an idea, or start building something new.</p>
-                </div>
+                <AiWelcome />
               ) : (
                 sortedMessages.map((message) => (
                   <MessageBubble
@@ -1413,16 +1403,6 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              <ToolMenu
-                disabled={isSending || isUploadingAttachment || chatAttachments.length >= 5}
-                onGenerateImage={() => {
-                  setChatAttachments([]);
-                  setExternalProcessingAllowed(false);
-                  setComposerMode("image");
-                  setChatError("");
-                }}
-                onUpload={(file, purpose) => void uploadChatAttachment(file, purpose)}
-              />
               <textarea
                 aria-label="Message AbhiAI"
                 disabled={isSending}
@@ -1433,6 +1413,19 @@ export default function Home() {
                 rows={1}
                 value={messageDraft}
               />
+              <div className="ai-composer-toolbar">
+              <ToolMenu
+                disabled={isSending || isUploadingAttachment || chatAttachments.length >= 5}
+                onGenerateImage={() => {
+                  setChatAttachments([]);
+                  setExternalProcessingAllowed(false);
+                  setComposerMode("image");
+                  setChatError("");
+                }}
+                onUpload={(file, purpose) => void uploadChatAttachment(file, purpose)}
+              />
+                <button className="ai-web-search" aria-pressed={webSearchAllowed} onClick={() => setWebSearchAllowed(current => !current)} type="button"><AppIcon name="globe" /><span>Web search</span></button>
+                <div className="ai-composer-send">
               <VoiceInput
                 disabled={isSending || composerMode === "image"}
                 onChange={setMessageDraft}
@@ -1449,6 +1442,8 @@ export default function Home() {
                   <AppIcon name="send" />
                 </button>
               )}
+                </div>
+              </div>
             </form>
             <div className="chat-consent-controls">
               {chatAttachments.length > 0 && (
@@ -1462,18 +1457,14 @@ export default function Home() {
                   {!externalProcessingAllowed && <strong>Required</strong>}
                 </label>
               )}
-              <div className="chat-web-search"><Toggle checked={webSearchAllowed} label="Allow web search for this message" onCheckedChange={setWebSearchAllowed} /><span>Allow web search for this message</span></div>
             </div>
+            {!isLoadingHistory && sortedMessages.length === 0 && <AiQuickPrompts disabled={isSending} onSelect={(mode, draft, search) => { setComposerMode(mode); setMessageDraft(draft); setWebSearchAllowed(search); composerTextareaRef.current?.focus(); }} />}
             <p className="composer-note">AbhiAI can make mistakes. Verify important information.</p>
+            </div>
           </>
         ) : (
           <div className="ai-home">
-            <div className="ai-home-intro">
-              <span className="assistant-home-avatar" role="img" aria-label="AbhiAI assistant"><CharacterAvatar state="idle" animations="off" /></span>
-              <p className="eyebrow">Your intelligence workspace</p>
-              <h1>Think, create, and continue.</h1>
-              <p>Start with smart routing or choose an available model. Your conversations stay organized in one private workspace.</p>
-            </div>
+            <AiWelcome />
             <form className="home-composer" onSubmit={(event) => { event.preventDefault(); if (messageDraft.trim()) void startQuickAction("chat", messageDraft, false, true); }}>
               <textarea
                 aria-label="Start a conversation with AbhiAI"
@@ -1484,25 +1475,15 @@ export default function Home() {
                 value={messageDraft}
               />
               <div>
-                <label className="home-model-control"><span>Model</span><SelectControl aria-label="Model for new conversation" onChange={(event) => setHomeModelId(event.target.value)} value={homeModelId}><option value="AUTO">AbhiAI Auto · smart routing</option>{models.filter((model) => model.configured && model.status !== "UNAVAILABLE" && model.status !== "COMING_SOON").map((model) => <option key={model.id} value={model.id}>{model.displayName} · {providerLabel(model.provider)}</option>)}</SelectControl></label>
+                <span className="ai-home-hint">A new conversation starts here</span>
                 <div className="home-composer-actions">
                   <VoiceInput disabled={isCreatingConversation} onChange={setMessageDraft} value={messageDraft} />
                   <button aria-label="Start chat" disabled={isCreatingConversation || !messageDraft.trim()} type="submit"><AppIcon name="send" /></button>
                 </div>
               </div>
             </form>
-            <div aria-label="Quick actions" className="quick-actions">
-              <button data-accent="amber" disabled={isCreatingConversation} onClick={() => void startQuickAction("image", "Create an image of ")} type="button"><AppIcon name="image"/><span><strong>Create image</strong><small>Generate from a prompt</small></span></button>
-              <button data-accent="violet" disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Summarize and analyze this PDF: ")} type="button"><AppIcon name="article"/><span><strong>Analyze PDF</strong><small>Upload after opening chat</small></span></button>
-              <button data-accent="teal" disabled={isCreatingConversation} onClick={() => void startQuickAction("chat", "Research the latest information about ", true)} type="button"><AppIcon name="search"/><span><strong>Research</strong><small>Use supported web search</small></span></button>
-            </div>
-            <div className="ai-home-context-grid">
-              <section aria-labelledby="recent-intelligence-title" className="ai-home-context-card">
-                <div className="ai-home-context-heading"><div><p className="eyebrow">Continue</p><h2 id="recent-intelligence-title">Recent intelligence</h2></div><span>{conversations.length} chats</span></div>
-                {conversations.length > 0 ? <div className="ai-home-recent-list">{conversations.slice(0, 3).map((conversation) => <button key={conversation.id} onClick={() => void selectConversation(accessToken, conversation.id)} type="button"><span><strong>{conversation.title}</strong><small>{formatDate(conversation.updatedAt)}</small></span><AppIcon name="chevron-right" /></button>)}</div> : <p className="ai-home-context-empty">Your recent conversations will appear here after your first chat.</p>}
-              </section>
-              <section aria-labelledby="memory-home-title" className="ai-home-context-card memory-home-card"><span className="memory-home-icon"><AppIcon name="ai" /></span><div><p className="eyebrow">Personalize</p><h2 id="memory-home-title">Memory & privacy</h2><p>Review what AbhiAI can remember and keep personal context under your control.</p><button onClick={() => navigateWorkspace("memory")} type="button">Manage memory <AppIcon name="chevron-right" /></button></div></section>
-            </div>
+            <AiQuickPrompts disabled={isCreatingConversation} onSelect={(mode, draft, search) => void startQuickAction(mode, draft, search)} />
+            <p className="composer-note">AbhiAI can make mistakes. Verify important information.</p>
           </div>
         )}
       </section>
@@ -1537,6 +1518,22 @@ export default function Home() {
     )}
     </>
   );
+}
+
+function AiWelcome() {
+  return <div className="ai-welcome">
+    <span className="ai-welcome-mark"><Image alt="AbhiAI" height={64} src="/abhiai-logo.png" width={64} /></span>
+    <h2>How can I help you today?</h2>
+    <p className="ai-welcome-description">Ask, create, research, or work with your files.</p>
+  </div>;
+}
+
+function AiQuickPrompts({ disabled, onSelect }: { disabled: boolean; onSelect: (mode: ComposerMode, draft: string, search: boolean) => void }) {
+  return <div aria-label="Quick actions" className="quick-actions">
+    <button disabled={disabled} onClick={() => onSelect("image", "Create an image of ", false)} type="button"><AppIcon name="image"/><span><strong>Create image</strong><small>Turn an idea into something visual.</small></span></button>
+    <button disabled={disabled} onClick={() => onSelect("chat", "Summarize and analyze this PDF: ", false)} type="button"><AppIcon name="article"/><span><strong>Analyze PDF</strong><small>Find the key ideas in a document.</small></span></button>
+    <button disabled={disabled} onClick={() => onSelect("chat", "Research the latest information about ", true)} type="button"><AppIcon name="search"/><span><strong>Research</strong><small>Explore a topic with web search.</small></span></button>
+  </div>;
 }
 
 function MessageBubble({

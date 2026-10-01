@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { Room } from "livekit-client";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import styles from "./assistant.module.css";
 
 export type AvatarPlayback = {
@@ -25,6 +25,7 @@ export function AstraLiveAvatar({ token, conversationId, visible, route, playbac
   useEffect(() => {
     if (!enabled || !visible || !conversationId) return;
     let disposed = false, ready = false, revision = 0;
+    let phase = "session creation";
     let room: Room | undefined, socket: WebSocket | undefined;
     let readyTimer: ReturnType<typeof setTimeout>;
     const send = (type: string, audio?: string, event_id = crypto.randomUUID()) => {
@@ -46,7 +47,11 @@ export function AstraLiveAvatar({ token, conversationId, visible, route, playbac
       clearTimeout(readyTimer); socket?.close(); void room?.disconnect();
       void api.closeLiveAvatar(token, id).catch(() => {});
     };
-    const fail = () => {
+    const fail = (failure?: unknown) => {
+      if (process.env.NODE_ENV === "development") {
+        // Never log the raw exception: SDK errors can contain session URLs/tokens.
+        console.warn("[Astra LiveAvatar]", phase, "failed", failure instanceof ApiError ? `HTTP ${failure.status}` : "");
+      }
       release();
       if (!disposed) { setError("Astra couldn't start the live avatar. Try again, or continue with standard voice."); setActiveScope(null); }
     };
@@ -63,11 +68,13 @@ export function AstraLiveAvatar({ token, conversationId, visible, route, playbac
       if (disposed) return;
       const credentials = await api.createLiveAvatar(token, { id, conversationId });
       if (disposed) { void api.closeLiveAvatar(token,id).catch(() => {}); return; }
+      phase = "WebRTC connection";
       room = new Room({ adaptiveStream: true });
       room.on(RoomEvent.TrackSubscribed, track => { if (!disposed && video.current) { track.attach(video.current); void video.current.play().catch(() => setError("Tap the avatar to enable audio.")); } });
       room.on(RoomEvent.Disconnected, () => { if (ready && !disposed) fail(); });
       await room.connect(credentials.livekitUrl, credentials.livekitToken);
       if (disposed) { release(); return; }
+      phase = "avatar control connection";
       await new Promise<void>((resolve, reject) => {
         readyTimer = setTimeout(() => reject(new Error("Avatar timed out")), 30000);
         socket = new WebSocket(credentials.wsUrl);
@@ -85,6 +92,7 @@ export function AstraLiveAvatar({ token, conversationId, visible, route, playbac
         };
       });
       if (disposed) { release(); return; }
+      phase = "avatar stream/audio";
       ready = true; setStatus("Ready"); activity();
       playback.current = {
         interrupt,
@@ -127,7 +135,7 @@ export function AstraLiveAvatar({ token, conversationId, visible, route, playbac
           } catch { if (disposed || turn !== revision) return true; fail(); return false; }
         },
       };
-    })().catch(() => { if (!disposed) fail(); });
+    })().catch(failure => { if (!disposed) fail(failure); });
     return () => {
       disposed = true; release();
       window.removeEventListener("pagehide", release); document.removeEventListener("visibilitychange", hide);

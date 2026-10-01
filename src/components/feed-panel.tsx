@@ -1,11 +1,15 @@
 "use client";
 
+import Link from "next/link";
+import "./feed-panel.css";
+import { StoriesPanel } from "@/components/stories-panel";
+
 import { SelectControl } from "@/components/chat/tool-menu";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { api, ApiError, PageResponse, PostSearchResult, PostVisibility, UserProfile } from "@/lib/api";
+import { api, ApiError, Community, PageResponse, PostSearchResult, PostVisibility, UserProfile } from "@/lib/api";
 import { AppIcon } from "@/components/ui/app-icon";
 import { usePageContext, useAbhiAIContext } from "@/components/ai-character/abhiai-context";
 import { NewsBrief } from "@/components/news/news-brief";
@@ -166,15 +170,16 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
   }
 
   return (
-    <section className="workspace-view" aria-labelledby="feed-title">
+    <section className="workspace-view feed-page" aria-labelledby="feed-title">
       <header className="workspace-header">
         <div><p className="eyebrow">Social</p><h1 id="feed-title">Home feed</h1><p>Share ideas and see what your network is building.</p></div>
       </header>
       <div className="workspace-content feed-hub">
         <div className="feed-workspace">
-        <form id="post-composer" className="post-composer" onSubmit={publish}>
+        <StoriesPanel accessToken={accessToken} onUnauthorized={onUnauthorized} onViewProfile={onViewProfile} presentation="feed" />
+        <form id="post-composer" className={`post-composer${draft || attachments.length || pollEnabled ? " has-content" : ""}`} onSubmit={publish}>
           <UserAvatar accessToken={accessToken} className="profile-avatar" displayName={profile?.displayName ?? "AbhiAI"} profileMediaId={profile?.profileMediaId} profilePicture={profile?.profilePicture}/>
-          <textarea aria-label="Create a social post" maxLength={1000} onChange={(event) => setDraft(event.target.value)} placeholder="Share an idea, update, or question…" rows={3} value={draft} />
+          <textarea aria-label="Create a social post" maxLength={1000} onChange={(event) => setDraft(event.target.value)} placeholder="Share an idea, update, or question…" rows={1} value={draft} />
           {attachments.length > 0 && <div className="composer-image-list">{attachments.map((file,index)=><div key={`${file.name}-${file.lastModified}`}><span>{file.name}</span><button aria-label={`Remove ${file.name}`} onClick={()=>setAttachments((items)=>items.filter((_,i)=>i!==index))} type="button">×</button></div>)}</div>}
           {pollEnabled && <div className="poll-composer">{pollChoices.map((choice, index) => <div key={index}><input aria-label={`Poll choice ${index + 1}`} maxLength={100} onChange={(event) => setPollChoices((items) => items.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Choice ${index + 1}`} required value={choice}/>{pollChoices.length > 2 && <button aria-label={`Remove poll choice ${index + 1}`} onClick={() => setPollChoices((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button">×</button>}</div>)}<div className="poll-composer-settings">{pollChoices.length < 4 && <button onClick={() => setPollChoices((items) => [...items, ""])} type="button">＋ Add choice</button>}<label>Duration<SelectControl onChange={(event) => setPollDuration(Number(event.target.value))} value={pollDuration}><option value={1}>1 hour</option><option value={24}>1 day</option><option value={72}>3 days</option><option value={168}>7 days</option></SelectControl></label></div></div>}
           <div className="post-composer-footer">
@@ -197,9 +202,36 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
         </div>
         {page && !page.last && <button className="load-more-button" disabled={isLoading} onClick={() => void loadFeed(page.page + 1, true)} type="button">{isLoading ? "Loading…" : "Load more posts"}</button>}
         </div>
-        <NewsBrief accessToken={accessToken} onUnauthorized={onUnauthorized} />
+        <aside className="feed-discovery" aria-label="Discover on AbhiAI">
+          <FeedCommunities accessToken={accessToken} onUnauthorized={onUnauthorized} />
+          <NewsBrief accessToken={accessToken} onUnauthorized={onUnauthorized} />
+        </aside>
       </div>
       {selectedPost && createPortal(<div className="post-detail-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closePost(); }} role="presentation"><section aria-labelledby="post-detail-title" aria-modal={!assistantContext?.assistantOpen} className="post-detail-dialog" data-assistant-context="post" ref={postDetailDialog} role="dialog"><header><h2 id="post-detail-title">Post</h2><button className="post-assistant-action" type="button" onClick={() => assistantContext?.talkAboutCurrent()}>Talk about this post</button><button aria-label="Close post detail" onClick={closePost} ref={postDetailClose} type="button">×</button></header><PostCard accessToken={accessToken} currentUserId={profile?.id} detail onDelete={removePost} onError={setError} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} post={selectedPost}/></section></div>, document.body)}
     </section>
   );
+}
+
+/** Feed-only view of the existing public community directory. */
+function FeedCommunities({ accessToken, onUnauthorized }: { accessToken: string; onUnauthorized: () => void }) {
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  useEffect(() => {
+    let active = true;
+    void api.getCommunities(accessToken, 0, 4).then(result => {
+      if (active) { setCommunities(result.content); setStatus("ready"); }
+    }).catch(error => {
+      if (!active) return;
+      if (error instanceof ApiError && error.status === 401) onUnauthorized();
+      setStatus("error");
+    });
+    return () => { active = false; };
+  }, [accessToken, onUnauthorized]);
+  return <section className="feed-community-module" aria-labelledby="feed-communities-title">
+    <header><h2 id="feed-communities-title">Explore communities</h2><Link href="/social?view=communities">See all</Link></header>
+    {status === "loading" ? <p role="status">Loading communities…</p> : status === "error" ? <p>Communities are temporarily unavailable.</p> : communities.length === 0 ? <p>Discover communities and find your people.</p> : <ul>{communities.map(community => <li key={community.id}>
+      <span className="feed-community-icon" aria-hidden="true"><AppIcon name="community" /></span>
+      <span><strong>{community.name}</strong><small>{community.memberCount.toLocaleString()} {community.memberCount === 1 ? "member" : "members"}</small></span>
+    </li>)}</ul>}
+  </section>;
 }

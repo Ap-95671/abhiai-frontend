@@ -182,3 +182,11 @@
 .liveAvatar video { width:100%; max-height:230px; aspect-ratio:4/3; object-fit:contain; border-radius:var(--radius-md); }
 .liveAvatar > button { min-height:36px; padding:0 12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); }
 .liveAvatar > p { margin:0; font-size:12px; }
+
+/* The ordinary AI page uses a compact voice launcher; the assistant panel is unchanged. */
+.chatLauncher { height: 40px; gap: 8px; padding: 0 12px; box-shadow: none; }
+.chatLauncher > svg { width: 17px; height: 17px; }
+.chatLauncher span { font-size: .74rem; font-weight: 500; }
+.chatLauncher:hover { border-color: var(--line-strong); }
+.chatLauncher:focus-visible { outline: 2px solid var(--ink); }
+@media (max-width: 720px) { .chatLauncher { width: 40px; padding: 0; justify-content: center; } }

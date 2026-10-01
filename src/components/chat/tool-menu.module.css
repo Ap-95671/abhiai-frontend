@@ -74,3 +74,6 @@
 .actionMenu .destructive { color:var(--destructive-ink); border-top:1px solid var(--line); }.actionMenu .destructive:hover { background:var(--destructive-subtle); }
 @starting-style { .actionMenu:popover-open { opacity:0; transform:translateY(3px) scale(.985); } }
 @media (prefers-reduced-motion:reduce) { .actionMenu { transition:none; } }
+
+.optionCopy { display: grid; gap: 2px; }
+.optionCopy small { color: var(--muted); font-size: .68rem; font-weight: 400; }

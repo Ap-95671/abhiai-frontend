@@ -6,10 +6,12 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AuthenticatedImage } from "@/components/authenticated-image";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AppIcon } from "@/components/ui/app-icon";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { api, ApiError, Story, UserProfile } from "@/lib/api";
 
 type StoriesPanelProps = {
+  presentation?: "page" | "feed";
   accessToken: string;
   onUnauthorized: () => void;
   onViewProfile: (username: string) => void;
@@ -24,7 +26,9 @@ function timeLeft(expiresAt: string) {
   return `${Math.ceil(minutes / 60)}h left`;
 }
 
-export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: StoriesPanelProps) {
+export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile, presentation = "page" }: StoriesPanelProps) {
+  const [creatingInFeed, setCreatingInFeed] = useState(false);
+  const embedded = presentation === "feed";
   const [stories, setStories] = useState<Story[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -39,7 +43,7 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
   const [error, setError] = useState("");
 
   const selected = selectedIndex === null ? null : stories[selectedIndex] ?? null;
-  usePageContext(selected ? { pageType: "story", entityId: selected.id, title: `Story by @${selected.author.username}` } : { pageType: "other", title: "Stories" }, selected ? 20 : 5);
+  usePageContext(selected ? { pageType: "story", entityId: selected.id, title: `Story by @${selected.author.username}` } : embedded ? null : { pageType: "other", title: "Stories" }, selected ? 20 : 5);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -145,12 +149,21 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
   }
 
   return (
-    <section className="workspace-view" aria-labelledby="stories-title">
-      <header className="workspace-header">
+    <section className={embedded ? "feed-stories" : "workspace-view"} aria-label={embedded ? "Stories" : undefined} aria-labelledby={embedded ? undefined : "stories-title"}>
+      {embedded ? <div className="feed-story-strip" aria-label="Active stories">
+        <button className="feed-story-item feed-create-story" aria-label="Your story" aria-expanded={creatingInFeed} onClick={() => setCreatingInFeed(current => !current)} type="button">
+          <span className="feed-story-ring"><UserAvatar accessToken={accessToken} className="feed-story-avatar" displayName={profile?.displayName ?? "You"} profileMediaId={profile?.profileMediaId} profilePicture={profile?.profilePicture}/><span className="feed-story-plus"><AppIcon name="plus" /></span></span>
+          <span>Your story</span>
+        </button>
+        {stories.map((story, index) => <button aria-label={`View ${story.author.displayName}'s story${story.viewedByCurrentUser ? "" : " (unseen)"}`} className={`feed-story-item${story.viewedByCurrentUser ? " viewed" : ""}`} key={story.id} onClick={() => setSelectedIndex(index)} type="button">
+          <span className="feed-story-ring"><UserAvatar accessToken={accessToken} className="feed-story-avatar" displayName={story.author.displayName} profileMediaId={story.author.profileMediaId} profilePicture={story.author.profilePicture}/></span>
+          <span>{story.author.displayName}</span>
+        </button>)}
+      </div> : <header className="workspace-header">
         <div><p className="eyebrow">24-hour moments</p><h1 id="stories-title">Stories</h1><p>Share something lightweight with the AbhiAI community.</p></div>
-      </header>
-      <div className="workspace-content stories-workspace">
-        <form className={`story-composer${reviewing ? " story-reviewing" : ""}`} onSubmit={publish}>
+      </header>}
+      <div className={embedded ? "feed-story-content" : "workspace-content stories-workspace"}>
+        {(!embedded || creatingInFeed) && <form className={`story-composer${reviewing ? " story-reviewing" : ""}`} onSubmit={publish}>
           <h2 className="story-composer-title">{reviewing ? "Review your story" : "Create a story"}</h2>
           <div className="story-composer-preview" style={{ background }}>
             <span className="story-preview-label">Preview</span>
@@ -172,11 +185,11 @@ export function StoriesPanel({ accessToken, onUnauthorized, onViewProfile }: Sto
               <button className="story-publish" disabled={(storyMode === "text" ? !draft.trim() : !mediaFile) || isPublishing} type="submit">{isPublishing ? "Sharing…" : reviewing ? "Share story" : "Review story"}</button>
             </div>
           </div>
-        </form>
+        </form>}
         {error && <p className="inline-error" role="alert">{error}</p>}
         {isLoading && <div className="feed-loading">Loading stories…</div>}
-        {!isLoading && stories.length === 0 && !error && <EmptyState variant="stories" compact description="Create a text, image, or video story. It will automatically expire after 24 hours." icon="story" title="No active stories yet" />}
-        {stories.length > 0 && <div className="story-rail" aria-label="Active stories">{stories.map((story, index) => (
+        {!embedded && !isLoading && stories.length === 0 && !error && <EmptyState variant="stories" compact description="Create a text, image, or video story. It will automatically expire after 24 hours." icon="story" title="No active stories yet" />}
+        {!embedded && stories.length > 0 && <div className="story-rail" aria-label="Active stories">{stories.map((story, index) => (
           <button className={story.viewedByCurrentUser ? "story-card viewed" : "story-card"} key={story.id} onClick={() => setSelectedIndex(index)} style={{ background: story.backgroundColor }} type="button">
             <StoryPreview accessToken={accessToken} story={story} />
             <span className="story-card-shade" />
