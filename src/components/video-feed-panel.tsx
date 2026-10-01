@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import "./video-feed-panel.css";
 import { usePageContext } from "./ai-character/abhiai-context";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +27,9 @@ export function VideoFeedPanel({ accessToken, onUnauthorized, onViewProfile }: V
   const [page, setPage] = useState<PageResponse<PostSearchResult> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+  const currentVideo = posts.find(post => post.id === selectedVideoId) ?? posts[0];
+  usePageContext(currentVideo ? { pageType: "video", entityId: currentVideo.id, title: `Video by @${currentVideo.author.username}`, summary: `${currentVideo.author.displayName}: ${currentVideo.textContent ?? ""}\n${currentVideo.viewCount} views` } : { pageType: "video", title: "Videos" }, 10);
 
   const load = useCallback(async (pageNumber: number, append: boolean) => {
     setIsLoading(true);
@@ -50,9 +54,10 @@ export function VideoFeedPanel({ accessToken, onUnauthorized, onViewProfile }: V
     <section className="workspace-view video-workspace-view" aria-labelledby="video-feed-title">
       <header className="workspace-header video-feed-header">
         <div>
-          <p className="eyebrow">Short video</p>
-          <h1 id="video-feed-title">Videos</h1>
-          <p>Discover clips from people you follow and the public AbhiAI network.</p>
+          <p className="eyebrow">AbhiAI Videos</p>
+          <h1 id="video-feed-title">A new perspective.<br/>Press play.</h1>
+          <p>Real moments. Fresh ideas. Discover your next watch.</p>
+          <Link className="video-upload-link" href="/social?compose=video#post-composer">Share a video <span aria-hidden="true">↗</span></Link>
         </div>
       </header>
       <div className="video-feed-workspace">
@@ -70,6 +75,7 @@ export function VideoFeedPanel({ accessToken, onUnauthorized, onViewProfile }: V
               onUnauthorized={onUnauthorized}
               onViewProfile={onViewProfile}
               post={post}
+              onSelect={() => setSelectedVideoId(post.id)}
             />
           ))}
         </div>
@@ -83,22 +89,14 @@ export function VideoFeedPanel({ accessToken, onUnauthorized, onViewProfile }: V
   );
 }
 
-function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }: {
+function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post, onSelect }: {
   accessToken: string;
   onError: (message: string) => void;
   onUnauthorized: () => void;
   onViewProfile: (username: string) => void;
   post: PostSearchResult;
+  onSelect: () => void;
 }) {
-  const surface = useRef<HTMLElement>(null);
-  const [focused, setFocused] = useState(false);
-  usePageContext(focused ? { pageType: "video", entityId: post.id, title: `Video by @${post.author.username}` } : null, 10);
-  useEffect(() => {
-    if (!surface.current) return;
-    const observer = new IntersectionObserver(([entry]) => setFocused(entry.intersectionRatio >= 0.6), { threshold: [0, 0.6] });
-    observer.observe(surface.current);
-    return () => observer.disconnect();
-  }, []);
   const video = post.media.find((asset) => asset.kind === "VIDEO");
   const [liked, setLiked] = useState(false);
   const [statusReady, setStatusReady] = useState(false);
@@ -202,7 +200,7 @@ function VideoPost({ accessToken, onError, onUnauthorized, onViewProfile, post }
   if (!video) return null;
 
   return (
-    <article className="video-post" ref={surface}>
+    <article className="video-post" onPointerDown={onSelect} onFocusCapture={onSelect} data-assistant-context="video">
       <VideoPlayer accessToken={accessToken} asset={video} onViewed={recordView} />
       <div className="video-gradient" aria-hidden="true" />
       <div className="video-caption">

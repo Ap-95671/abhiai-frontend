@@ -1,0 +1,23 @@
+/* Scoped to Videos; existing feed and player behaviors are retained. */
+.workspace-view.video-workspace-view { background:#101010; color:#f5f5f3; }
+:root .video-workspace-view .video-feed-header { background:transparent; border:0; display:flex; justify-content:center; text-align:center; padding:clamp(40px,6vw,88px) 24px 38px; }
+:root .video-workspace-view .video-feed-header .eyebrow { color:#b5b5b0; letter-spacing:.18em; font-size:.68rem; }
+:root .video-workspace-view .video-feed-header h1 { color:#f5f5f3; font-size:clamp(2.2rem,4.2vw,4.4rem); line-height:1.05; letter-spacing:-.055em; margin:16px 0; }
+:root .video-workspace-view .video-feed-header p:not(.eyebrow) { color:#b5b5b0; font-size:.9rem; line-height:1.6; }
+:root .video-workspace-view .video-upload-link { display:inline-flex; gap:24px; align-items:center; padding:12px 18px; margin-top:22px; background:#f3f3ef; color:#151515; border-radius:8px; text-decoration:none; font-size:.8rem; font-weight:650; }
+:root .video-workspace-view .video-feed-workspace { max-width:none; padding:0 clamp(16px,3vw,40px) 48px; }
+:root .video-workspace-view .vertical-video-feed { display:grid; grid-auto-flow:column; grid-auto-columns:clamp(260px,27vw,330px); grid-template-columns:none; align-items:start; gap:20px; overflow-x:auto; padding:6px 0 24px; scroll-snap-type:x proximity; overscroll-behavior-inline:contain; }
+:root .video-workspace-view .video-post { display:flex; flex-direction:column; aspect-ratio:auto; min-height:0; max-height:none; background:#181818; border:1px solid #303030; border-radius:12px; box-shadow:none; scroll-snap-align:start; }
+:root .video-workspace-view .video-player { width:100%; height:auto; aspect-ratio:9/16; background:#090909; }
+:root .video-workspace-view .video-player video { display:block; object-fit:contain; background:#090909; }
+:root .video-workspace-view .video-gradient { display:none; }
+:root .video-workspace-view .video-caption { position:static; max-width:none; padding:16px 16px 10px; color:#f5f5f3; }
+:root .video-workspace-view .video-author { color:#f5f5f3; }
+:root .video-workspace-view .video-author small,:root .video-workspace-view .video-views { color:#acaca8; }
+:root .video-workspace-view .video-caption > p { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:.8rem; margin:10px 0 6px; }
+:root .video-workspace-view .video-actions { position:static; display:flex; justify-content:space-between; gap:6px; padding:0 12px 12px; }
+:root .video-workspace-view .video-actions button { flex-direction:row; gap:6px; width:auto; min-width:44px; height:38px; border:0; border-radius:8px; color:#d1d1cc; background:transparent; }
+:root .video-workspace-view .video-actions button.selected { background:#f1f1eb; color:#141414; }
+:root .video-workspace-view .video-replies { background:#181818; color:#f5f5f3; max-height:60%; }
+:root .video-workspace-view .load-more-button { display:block; margin:18px auto 0; }
+@media(max-width:600px) { :root .video-workspace-view .vertical-video-feed { grid-auto-columns:min(80vw,330px); gap:14px; } :root .video-workspace-view .video-feed-header { padding-top:38px; } }

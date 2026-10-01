@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
+import "./profile-panel.css";
 import { ActionMenu } from "./chat/tool-menu";
 import { AppIcon } from "./ui/app-icon";
 
@@ -53,8 +54,8 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
   const [lightbox, setLightbox] = useState<"profile" | "cover" | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
   usePageContext(!isLoading && profile && (!username || username.toLowerCase() === profile.username.toLowerCase())
-    ? selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}` }
-      : { pageType: "profile", entityId: profile.username, title: profile.displayName } : null, selectedPost ? 20 : 10);
+    ? selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}`, summary: `${selectedPost.author.displayName}: ${selectedPost.textContent ?? ""}` }
+      : { pageType: "profile", entityId: profile.username, title: profile.displayName, summary: `@${profile.username}\n${profile.bio ?? ""}\n${profile.location ?? ""}\n${profile.postCount} posts · ${profile.followerCount} followers · ${profile.followingCount} following` } : null, selectedPost ? 20 : 10);
   const postDialogRef = useRef<HTMLElement | null>(null);
   const postCloseRef = useRef<HTMLButtonElement | null>(null);
   const postReturnFocus = useRef<HTMLElement | null>(null);
@@ -252,13 +253,13 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
     : profile.coverPicture ? <img alt={`${profile.displayName} cover`} className="profile-cover-image" src={profile.coverPicture}/> : null;
   const profileImage = <UserAvatar accessToken={accessToken} className="profile-avatar-image" displayName={profile.displayName} profileMediaId={profile.profileMediaId} profilePicture={profile.profilePicture}/>;
 
-  return <section className="workspace-view" aria-labelledby="profile-title">
+  return <section className="workspace-view profile-workspace-view" aria-labelledby="profile-title">
     <div className="profile-cover">{coverImage && <button aria-label={`View ${profile.displayName}'s cover photo`} className="profile-cover-button" onClick={() => setLightbox("cover")} type="button">{coverImage}</button>}</div>
     <div className="profile-page">
       <div className="profile-hero">
         <div className="profile-large-avatar">{profile.profileMediaId || profile.profilePicture ? <button aria-label={`View ${profile.displayName}'s profile photo`} className="profile-avatar-button" onClick={() => setLightbox("profile")} type="button">{profileImage}</button> : profileImage}</div>
         <div className="profile-actions">
-          {ownProfile ? <button className="secondary-button" onClick={() => setEditing(!editing)} type="button">{editing ? "Cancel" : "Edit profile"}</button>
+          {ownProfile ? <button className="primary-button" onClick={() => setEditing(!editing)} type="button">{editing ? "Cancel" : "Edit profile"}</button>
             : <button className={following ? "secondary-button" : "primary-button"} disabled={isSaving || blockedByMe} onClick={() => void toggleFollow()} type="button">{following ? "Following" : "Follow"}</button>}
           <ActionMenu label="Profile options" items={ownProfile ? [
             { label: profile.accountPrivacy === "PRIVATE" ? "Make public" : "Make private", disabled:isSaving, onSelect:() => void togglePrivacy() },
@@ -270,11 +271,15 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
           {!ownProfile && <ReportButton key={profile.id} accessToken={accessToken} onUnauthorized={onUnauthorized} targetId={profile.id} targetType="USER" hideTrigger open={reportOpen} onOpenChange={setReportOpen}/>}
         </div>
       </div>
+      <div className="profile-overview">
+      <div className="profile-identity" data-assistant-context="profile">
       <h1 id="profile-title">{profile.displayName}{profile.verifiedStatus !== "NONE" && <span className="verified-badge">✓</span>}</h1>
       <p className="profile-username">@{profile.username}</p>
       <p className="profile-bio">{profile.bio || "Exploring and building with AbhiAI."}</p>
       <div className="profile-details">{profile.location && <span>⌖ {profile.location}</span>}{profile.website && <a href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`} rel="noreferrer" target="_blank">↗ {profile.website}</a>}<span>Joined {new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(profile.createdAt))}</span></div>
+      </div>
       <div className="profile-stats"><div><strong>{compact(profile.postCount)}</strong><span>Posts</span></div><div><strong>{compact(profile.followerCount)}</strong><span>Followers</span></div><div><strong>{compact(profile.followingCount)}</strong><span>Following</span></div></div>
+      </div>
       {error && <p className="inline-error" role="alert">{error}</p>}
       {blockedByMe && <p className="profile-empty">You blocked this account. Their posts, messages, mentions, and notifications are hidden.</p>}
       {editing && form && <form className="profile-form" onSubmit={save}>
@@ -299,7 +304,7 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
             {replyPage?.content.length ? <div className="profile-content-list">{replyPage.content.map((reply) => <article className="profile-reply-card" key={reply.id}><p className="profile-reply-context">Replied to @{reply.post.author.username}</p><p>{reply.textContent}</p><small>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(reply.createdAt))}</small><div className="profile-parent-post"><strong>{reply.post.author.displayName}</strong><p>{reply.post.textContent}</p></div></article>)}</div> : !isLoadingContent && <p className="profile-empty">No visible replies yet.</p>}
             {replyPage && !replyPage.last && <button className="load-more-button" disabled={isLoadingContent} onClick={() => void loadContent(activeTab, replyPage.page + 1, true)} type="button">{isLoadingContent ? "Loading…" : "Load more"}</button>}
           </> : <>
-            {postPage?.content.length ? <div className="profile-content-list">{postPage.content.map((post) => <PostCard accessToken={accessToken} currentUserId={currentUserId} key={post.id} onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onOpen={openPost} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={post}/>)}</div> : !isLoadingContent && <p className="profile-empty">No visible {activeTab} yet.</p>}
+            {postPage?.content.length ? <div className={`profile-content-list ${activeTab === "media" ? "profile-media-grid" : ""}`}>{postPage.content.map((post) => <PostCard accessToken={accessToken} currentUserId={currentUserId} key={post.id} onDelete={ownProfile ? deleteProfilePost : undefined} onError={setContentError} onOpen={openPost} onPin={ownProfile && activeTab === "posts" ? togglePin : undefined} onUnauthorized={onUnauthorized} onViewHashtag={onViewHashtag} onViewProfile={onViewProfile} pinBusy={isSaving} post={post}/>)}</div> : !isLoadingContent && <p className="profile-empty">No visible {activeTab} yet.</p>}
             {postPage && !postPage.last && <button className="load-more-button" disabled={isLoadingContent} onClick={() => void loadContent(activeTab, postPage.page + 1, true)} type="button">{isLoadingContent ? "Loading…" : "Load more"}</button>}
           </>)}
       </div>}

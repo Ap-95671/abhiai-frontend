@@ -190,3 +190,21 @@
 .chatLauncher:hover { border-color: var(--line-strong); }
 .chatLauncher:focus-visible { outline: 2px solid var(--ink); }
 @media (max-width: 720px) { .chatLauncher { width: 40px; padding: 0; justify-content: center; } }
+
+/* Live mode changes presentation only; the same conversation and stream stay mounted. */
+.conversationArea { display:flex; flex:1; min-height:0; }
+.panel.fullLive { position:fixed; inset:var(--viewport-top,0) 0 auto; margin:0; width:100%; max-width:none; height:var(--viewport-height,100dvh); border:0; border-radius:0; box-shadow:none; }
+.fullLive .header { padding:12px clamp(16px,4vw,64px); }
+.fullLive .contextBar { padding-inline:clamp(16px,4vw,64px); }
+.fullLive .stage { flex:1; min-height:0; overflow:auto; padding:12px 20px; gap:4px; }
+.fullLive .liveAvatar { flex:1; min-height:0; display:flex; flex-wrap:wrap; justify-content:center; align-content:center; gap:8px; }
+.fullLive .liveAvatar video { flex-basis:100%; width:100%; height:calc(100% - 48px); min-height:100px; max-height:none; aspect-ratio:auto; object-fit:contain; border-radius:8px; background:var(--canvas); }
+.fullLive .liveAvatar p { margin:0; align-self:center; }
+.fullLive .liveAvatar button { min-height:32px; }
+.fullLive .characterStatus,.fullLive .connectionStatus { font-size:.72rem; margin:0; }
+.fullLive .conversationArea { flex:0 1 24vh; min-height:90px; width:min(900px,100%); margin-inline:auto; }
+.fullLive .conversationHidden { display:none; }
+.fullLive .footer { width:min(900px,100%); margin-inline:auto; }
+.fullLive .privacy { margin:6px 2px 0; }
+.fullLive .inputTools button { background:transparent; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:.72rem; }
+@media(max-width:700px) { .fullLive .stage { padding:6px 12px; } .fullLive .eyebrow { display:none; } .fullLive .footer { padding-top:8px; } .fullLive .inputTools { flex-wrap:wrap; } }

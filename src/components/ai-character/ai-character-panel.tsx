@@ -20,6 +20,8 @@ import styles from "./assistant.module.css";
 
 type Props = { token: string; userId: string; open: boolean; voiceAvailable: boolean; onDismiss(): void };
 export default function AiCharacterPanel({ token, userId, open, voiceAvailable, onDismiss }: Props) {
+  const [liveMode,setLiveMode] = useState(false);
+  const [showLiveConversation,setShowLiveConversation] = useState(false);
   const [settingsOpen,setSettingsOpen] = useState(false);
   const assistant = useAiCharacter(token, open, userId);
   const agent=useAssistantAgent(token,userId,open,()=>assistant.initialize());
@@ -35,47 +37,47 @@ export default function AiCharacterPanel({ token, userId, open, voiceAvailable, 
     await agent.update({...agent.settings,...patch});
   }
   const dialog = useRef<HTMLDialogElement>(null);
-  const historyMarker = useRef<string | null>(null);
   const dismiss = useRef(onDismiss);
   useEffect(() => { dismiss.current = onDismiss; }, [onDismiss]);
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement;
+    return () => { queueMicrotask(() => {
+      if (!dialog.current?.open && previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus({ preventScroll: true });
+    }); };
+  }, [open]);
   useEffect(() => {
     const element = dialog.current;
     if (!element || !open) { element?.close(); return; }
     const mobile = matchMedia("(max-width: 700px)").matches;
-    if (mobile) element.showModal(); else element.show();
-    const previousFocus = document.activeElement;
-    const marker = historyMarker.current ??= crypto.randomUUID();
-    if (mobile && history.state?.abhiaiAssistant !== marker) history.pushState({ ...history.state, abhiaiAssistant: marker }, "");
+    if (mobile || liveMode) element.showModal(); else element.show();
     const back = () => dismiss.current();
     const resize = () => {
       const viewport = window.visualViewport;
-      if (!viewport || !mobile) return;
+      if (!viewport || (!mobile && !liveMode)) return;
       element.style.setProperty("--viewport-height", `${viewport.height}px`);
       element.style.setProperty("--viewport-top", `${viewport.offsetTop}px`);
     };
-    if (mobile) window.addEventListener("popstate", back);
+    window.addEventListener("popstate", back);
     window.visualViewport?.addEventListener("resize", resize);
     window.visualViewport?.addEventListener("scroll", resize); resize();
     return () => {
       element.close(); window.removeEventListener("popstate", back);
       window.visualViewport?.removeEventListener("resize", resize);
       window.visualViewport?.removeEventListener("scroll", resize);
-      // Strict Mode replays effects. Defer removal so a reopened dialog keeps its one history entry.
-      queueMicrotask(() => { if (mobile && !element.open && history.state?.abhiaiAssistant === marker) history.back(); });
-      if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
-  }, [open]);
+  }, [open, liveMode]);
   const connecting = assistant.connection === "connecting" || assistant.connection === "reconnecting";
   const connectionText = connecting ? (assistant.connection === "reconnecting" ? "Reconnecting…" : "Connecting to AbhiAI…")
     : assistant.connection === "connected" ? "Live voice connected" : assistant.connection === "expired" ? "Voice session ended · text available" : "Text chat available";
-  return <dialog ref={dialog} className={styles.panel} data-assistant-panel="true" onKeyDown={event=>{ if(event.key === "Escape") { event.stopPropagation(); onDismiss(); } }} aria-labelledby="assistant-title" onCancel={event => { event.preventDefault(); onDismiss(); }}>
+  return <dialog ref={dialog} className={`${styles.panel} ${liveMode ? styles.fullLive : ""}`} data-assistant-panel="true" onKeyDown={event=>{ if(event.key === "Escape") { event.stopPropagation(); onDismiss(); } }} aria-labelledby="assistant-title" onCancel={event => { event.preventDefault(); onDismiss(); }}>
     <div className={styles.panelInner}>
       <header className={styles.header}>
-        <div><span className={styles.eyebrow}>YOUR AI COMPANION</span><h2 id="assistant-title">AbhiAI Assistant</h2></div>
+        <div><span className={styles.eyebrow}>{liveMode ? "LIVE AVATAR" : "YOUR AI COMPANION"}</span><h2 id="assistant-title">{liveMode ? "Astra" : "AbhiAI Assistant"}</h2></div>
         <div className={styles.headerActions}>
-          <button type="button" aria-label={settingsOpen ? "Back to assistant conversation" : "Assistant settings and memory"} aria-expanded={settingsOpen} onClick={()=>{ assistant.endVoice(); setSettingsOpen(value=>!value); }}>⚙</button>
-          <button type="button" disabled={assistant.loading || assistant.busy || assistant.unsaved || agent.running} aria-label="Start a new assistant conversation" title="New conversation" onClick={() => void assistant.initialize(true)}><AppIcon name="plus" /></button>
-          <button type="button" aria-label="Minimize assistant and stop microphone" title="Minimize" onClick={onDismiss}>−</button>
+          <button type="button" disabled={liveMode} aria-label={settingsOpen ? "Back to assistant conversation" : "Assistant settings and memory"} aria-expanded={settingsOpen} onClick={()=>{ assistant.endVoice(); setSettingsOpen(value=>!value); }}>⚙</button>
+          <button type="button" disabled={liveMode || assistant.loading || assistant.busy || assistant.unsaved || agent.running} aria-label="Start a new assistant conversation" title="New conversation" onClick={() => void assistant.initialize(true)}><AppIcon name="plus" /></button>
+          <button type="button" aria-label="Minimize assistant and stop microphone" title={liveMode ? "Return to page and end live session" : "Minimize"} onClick={onDismiss}>−</button>
           <button autoFocus type="button" aria-label="Close assistant and end voice session" title="Close assistant" onClick={onDismiss}><AppIcon name="x" /></button>
         </div>
       </header>
@@ -105,18 +107,20 @@ export default function AiCharacterPanel({ token, userId, open, voiceAvailable, 
         {agent.error && <p role="alert">{agent.error}</p>}
       </div> : <>
       <section className={styles.stage} aria-label="AbhiAI character">
-        <AstraLiveAvatar token={token} conversationId={assistant.conversationId} visible={open && !taskMode} listening={assistant.microphone && !assistant.busy} route={`${assistant.pageContext?.page?.route}:${assistant.pageContext?.page?.currentSection}`} playback={assistant.avatar}><CharacterAvatar state={agent.running?"thinking":assistant.character} expression={agent.running?"thinking":assistant.expression} animations={assistant.animations} level={assistant.level} /></AstraLiveAvatar>
+        <AstraLiveAvatar onActiveChange={setLiveMode} token={token} conversationId={assistant.conversationId} visible={open && !taskMode} listening={assistant.microphone && !assistant.busy} route={`${assistant.pageContext?.page?.route}:${assistant.pageContext?.page?.currentSection}`} playback={assistant.avatar}><CharacterAvatar state={agent.running?"thinking":assistant.character} expression={agent.running?"thinking":assistant.expression} animations={assistant.animations} level={assistant.level} /></AstraLiveAvatar>
         <p className={styles.characterStatus} role="status" aria-live="polite">{assistant.loading ? "Opening your conversation…" : assistant.toolStatus || characterLabels[assistant.character]}</p>
         <p className={styles.connectionStatus}>{connectionText}</p>
         {assistant.microphone && <span className={styles.micNotice}><i />Microphone on · audio is sent to Gemini</span>}
         {assistant.character === "speaking" && assistant.level > 0 && <div className={styles.waveform} aria-hidden="true">{[0.4, 0.7, 1, 0.8, 0.5].map((weight, i) => <i key={i} style={{ "--bar-height": `${3 + assistant.level * 18 * weight}px` } as CSSProperties} />)}</div>}
       </section>
+      <div className={`${styles.conversationArea} ${liveMode && !showLiveConversation ? styles.conversationHidden : ""}`} id="astra-conversation">
       <AssistantTranscript token={token} toolResults={<>
         <AssistantToolResults results={assistant.toolResults} token={token} onNavigate={onDismiss}/>
         {agent.suggestion && <div className={styles.notice}>You have an unfinished task: {agent.suggestion.goal}<button type="button" onClick={()=>{agent.select(agent.suggestion);agent.dismissSuggestion();}}>Review</button><button type="button" onClick={agent.dismissSuggestion}>Dismiss</button></div>}
         <AgentProgress task={agent.task} running={agent.running} token={token} onStop={t=>void agent.stop(t.id)} onResume={t=>void agent.resume(t)} onConfirm={t=>void agent.confirm(t)} onNavigate={onDismiss}/>
         {!!agent.tasks.length && <details className={styles.taskHistory}><summary>Recent assistant tasks</summary>{agent.tasks.map(t=><button key={t.id} type="button" disabled={agent.running} onClick={()=>agent.select(t)}>{t.goal} · {t.status.toLowerCase()} · {new Date(t.updatedAt).toLocaleDateString()}</button>)}</details>}
       </>} messages={assistant.messages} onPlay={assistant.play} speechSupported={assistant.speechSupported} />
+      </div>
       {agent.error && <p className={styles.error} role="alert">{agent.error}</p>}
       {assistant.pageContext?.contextError && <p className={styles.notice} role="status">{assistant.pageContext.contextError}</p>}
       {assistant.notice && <p className={styles.notice} role="status">{assistant.notice}</p>}
@@ -126,7 +130,7 @@ export default function AiCharacterPanel({ token, userId, open, voiceAvailable, 
         {assistant.error.includes("Audio") && <button type="button" onClick={() => void assistant.enableAudio()}>Enable audio</button>}
       </div>}
       <footer className={styles.footer}>
-        <div className={styles.inputTools}><label className={styles.taskToggle}><input type="checkbox" checked={taskMode} disabled={agent.running || assistant.busy} onChange={e=>{assistant.endVoice();setTaskMode(e.target.checked);}}/> Multi-step task</label>
+        <div className={styles.inputTools}>{liveMode && <button type="button" aria-expanded={showLiveConversation} aria-controls="astra-conversation" onClick={() => setShowLiveConversation(value => !value)}>{showLiveConversation ? "Hide conversation" : "Show conversation"}</button>}<label className={styles.taskToggle}><input type="checkbox" checked={taskMode} disabled={liveMode || agent.running || assistant.busy} onChange={e=>{assistant.endVoice();setTaskMode(e.target.checked);}}/> Multi-step task</label>
         {!taskMode && <label className={styles.upload} title="Image, screenshot, PDF or text">Attach file<input className="sr-only" aria-label="Attach image, screenshot, PDF or text" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" disabled={assistant.busy || agent.running || assistant.uploading} onChange={e=>{const file=e.target.files?.[0];if(file)void assistant.upload(file);e.target.value="";}}/></label>}</div>
         {assistant.attachment && <div className={styles.notice}><span>{assistant.attachment.filename}</span><button type="button" onClick={()=>void assistant.removeAttachment()}>Remove</button></div>}
         <AssistantComposer maxLength={taskMode?2000:10000} disabled={assistant.loading || !assistant.conversationId || agent.running || assistant.uploading} onSend={content=>{

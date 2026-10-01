@@ -15,7 +15,7 @@ const Context = createContext<ContextState | null>(null);
 export function AbhiAIContextProvider({ children, base, userId, token, onOpenComposer }: {
   children: ReactNode; base: AbhiAIPageContext; userId: string; token?: string; onOpenComposer(): void;
 }) {
-  const scope = `${base.route}:${base.pageType}:${base.entityId ?? ""}`;
+  const scope = `${userId}:${base.route}:${base.pageType}:${base.entityId ?? ""}`;
   const [assistantOpen,setAssistantOpen] = useState(false);
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const [enabled, updateEnabled] = useState(false);
@@ -25,6 +25,8 @@ export function AbhiAIContextProvider({ children, base, userId, token, onOpenCom
   const [draft, setDraft] = useState("");
   const takeDraft = useCallback(() => setDraft(""), []);
   useEffect(() => { queueMicrotask(() => {
+    setSelection({ scope: "", entity: "", text: "" });
+    setDocumentContext(null); setDraft(""); setContextError("");
     try { updateEnabled(localStorage.getItem(`abhiai.assistant.page-context.${userId}`) !== "off"); } catch { updateEnabled(true); }
   }); }, [userId]);
   const setEnabled = useCallback((value: boolean) => {

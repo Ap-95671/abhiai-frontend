@@ -1,4 +1,5 @@
 "use client";
+import "./news-panel.css";
 
 import { SelectControl } from "@/components/chat/tool-menu";
 
@@ -84,7 +85,7 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [page, setPage] = useState<NewsPage | null>(null);
   const [selected, setSelected] = useState<NewsArticle | null>(null);
-  usePageContext(selected ? { pageType: "news", entityId: selected.id, title: selected.title } : {
+  usePageContext(selected ? { pageType: "news", entityId: selected.id, title: selected.title, region, summary: `${selected.description ?? ""}\nSource: ${selected.sourceName}\n${selected.category} · ${selected.publishedAt}` } : {
     pageType: "news", title: "News", region, currentSection: category,
     summary: articles.slice(0,8).map(article => `${article.title} — ${article.sourceName}`).join("\n"),
   }, selected ? 20 : 5);
@@ -247,13 +248,16 @@ export function NewsPanel({ accessToken, onUnauthorized }: { accessToken: string
         {error && articles.length === 0 && <div className="news-state-card" role="alert"><AppIcon name="globe"/><h2>News is temporarily unavailable</h2><p>We could not load the latest stories. Your social feed and chat are still available.</p><button onClick={() => void load()} type="button">Try again</button></div>}
         {!loading && !error && articles.length === 0 && <div className="news-state-card"><AppIcon name="search"/><h2>No stories found for this topic</h2><p>Try another search, category, or region.</p><button onClick={() => { setSearchDraft(""); setCategory("latest"); setRegion("global"); }} type="button">Explore Latest News</button></div>}
 
+        <div className="news-lead-grid">
         {featured && (
           <article className="news-featured" onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) openStory(featured); }}>
             <NewsImage alt={featured.title} className="news-featured-image" src={featured.imageUrl}/>
             <div className="news-featured-copy"><p>{featured.category.toUpperCase()} · {relativeTime(featured.publishedAt)}</p><h2>{featured.title}</h2>{featured.description && <span>{featured.description}</span>}<small>Source: {featured.sourceName}{featured.relatedStoryCount > 1 ? ` · Reported by ${featured.relatedStoryCount} sources` : ""}</small><div><button onClick={() => openStory(featured)} type="button">Read Story</button><button onClick={() => askAbhiAI(featured)} type="button"><AppIcon name="ai"/> Ask AbhiAI</button></div></div>
           </article>
         )}
-        {standardStories.length > 0 && <><div className="news-section-heading"><div><p className="eyebrow">Latest stories</p><h2>{query ? `Results for “${query}”` : `${regions.find(([value]) => value === region)?.[1]} briefing`}</h2></div>{page && <small>{page.stale ? "Showing cached stories" : `Updated ${relativeTime(page.updatedAt)}`}</small>}</div><div className="news-story-grid">{standardStories.map((article) => <NewsCard article={article} key={article.id} onAsk={askAbhiAI} onOpen={openStory} onSave={toggleSaved} saved={savedIds.has(article.id)}/>)}</div></>}
+        {standardStories.length > 0 && <aside className="news-secondary" aria-label="More top stories">{standardStories.slice(0,3).map(article => <NewsCard article={article} key={article.id} onAsk={askAbhiAI} onOpen={openStory} onSave={toggleSaved} saved={savedIds.has(article.id)}/>)}</aside>}
+        </div>
+        {standardStories.length > 3 && <><div className="news-section-heading"><div><p className="eyebrow">More stories</p><h2>{query ? `Results for “${query}”` : `${regions.find(([value]) => value === region)?.[1]} briefing`}</h2></div>{page && <small>{page.stale ? "Showing cached stories" : `Updated ${relativeTime(page.updatedAt)}`}</small>}</div><div className="news-story-grid">{standardStories.slice(3).map((article) => <NewsCard article={article} key={article.id} onAsk={askAbhiAI} onOpen={openStory} onSave={toggleSaved} saved={savedIds.has(article.id)}/>)}</div></>}
         {page?.hasMore && <button className="load-more-button news-load-more" disabled={loadingMore} onClick={() => void load(page.page + 1, true)} type="button">{loadingMore ? "Loading stories…" : "Load more stories"}</button>}
       </div>
       </div>

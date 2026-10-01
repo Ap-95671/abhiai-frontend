@@ -38,7 +38,7 @@ export function FeedPanel({ accessToken, onUnauthorized, onViewHashtag, onViewPr
   const [pollChoices, setPollChoices] = useState(["", ""]);
   const [pollDuration, setPollDuration] = useState(24);
   const [selectedPost, setSelectedPost] = useState<PostSearchResult | null>(null);
-  usePageContext(selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}` } : null, 20);
+  usePageContext(selectedPost ? { pageType: "post", entityId: selectedPost.id, title: `Post by @${selectedPost.author.username}`, summary: `${selectedPost.author.displayName}: ${selectedPost.textContent ?? ""}` } : null, 20);
   const assistantContext = useAbhiAIContext();
   const pendingDraft = assistantContext?.draft;
   const takeDraft = assistantContext?.takeDraft;

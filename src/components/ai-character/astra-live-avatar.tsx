@@ -12,13 +12,14 @@ export type AvatarPlayback = {
   listen(value: boolean): void;
 };
 /** Optional presentation sink: never receives questions, prompts, tools or conversation history. */
-export function AstraLiveAvatar({ token, conversationId, visible, route, playback, children, listening }: {
+export function AstraLiveAvatar({ token, conversationId, visible, route, playback, children, listening, onActiveChange }: {
   token: string; conversationId?: string; visible: boolean; route: string; listening: boolean;
-  playback: RefObject<AvatarPlayback | null>; children: ReactNode;
+  playback: RefObject<AvatarPlayback | null>; children: ReactNode; onActiveChange(active: boolean): void;
 }) {
   const scope = `${route}:${conversationId}`;
   const [activeScope, setActiveScope] = useState<string | null>(null);
   const enabled = activeScope === scope;
+  useEffect(() => { onActiveChange(enabled && visible); return () => onActiveChange(false); }, [enabled, visible, onActiveChange]);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   const video = useRef<HTMLVideoElement>(null);
