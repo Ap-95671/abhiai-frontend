@@ -33,6 +33,9 @@ export type MessageCitation = {
   title: string;
   url: string;
   domain: string;
+  description?: string | null;
+  sourceDate?: string | null;
+  retrievedAt?: string | null;
 };
 
 export type MemoryCategory = "PREFERENCE" | "INTEREST" | "ASSISTANT_SETTING" | "PROJECT_CONTEXT" | "ONGOING_TASK" | "RECENT_GOAL" | "USER_DEFINED_FACT" | "WORKFLOW";

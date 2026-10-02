@@ -1424,7 +1424,7 @@ export default function Home() {
                 }}
                 onUpload={(file, purpose) => void uploadChatAttachment(file, purpose)}
               />
-                <button className="ai-web-search" aria-pressed={webSearchAllowed} onClick={() => setWebSearchAllowed(current => !current)} type="button"><AppIcon name="globe" /><span>Web search</span></button>
+                <button className="ai-web-search" aria-label={webSearchAllowed ? "Web search: forced on" : "Web search: automatic for current information"} title={webSearchAllowed ? "Search the web for every message" : "Search automatically when current information is needed"} aria-pressed={webSearchAllowed} onClick={() => setWebSearchAllowed(current => !current)} type="button"><AppIcon name="globe" /><span>Web search</span></button>
                 <div className="ai-composer-send">
               <VoiceInput
                 disabled={isSending || composerMode === "image"}
