@@ -1,0 +1,8 @@
+/* Legacy account/history menus share the theme and proportions of ToolMenu. */
+:root .account-menu, :root .conversation-menu { background:var(--dropdown-surface); color:var(--ink); border:1px solid var(--line); border-radius:16px; padding:8px; gap:3px; box-shadow:var(--shadow-floating); max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow-y:auto; transition:opacity 160ms ease,transform 160ms ease; }
+:root .account-menu button, :root .conversation-menu button { display:flex; align-items:center; width:100%; min-height:40px; border-radius:9px; padding:9px 12px; gap:12px; font-size:.81rem; font-weight:500; line-height:1.4; background:transparent; color:var(--ink); border:0; text-align:left; }
+:root .account-menu button:hover, :root .account-menu button:focus-visible, :root .conversation-menu button:hover, :root .conversation-menu button:focus-visible { background:var(--surface-hover); }
+:root .account-menu svg, :root .conversation-menu svg { flex-shrink:0; width:18px; height:18px; }
+:root .account-menu .danger-menu-item, :root .conversation-menu .danger-menu-item { border-top:1px solid var(--line); margin-top:4px; color:var(--destructive-ink); }
+@starting-style { .conversation-menu { opacity:0; transform:translateY(3px); } }
+@media(prefers-reduced-motion:reduce) { :root .conversation-menu, :root .account-menu { transition:none; } }

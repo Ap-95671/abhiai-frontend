@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { AppIcon } from "@/components/ui/app-icon";
 
 import styles from "./tool-menu.module.css";
+import "./menu-shell.css";
 
 export function useMenuPresence(open: boolean) {
   const [retained, setRetained] = useState(false);
@@ -33,16 +34,22 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
   const menuRef = useRef<HTMLDivElement>(null);
   const initialFocus = useRef<"first" | "last">("first");
   const menuId = useId();
+  const [placement, setPlacement] = useState({ left: 12, top: 12, width: 290, maxHeight: 320 });
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    const bounds = triggerRef.current!.getBoundingClientRect();
+    const width = Math.min(300, innerWidth - 24);
+    const above = Math.max(0, bounds.top - 18), below = Math.max(0, innerHeight - bounds.bottom - 18);
+    const up = above >= Math.min(320, below), maxHeight = Math.min(320, up ? above : below);
+    setPlacement({ left: Math.max(12, Math.min(bounds.left, innerWidth - width - 12)), top: up ? Math.max(12, bounds.top - maxHeight - 6) : bounds.bottom + 6, width, maxHeight });
     const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)');
     items?.[initialFocus.current === "last" ? items.length - 1 : 0]?.focus();
     function closeOnOutsidePress(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as Node) && !menuRef.current?.contains(event.target as Node)) setOpen(false);
     }
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -51,9 +58,12 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
         triggerRef.current?.focus();
       }
     }
+    const reposition = () => setOpen(false);
+    window.addEventListener("resize", reposition);
     document.addEventListener("pointerdown", closeOnOutsidePress);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
+      window.removeEventListener("resize", reposition);
       document.removeEventListener("pointerdown", closeOnOutsidePress);
       document.removeEventListener("keydown", closeOnEscape);
     };
@@ -98,7 +108,7 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
 
   return (
     <div className={styles.root} ref={rootRef} onBlur={(event) => {
-      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !menuRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
     }}>
       <button
         ref={triggerRef}
@@ -122,14 +132,14 @@ export function ToolMenu({ disabled = false, onGenerateImage, onUpload }: ToolMe
       >
         <AppIcon name="plus" />
       </button>
-      {present && (
-        <div data-open={open} inert={!open} aria-hidden={!open} aria-label="AI tools" className={styles.menu} id={menuId} onKeyDown={handleMenuKeys} ref={menuRef} role="menu">
+      {present && createPortal(
+        <div style={placement} data-open={open} inert={!open} aria-hidden={!open} aria-label="AI tools" className={`${styles.menu} ${styles.toolsList}`} id={menuId} onKeyDown={handleMenuKeys} ref={menuRef} role="menu">
           <ToolItem detail="JPEG, PNG, or WebP · up to 5 MB" icon={<AppIcon name="image" />} label="Upload image" onClick={() => selectFile(imageInputRef.current)} />
           <ToolItem detail="Extract text or OCR · up to 10 MB" icon={<AppIcon name="document" />} label="Upload PDF" onClick={() => selectFile(pdfInputRef.current)} />
           <ToolItem detail="UTF-8 plain text · up to 10 MB" icon={<AppIcon name="article" />} label="Upload text file" onClick={() => selectFile(textInputRef.current)} />
           <ToolItem detail="Create an image from a prompt" icon={<AppIcon name="image" />} label="Generate image" onClick={() => { closeMenu(); onGenerateImage(); }} />
           <ToolItem detail="Not available yet" disabled icon={<AppIcon name="more" />} label="More tools" onClick={() => undefined} />
-        </div>
+        </div>, rootRef.current?.closest("dialog, [role=dialog]") ?? document.body
       )}
       <input accept="image/jpeg,image/png,image/webp" className={styles.fileInput} onChange={(event) => handleFile(event, "image")} ref={imageInputRef} type="file" />
       <input accept="text/plain,.txt" className={styles.fileInput} onChange={(event) => handleFile(event, "document")} ref={textInputRef} type="file" />

@@ -1,4 +1,7 @@
 "use client";
+import "./explore-panel.css";
+import { useRouter } from "next/navigation";
+import { AppIcon } from "@/components/ui/app-icon";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -31,6 +34,8 @@ export function ExplorePanel({
   onViewHashtag,
   onViewProfile,
 }: ExplorePanelProps) {
+  const router = useRouter();
+  const [search, setSearch] = useState("");
   const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,7 +65,7 @@ export function ExplorePanel({
   }, [loadExplore]);
 
   return (
-    <section className="workspace-view" aria-labelledby="explore-title">
+    <section className="workspace-view explore-page" aria-labelledby="explore-title">
       <header className="workspace-header explore-header">
         <div>
           <p className="eyebrow">Discover</p>
@@ -70,14 +75,14 @@ export function ExplorePanel({
       </header>
 
       <div className="workspace-content explore-workspace">
+        <form className="explore-search" role="search" onSubmit={event => { event.preventDefault(); if (search.trim()) router.push(`/social?view=search&q=${encodeURIComponent(search.trim())}`); }}>
+          <AppIcon name="search"/><input aria-label="Search AbhiAI" type="search" placeholder="Search people, posts, and topics…" value={search} onChange={event => setSearch(event.target.value)} maxLength={200}/><button type="submit" disabled={!search.trim()}>Search</button>
+        </form>
         {error && <p className="inline-error" role="alert">{error}</p>}
         {isLoading && !explore && <div className="explore-loading" aria-label="Loading Explore"><span /><span /><span /></div>}
 
         {explore && <>
-          <aside className="ranking-note">
-            <span aria-hidden="true">✦</span>
-            <p><strong>How Explore is ranked</strong>{explore.rankingSummary} Window: {explore.rankingWindowDays} days.</p>
-          </aside>
+          <details className="ranking-note"><summary>How discovery works</summary><p>{explore.rankingSummary} Window: {explore.rankingWindowDays} days.</p></details>
 
           <div className="explore-overview-grid">
             <section className="explore-section explore-topic-section" aria-labelledby="trending-topics-title">

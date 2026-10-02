@@ -62,6 +62,8 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
 
   const loadProfile = useCallback(async () => {
     const request = ++profileRequestId.current;
+    contentRequestId.current++;
+    setProfile(null); setPostPage(null); setReplyPage(null); setContentError("");
     setIsLoading(true); setError("");
     try {
       const current = await api.getCurrentProfile(accessToken);
@@ -114,14 +116,19 @@ export function ProfilePanel({ accessToken, username, onUnauthorized, onViewHash
         setReplyPage(null);
       }
     } catch (contentError) {
-      if (contentError instanceof ApiError && contentError.status === 401) return onUnauthorized();
       if (currentRequest !== contentRequestId.current) return;
+      if (contentError instanceof ApiError && contentError.status === 401) return onUnauthorized();
       setContentError(contentError instanceof Error ? contentError.message : "Profile content could not be loaded.");
       if (!append) { setPostPage(null); setReplyPage(null); }
     } finally { if (currentRequest === contentRequestId.current) setIsLoadingContent(false); }
   }, [accessToken, onUnauthorized, profile]);
 
-  useEffect(() => { if (profile) queueMicrotask(() => void loadContent(activeTab)); }, [activeTab, loadContent, profile]);
+  useEffect(() => {
+    let active = true;
+    setPostPage(null); setReplyPage(null);
+    if (profile) queueMicrotask(() => { if (active) void loadContent(activeTab); });
+    return () => { active = false; contentRequestId.current++; };
+  }, [activeTab, loadContent, profile]);
 
   const closePost = useCallback(() => {
     setSelectedPost(null);

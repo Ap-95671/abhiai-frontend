@@ -1,4 +1,5 @@
 "use client";
+import "./notifications-panel.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -116,7 +117,7 @@ export function NotificationsPanel({
     try {
       await api.markAllNotificationsRead(accessToken);
       const readAt = new Date().toISOString();
-      setNotifications((current) => current.map((item) => ({ ...item, read: true, readAt: item.readAt ?? readAt })));
+      setNotifications((current) => filter === "unread" ? [] : current.map((item) => ({ ...item, read: true, readAt: item.readAt ?? readAt })));
       onUnreadCountChange(0);
     } catch (markError) {
       if (markError instanceof ApiError && markError.status === 401) {
@@ -132,12 +133,16 @@ export function NotificationsPanel({
   const unreadOnPage = notifications.filter((item) => !item.read).length;
 
   return (
-    <section className="workspace-view" aria-labelledby="notifications-title">
+    <section className="workspace-view notifications-page" aria-labelledby="notifications-title">
       <header className="workspace-header notification-header">
         <div>
           <p className="eyebrow">Activity</p>
           <h1 id="notifications-title">Notifications</h1>
-          <p>Keep up with the people and posts connected to you.</p>
+
+        </div>
+        <div className="notification-filters" role="tablist" aria-label="Notification filter">
+          <button aria-selected={filter === "all"} className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")} role="tab" type="button">All</button>
+          <button aria-selected={filter === "unread"} className={filter === "unread" ? "active" : ""} onClick={() => setFilter("unread")} role="tab" type="button">Unread</button>
         </div>
         <button
           className="secondary-button button-sm"
@@ -151,10 +156,6 @@ export function NotificationsPanel({
 
       <div className="workspace-content notifications-workspace">
         {error && <p className="inline-error" role="alert">{error}</p>}
-        <div className="notification-filters" role="tablist" aria-label="Notification filter">
-          <button aria-selected={filter === "all"} className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")} role="tab" type="button">All</button>
-          <button aria-selected={filter === "unread"} className={filter === "unread" ? "active" : ""} onClick={() => setFilter("unread")} role="tab" type="button">Unread</button>
-        </div>
         {isLoading && notifications.length === 0 && (
           <div className="notification-skeletons" aria-label="Loading notifications">
             <div /><div /><div />
@@ -193,7 +194,7 @@ export function NotificationsPanel({
                     type="button"
                   >
                     <span aria-hidden="true" />
-                    Mark read
+                    <span className="sr-only">Mark read</span>
                   </button>
                 )}
               </article>

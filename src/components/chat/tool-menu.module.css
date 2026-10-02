@@ -77,3 +77,14 @@
 
 .optionCopy { display: grid; gap: 2px; }
 .optionCopy small { color: var(--muted); font-size: .68rem; font-weight: 400; }
+
+
+.menu { border-radius:16px; padding:8px; gap:3px; }
+.item { min-height:40px; border-radius:9px; padding:9px 12px; gap:12px; font-size:.81rem; font-weight:500; line-height:1.4; grid-template-columns:24px minmax(0,1fr); }
+.icon { background:transparent; width:24px; height:24px; }
+.icon svg { width:18px; height:18px; }
+.copy strong { font-weight:600; }
+.copy small { line-height:1.45; }
+:global(:root) .selectList .selectOption[role="option"] { border-radius:9px; min-height:40px; font-size:.81rem; padding:10px 12px; }
+:global(:root) .selectList .selectOption[aria-selected="true"] { background:var(--surface-hover); }
+.toolsList { position:fixed; bottom:auto; min-width:0; overflow-y:auto; overscroll-behavior:contain; z-index:80; box-sizing:border-box; }
