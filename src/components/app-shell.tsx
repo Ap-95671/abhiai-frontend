@@ -3,7 +3,7 @@
 import { CSSProperties, FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { AuthenticatedImage } from "@/components/authenticated-image";
@@ -28,7 +28,7 @@ import { NewsPanel } from "@/components/news/news-panel";
 import { MemoryPanel } from "@/components/memory-panel";
 import { AppIcon, AppIconName } from "@/components/ui/app-icon";
 import { CharacterAvatar } from "@/components/ai-character/character-avatar";
-import "./chat/ai-workspace.css";
+import "@/app/chat/ai-workspace.css";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { usePageContext, AssistantDocumentButton } from "@/components/ai-character/abhiai-context";
@@ -37,7 +37,7 @@ import { VoiceInput } from "@/components/voice/voice-input";
 import { SpeechPlaybackController, useSpeechPlayback } from "@/components/voice/use-speech-playback";
 
 import {
-  api,
+  api, restoreSession, sessionAccessToken, SESSION_EVENT,
   ApiError,
   ChatMessage,
   ConversationAttachment,
@@ -48,8 +48,6 @@ import {
 } from "@/lib/api";
 import { NEWS_CHAT_PROMPT_STORAGE_KEY } from "@/lib/news";
 
-const TOKEN_STORAGE_KEY = "abhiai.access-token";
-const SESSION_TOKEN_STORAGE_KEY = "abhiai.session-access-token";
 const SIDEBAR_STORAGE_KEY = "abhiai.sidebar-collapsed";
 const ACTIVE_CONVERSATION_STORAGE_KEY = "abhiai.active-conversation-id";
 
@@ -128,11 +126,18 @@ function groupConversations(items: ConversationSummary[]): ConversationGroup[] {
   })).filter((group) => group.items.length > 0);
 }
 
-export default function Home() {
+export default function AppShell() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [sessionResolved, setSessionResolved] = useState(false);
+  const [sessionRestoreError, setSessionRestoreError] = useState("");
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const hadSession = useRef(false);
+  const profileLoaded = useRef(false);
+  const modelsLoaded = useRef(false);
+  const conversationsLoaded = useRef(false);
   const [guestView, setGuestView] = useState<GuestView>(pathname === "/login" ? "auth" : "landing");
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [displayName, setDisplayName] = useState("");
@@ -191,7 +196,7 @@ export default function Home() {
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [accountMenuStyle, setAccountMenuStyle] = useState<CSSProperties>();
-  const [locationSearch, setLocationSearch] = useState("");
+  const locationSearch = searchParams.size ? `?${searchParams.toString()}` : "";
   const shouldFollowStreamRef = useRef(true);
   const pendingNewsPromptStartedRef = useRef(false);
   useAssistantSession(sessionResolved, accessToken, currentUser?.id, mobileSidebarOpen || accountMenuOpen || !!conversationDialog);
@@ -200,12 +205,6 @@ export default function Home() {
     title: activeView === "chat" ? selectedConversation?.title ?? "New conversation" : activeView, currentSection: activeView } : null, 1);
 
 
-  useEffect(() => {
-    const syncLocation = () => setLocationSearch(window.location.search);
-    syncLocation();
-    window.addEventListener("popstate", syncLocation);
-    return () => window.removeEventListener("popstate", syncLocation);
-  }, []);
 
   useEffect(() => {
     if (!mobileSidebarOpen) return;
@@ -307,8 +306,10 @@ export default function Home() {
   }, [messageDraft, conversationId]);
 
   const expireSession = useCallback((message = "") => {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+    hadSession.current = false;
+    profileLoaded.current = false;
+    modelsLoaded.current = false;
+    conversationsLoaded.current = false;
     window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
     setAccessToken(null);
     setEmail("");
@@ -335,9 +336,10 @@ export default function Home() {
   const handleSessionExpired = useCallback(() => {
     setGuestView("auth");
     expireSession("Your session has expired. Please sign in again.");
-    const nextPath = pathname === "/social" ? `/social${locationSearch}` : pathname === "/news" ? `/news${locationSearch}` : "/chat";
+    const { pathname: currentPath, search } = window.location;
+    const nextPath = currentPath === "/social" || currentPath === "/news" ? `${currentPath}${search}` : "/chat";
     router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
-  }, [expireSession, locationSearch, pathname, router]);
+  }, [expireSession, router]);
 
   const pushSocialRoute = useCallback((view: ActiveView, options?: { username?: string; tag?: string; query?: string; kind?: string; hash?: string; replace?: boolean }) => {
     const params = new URLSearchParams();
@@ -347,7 +349,6 @@ export default function Home() {
     if (options?.query) params.set("q", options.query);
     if (options?.kind) params.set("kind", options.kind);
     const next = `/social${params.size ? `?${params.toString()}` : ""}${options?.hash ? `#${options.hash}` : ""}`;
-    setLocationSearch(params.size ? `?${params.toString()}` : "");
     if (options?.replace) router.replace(next); else router.push(next);
   }, [router]);
 
@@ -364,14 +365,18 @@ export default function Home() {
   }, [pushSocialRoute]);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      setAccessToken(
-        window.localStorage.getItem(TOKEN_STORAGE_KEY)
-        ?? window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY),
-      );
-      setSessionResolved(true);
-    });
-  }, []);
+    let active = true;
+    const changed = () => {
+      const token = sessionAccessToken();
+      if (token) { hadSession.current = true; setAccessToken(token); }
+      else if (hadSession.current) handleSessionExpired();
+    };
+    window.addEventListener(SESSION_EVENT, changed);
+    void restoreSession().then(token => {
+      if (active) { hadSession.current = !!token; setAccessToken(token); setSessionResolved(true); setSessionRestoreError(""); }
+    }).catch(error => { if (active) setSessionRestoreError(errorMessage(error)); });
+    return () => { active = false; window.removeEventListener(SESSION_EVENT, changed); };
+  }, [handleSessionExpired, restoreAttempt]);
 
   useEffect(() => {
     if (!sessionResolved) return;
@@ -408,11 +413,11 @@ export default function Home() {
   }, [accessToken, pathname, router, sessionResolved, socialRouteParams]);
 
   useEffect(() => {
-    if (!accessToken || socialWorkspace) return;
+    if (!accessToken || socialWorkspace || modelsLoaded.current) return;
 
     let active = true;
     api.getModels(accessToken)
-      .then((items) => { if (active) setModels(items); })
+      .then((items) => { if (active) { modelsLoaded.current = true; setModels(items); } })
       .catch((error: unknown) => {
         if (active && error instanceof ApiError && error.status === 401) handleSessionExpired();
       });
@@ -420,10 +425,10 @@ export default function Home() {
   }, [accessToken, handleSessionExpired, socialWorkspace]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || profileLoaded.current) return;
     let active = true;
     api.getCurrentProfile(accessToken)
-      .then((profile) => { if (active) setCurrentUser(profile); })
+      .then((profile) => { if (active) { profileLoaded.current = true; setCurrentUser(profile); } })
       .catch((error: unknown) => {
         if (active && error instanceof ApiError && error.status === 401) handleSessionExpired();
       });
@@ -431,7 +436,7 @@ export default function Home() {
   }, [accessToken, handleSessionExpired]);
 
   useEffect(() => {
-    if (!accessToken || socialWorkspace) return;
+    if (!accessToken || socialWorkspace || conversationsLoaded.current) return;
 
     let isCurrent = true;
     queueMicrotask(() => {
@@ -456,12 +461,13 @@ export default function Home() {
         if (!storedConversation) {
           if (storedConversationId) window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
           setSelectedConversation(null);
+          conversationsLoaded.current = true;
           return;
         }
 
         setIsLoadingHistory(true);
         const conversation = await api.getConversation(accessToken, storedConversation.id);
-        if (isCurrent) setSelectedConversation(conversation);
+        if (isCurrent) { setSelectedConversation(conversation); conversationsLoaded.current = true; }
       })
       .catch((error: unknown) => {
         if (!isCurrent) return;
@@ -555,13 +561,6 @@ export default function Home() {
   function navigateWorkspace(view: ActiveView, workspace: "chat" | "social" = "social") {
     setActiveView(view);
     setMobileSidebarOpen(false);
-    if (workspace === "chat") {
-      activeConversationIdRef.current = undefined;
-      window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
-      setSelectedConversation(null);
-      setConversationStateResolved(true);
-      setChatError("");
-    }
     if (workspace === "chat") router.push("/chat");
     else if (view === "news") router.push("/news");
     else pushSocialRoute(view);
@@ -611,14 +610,7 @@ export default function Home() {
         await api.register(displayName.trim(), email.trim(), password);
       }
 
-      const session = await api.login(email.trim(), password);
-      if (rememberMe) {
-        window.localStorage.setItem(TOKEN_STORAGE_KEY, session.accessToken);
-        window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-      } else {
-        window.sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, session.accessToken);
-        window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-      }
+      const session = await api.login(email.trim(), password, rememberMe);
       setAuthSuccess(true);
       setCredentialFailures(0);
       setAccessToken(session.accessToken);
@@ -648,10 +640,13 @@ export default function Home() {
     }
   }
 
-  function signOut() {
-    expireSession();
-    setGuestView("auth");
-    router.replace("/login");
+  async function signOut() {
+    try {
+      await api.logout();
+      expireSession();
+      setGuestView("auth");
+      router.replace("/login");
+    } catch (error) { setToast({ id: Date.now(), message: errorMessage(error), tone: "error" }); }
   }
 
   async function createConversation(): Promise<ConversationDetail | null> {
@@ -1049,6 +1044,7 @@ export default function Home() {
       <>
         {pathname === "/" && <BrandIntro />}
         <main className="session-loader" aria-label="Loading AbhiAI">
+          {sessionRestoreError && <div role="alert"><p>{sessionRestoreError}</p><button type="button" onClick={() => setRestoreAttempt(value => value + 1)}>Retry session restoration</button></div>}
           <Image alt="AbhiAI" height={64} priority src="/abhiai-logo.png" width={64} />
         </main>
       </>

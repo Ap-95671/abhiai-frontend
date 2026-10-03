@@ -446,6 +446,99 @@ export class ApiError extends Error {
   }
 }
 
+export const TOKEN_STORAGE_KEY = "abhiai.access-token";
+export const SESSION_TOKEN_STORAGE_KEY = "abhiai.session-access-token";
+export const SESSION_EVENT = "abhiai:session";
+let currentToken: string | null = null;
+let sessionVersion = 0;
+let refreshFlight: Promise<string> | null = null;
+
+function storedToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY) ?? window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+}
+function publishToken(token: string | null) {
+  currentToken = token;
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EVENT));
+}
+export function clearSession() {
+  sessionVersion++;
+  refreshFlight = null;
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+  }
+  publishToken(null);
+}
+export function sessionAccessToken() { return currentToken; }
+
+async function authRequest(action: string, body: object = {}): Promise<AuthTokenResponse> {
+  const response = await fetch(`/api/auth/${action}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+    body: JSON.stringify(body), signal: AbortSignal.timeout(35000),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new ApiError(payload.message ?? "Unable to restore session.", response.status);
+  return payload;
+}
+
+function refreshSession(): Promise<string> {
+  if (refreshFlight) return refreshFlight;
+  const version = sessionVersion;
+  const flight = (async () => {
+    try {
+      const session = await authRequest("refresh");
+      if (version !== sessionVersion) throw new ApiError("Session changed. Please retry.", 409);
+      if (!session.accessToken) throw new ApiError("Invalid session response.", 502);
+      if (typeof window !== "undefined") {
+        const storage = window.localStorage.getItem(TOKEN_STORAGE_KEY) ? window.localStorage : window.sessionStorage;
+        storage.setItem(storage === window.localStorage ? TOKEN_STORAGE_KEY : SESSION_TOKEN_STORAGE_KEY, session.accessToken);
+      }
+      publishToken(session.accessToken);
+      return session.accessToken;
+    } catch (error) {
+      if (version === sessionVersion && error instanceof ApiError && (error.status === 401 || error.status === 400)) {
+        clearSession();
+        throw new ApiError("Your session has expired. Please sign in again.", 401);
+      }
+      throw error;
+    }
+  })();
+  refreshFlight = flight;
+  void flight.finally(() => { if (refreshFlight === flight) refreshFlight = null; }).catch(() => {});
+  return flight;
+}
+
+export async function restoreSession(): Promise<string | null> {
+  currentToken = storedToken();
+  // The HttpOnly cookie can restore a session even when the access-token storage was cleared.
+  if (currentToken) return currentToken;
+  try { return await refreshSession(); }
+  catch (error) { if (error instanceof ApiError && error.status === 401) return null; throw error; }
+}
+
+/** One transport for JSON, uploads, media and streaming; retries only an unauthenticated response. */
+async function sessionFetch(url: string, options: RequestInit): Promise<Response> {
+  const headers = new Headers(options.headers);
+  const supplied = headers.get("Authorization");
+  if (!supplied) return fetch(url, options);
+  const version = sessionVersion;
+  const usedToken = currentToken ?? storedToken() ?? supplied.replace(/^Bearer /, "");
+  headers.set("Authorization", `Bearer ${usedToken}`);
+  const response = await fetch(url, { ...options, headers });
+  if (version !== sessionVersion) throw new ApiError("Session changed. Please retry.", 409);
+  if (response.status !== 401) return response;
+  await response.body?.cancel();
+  const token = currentToken && currentToken !== usedToken ? currentToken : await refreshSession();
+  if (version !== sessionVersion) throw new ApiError("Session changed. Please retry.", 409);
+  options.signal?.throwIfAborted();
+  headers.set("Authorization", `Bearer ${token}`);
+  const retried = await fetch(url, { ...options, headers });
+  if (version !== sessionVersion) throw new ApiError("Session changed. Please retry.", 409);
+  if (retried.status === 401) clearSession();
+  return retried;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -462,7 +555,7 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await sessionFetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
   });
@@ -534,11 +627,19 @@ export const api = {
     });
   },
 
-  login(email: string, password: string): Promise<AuthTokenResponse> {
-    return request("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+  async login(email: string, password: string, rememberMe = true): Promise<AuthTokenResponse> {
+    const session = await authRequest("login", { email, password, rememberMe });
+    clearSession();
+    const storage = rememberMe ? window.localStorage : window.sessionStorage;
+    storage.setItem(rememberMe ? TOKEN_STORAGE_KEY : SESSION_TOKEN_STORAGE_KEY, session.accessToken);
+    publishToken(session.accessToken);
+    return session;
+  },
+  async logout(): Promise<void> {
+    // Wait for any renewal before revoking, so it cannot resurrect a signed-out session.
+    await refreshFlight?.catch(() => {});
+    await authRequest("logout");
+    clearSession();
   },
 
   getConversations(accessToken: string): Promise<ConversationSummary[]> {
@@ -986,20 +1087,20 @@ export const api = {
 
   async uploadImage(accessToken: string, file: File): Promise<MediaAsset> {
     const body = new FormData(); body.append("file", file);
-    const response = await fetch(`${API_BASE_URL}/media/images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, body });
+    const response = await sessionFetch(`${API_BASE_URL}/media/images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, body });
     if (!response.ok) { const payload=(await response.json().catch(()=>({}))) as ApiErrorPayload; throw new ApiError(payload.message ?? "Image upload failed.", response.status, payload.validationErrors ?? {}); }
     return response.json() as Promise<MediaAsset>;
   },
 
   async uploadAttachment(accessToken: string, file: File): Promise<MediaAsset> {
     const body = new FormData(); body.append("file", file);
-    const response = await fetch(`${API_BASE_URL}/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, body });
+    const response = await sessionFetch(`${API_BASE_URL}/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, body });
     if (!response.ok) { const payload=(await response.json().catch(()=>({}))) as ApiErrorPayload; throw new ApiError(payload.message ?? "Attachment upload failed.", response.status, payload.validationErrors ?? {}); }
     return response.json() as Promise<MediaAsset>;
   },
 
   async getMediaBlob(accessToken: string, mediaId: string, thumbnail = false): Promise<Blob> {
-    const response=await fetch(`${API_BASE_URL}/media/${mediaId}/${thumbnail ? "thumbnail" : "content"}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const response=await sessionFetch(`${API_BASE_URL}/media/${mediaId}/${thumbnail ? "thumbnail" : "content"}`, { headers: { Authorization: `Bearer ${accessToken}` } });
     if(!response.ok) throw new ApiError("Image could not be loaded.",response.status); return response.blob();
   },
 
@@ -1121,7 +1222,7 @@ export const api = {
     prompt: string,
     signal?: AbortSignal,
   ): Promise<ChatExchange> {
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/images`, {
+    const response = await sessionFetch(`${API_BASE_URL}/conversations/${conversationId}/images`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -1162,7 +1263,7 @@ export const api = {
       fallbackAllowed?: boolean;
     },
   ): Promise<ChatExchange> {
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
+    const response = await sessionFetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1247,7 +1348,7 @@ export const api = {
   ): Promise<ConversationAttachment> {
     const body = new FormData();
     body.append("file", file);
-    const response = await fetch(
+    const response = await sessionFetch(
       `${API_BASE_URL}/conversations/${conversationId}/attachments`,
       {
         method: "POST",

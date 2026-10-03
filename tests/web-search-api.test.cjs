@@ -13,7 +13,7 @@ function fixture(events) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(code, {
-    module: compiledModule, exports: compiledModule.exports, process: { env: {} }, TextDecoder, AbortController, console,
+    module: compiledModule, exports: compiledModule.exports, process: { env: {} }, TextDecoder, AbortController, Headers, console,
     fetch: async (url, options) => {
       calls.push({ url, options });
       return new Response(events, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
