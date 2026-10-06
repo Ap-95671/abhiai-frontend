@@ -37,7 +37,7 @@ import { VoiceInput } from "@/components/voice/voice-input";
 import { SpeechPlaybackController, useSpeechPlayback } from "@/components/voice/use-speech-playback";
 
 import {
-  api, restoreSession, sessionAccessToken, SESSION_EVENT,
+  api, clearSession, restoreSession, sessionAccessToken, syncStoredSession, SESSION_EVENT, TOKEN_STORAGE_KEY, LOGOUT_PENDING_STORAGE_KEY,
   ApiError,
   ChatMessage,
   ConversationAttachment,
@@ -156,6 +156,8 @@ export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const signOutPending = useRef(false);
   const accountMenuPresent = useMenuPresence(accountMenuOpen);
   const [moreNavigationOpen, setMoreNavigationOpen] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -306,6 +308,8 @@ export default function AppShell() {
   }, [messageDraft, conversationId]);
 
   const expireSession = useCallback((message = "") => {
+    streamAbortController.current?.abort();
+    stopSpeechPlayback();
     hadSession.current = false;
     profileLoaded.current = false;
     modelsLoaded.current = false;
@@ -318,6 +322,7 @@ export default function AppShell() {
     setSelectedConversation(null);
     setConversationStateResolved(false);
     setChatError("");
+    setIsSending(false);
     setMessageDraft("");
     setComposerMode("chat");
     setChatAttachments([]);
@@ -331,7 +336,7 @@ export default function AppShell() {
     setMobileSidebarOpen(false);
     setAccountMenuOpen(false);
     setAuthError(message);
-  }, []);
+  }, [stopSpeechPlayback]);
 
   const handleSessionExpired = useCallback(() => {
     setGuestView("auth");
@@ -367,15 +372,28 @@ export default function AppShell() {
   useEffect(() => {
     let active = true;
     const changed = () => {
+      if (signOutPending.current) return;
       const token = sessionAccessToken();
       if (token) { hadSession.current = true; setAccessToken(token); }
       else if (hadSession.current) handleSessionExpired();
     };
     window.addEventListener(SESSION_EVENT, changed);
+    const storageChanged = (event: StorageEvent) => {
+      if (event.key === LOGOUT_PENDING_STORAGE_KEY && event.newValue === "true") { clearSession(); return; }
+      if (event.key === TOKEN_STORAGE_KEY || event.key === LOGOUT_PENDING_STORAGE_KEY || event.key === null) syncStoredSession();
+    };
+    const pageShown = (event: PageTransitionEvent) => { if (event.persisted) syncStoredSession(); };
+    window.addEventListener("storage", storageChanged);
+    window.addEventListener("pageshow", pageShown);
     void restoreSession().then(token => {
       if (active) { hadSession.current = !!token; setAccessToken(token); setSessionResolved(true); setSessionRestoreError(""); }
     }).catch(error => { if (active) setSessionRestoreError(errorMessage(error)); });
-    return () => { active = false; window.removeEventListener(SESSION_EVENT, changed); };
+    return () => {
+      active = false;
+      window.removeEventListener(SESSION_EVENT, changed);
+      window.removeEventListener("storage", storageChanged);
+      window.removeEventListener("pageshow", pageShown);
+    };
   }, [handleSessionExpired, restoreAttempt]);
 
   useEffect(() => {
@@ -641,12 +659,19 @@ export default function AppShell() {
   }
 
   async function signOut() {
+    if (signOutPending.current) return;
+    signOutPending.current = true;
+    setIsSigningOut(true);
     try {
-      await api.logout();
+      const revocation = api.logout();
       expireSession();
       setGuestView("auth");
       router.replace("/login");
-    } catch (error) { setToast({ id: Date.now(), message: errorMessage(error), tone: "error" }); }
+      await revocation;
+    } catch (error) {
+      setAuthError(`Signed out on this device. Server session revocation could not be confirmed: ${errorMessage(error)} It will be retried before your next login.`);
+    }
+    finally { signOutPending.current = false; setIsSigningOut(false); }
   }
 
   async function createConversation(): Promise<ConversationDetail | null> {
@@ -1508,7 +1533,7 @@ export default function AppShell() {
         <button onClick={() => { viewProfile(); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="profile"/> Profile</button>
         <button onClick={() => { navigateWorkspace("memory"); setAccountMenuOpen(false); setMobileSidebarOpen(false); }} role="menuitem" type="button"><AppIcon name="ai"/> Memory & privacy</button>
         <ThemeToggle menuItem />
-        <button className="danger-menu-item" onClick={signOut} role="menuitem" type="button">Sign out</button>
+        <button className="danger-menu-item" disabled={isSigningOut} onClick={signOut} role="menuitem" type="button">{isSigningOut ? "Signing out…" : "Sign out"}</button>
       </div>,
       document.body,
     )}

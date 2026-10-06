@@ -449,28 +449,46 @@ export class ApiError extends Error {
 export const TOKEN_STORAGE_KEY = "abhiai.access-token";
 export const SESSION_TOKEN_STORAGE_KEY = "abhiai.session-access-token";
 export const SESSION_EVENT = "abhiai:session";
+export const LOGOUT_PENDING_STORAGE_KEY = "abhiai.logout-pending";
 let currentToken: string | null = null;
 let sessionVersion = 0;
 let refreshFlight: Promise<string> | null = null;
+let logoutFlight: Promise<void> | null = null;
+let sessionClosed = false;
 
 function storedToken() {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(TOKEN_STORAGE_KEY) ?? window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+}
+function logoutPending() {
+  return typeof window !== "undefined" && window.localStorage.getItem(LOGOUT_PENDING_STORAGE_KEY) === "true";
 }
 function publishToken(token: string | null) {
   currentToken = token;
   if (typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EVENT));
 }
 export function clearSession() {
+  sessionClosed = true;
   sessionVersion++;
   refreshFlight = null;
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
     window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+    window.localStorage.removeItem("abhiai.active-conversation-id");
+    window.sessionStorage.removeItem("abhiai.pending-news-prompt");
   }
   publishToken(null);
 }
 export function sessionAccessToken() { return currentToken; }
+export function syncStoredSession() {
+  if (logoutPending()) { clearSession(); return; }
+  const token = storedToken();
+  if (token === currentToken) return;
+  if (!token) { clearSession(); return; }
+  sessionVersion++;
+  sessionClosed = false;
+  publishToken(token);
+}
 
 async function authRequest(action: string, body: object = {}): Promise<AuthTokenResponse> {
   const response = await fetch(`/api/auth/${action}`, {
@@ -483,6 +501,7 @@ async function authRequest(action: string, body: object = {}): Promise<AuthToken
 }
 
 function refreshSession(): Promise<string> {
+  if (logoutFlight || sessionClosed || logoutPending()) return Promise.reject(new ApiError("Session ended. Please sign in again.", 401));
   if (refreshFlight) return refreshFlight;
   const version = sessionVersion;
   const flight = (async () => {
@@ -510,6 +529,13 @@ function refreshSession(): Promise<string> {
 }
 
 export async function restoreSession(): Promise<string | null> {
+  if (logoutPending()) {
+    // The bridge may have been unreachable when logout was requested. Never use
+    // its remaining HttpOnly cookie to restore that session; retry revocation.
+    await api.logout();
+    return null;
+  }
+  if (logoutFlight || sessionClosed) return null;
   currentToken = storedToken();
   // The HttpOnly cookie can restore a session even when the access-token storage was cleared.
   if (currentToken) return currentToken;
@@ -522,6 +548,8 @@ async function sessionFetch(url: string, options: RequestInit): Promise<Response
   const headers = new Headers(options.headers);
   const supplied = headers.get("Authorization");
   if (!supplied) return fetch(url, options);
+  if (logoutFlight) throw new ApiError("Sign out is in progress.", 409);
+  if (sessionClosed) throw new ApiError("Your session has ended. Please sign in again.", 401);
   const version = sessionVersion;
   const usedToken = currentToken ?? storedToken() ?? supplied.replace(/^Bearer /, "");
   headers.set("Authorization", `Bearer ${usedToken}`);
@@ -628,18 +656,28 @@ export const api = {
   },
 
   async login(email: string, password: string, rememberMe = true): Promise<AuthTokenResponse> {
+    if (logoutFlight) await logoutFlight;
+    if (logoutPending()) await api.logout();
     const session = await authRequest("login", { email, password, rememberMe });
     clearSession();
+    sessionClosed = false;
     const storage = rememberMe ? window.localStorage : window.sessionStorage;
     storage.setItem(rememberMe ? TOKEN_STORAGE_KEY : SESSION_TOKEN_STORAGE_KEY, session.accessToken);
     publishToken(session.accessToken);
     return session;
   },
-  async logout(): Promise<void> {
-    // Wait for any renewal before revoking, so it cannot resurrect a signed-out session.
-    await refreshFlight?.catch(() => {});
-    await authRequest("logout");
+  logout(): Promise<void> {
+    if (logoutFlight) return logoutFlight;
+    // Invalidate outstanding responses immediately. Refresh does not rotate the cookie,
+    // so revocation can proceed without waiting for a slow refresh response.
+    window.localStorage.setItem(LOGOUT_PENDING_STORAGE_KEY, "true");
     clearSession();
+    const flight = authRequest("logout").then(() => {
+      window.localStorage.removeItem(LOGOUT_PENDING_STORAGE_KEY);
+    });
+    logoutFlight = flight;
+    void flight.finally(() => { if (logoutFlight === flight) logoutFlight = null; }).catch(() => {});
+    return flight;
   },
 
   getConversations(accessToken: string): Promise<ConversationSummary[]> {

@@ -15,12 +15,15 @@ const profile={id:userId,username:'testuser',displayName:'Test User',profilePict
 const conversation={id,title:'AbhiAI Assistant',createdAt:date,updatedAt:date,modelSelectionMode:'AUTO',preferredModelId:null,messages:[]};
 const normal={...conversation,id:normalId,title:'Existing AI chat',messages:[]};
 
-async function setup(browser, viewport) {
+async function setup(browser, viewport, seedOnce = false) {
   const context=await browser.newContext({viewport,reducedMotion:'reduce'});
   const state={preferences:{mode:"STANDARD",pageContext:true,agentActions:false,proactive:false,projectKey:"",fallbackAllowed:false},tasks:[],history:[],created:0,closed:0,textRequests:[],transcripts:[],sessionFailure:false,saveFailure:false};
-  await context.addInitScript(({userId,normalId})=>{
-    localStorage.setItem('abhiai.access-token','mock-jwt');
-    localStorage.setItem('abhiai.active-conversation-id',normalId);
+  await context.addInitScript(({userId,normalId,seedOnce})=>{
+    if (!seedOnce || !sessionStorage.getItem('fixture-seeded')) {
+      localStorage.setItem('abhiai.access-token','mock-jwt');
+      localStorage.setItem('abhiai.active-conversation-id',normalId);
+      sessionStorage.setItem('fixture-seeded','true');
+    }
     localStorage.setItem(`abhiai.assistant.auto-speak.${userId}`,'off');
     window.__micDenied=true; window.__tracks=[]; window.__sent=[];
     Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{
@@ -45,7 +48,7 @@ async function setup(browser, viewport) {
     }
     window.WebSocket=Socket;
     window.__emit=event=>window.__socket.onmessage?.({data:JSON.stringify(event)});
-  },{userId,normalId});
+  },{userId,normalId,seedOnce});
   await context.route('**/api/v1/**',async route=>{
     const req=route.request(), url=new URL(req.url()), p=url.pathname.replace(/^.*\/api\/v1/,'');
     const json=async(body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});

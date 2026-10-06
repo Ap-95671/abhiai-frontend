@@ -113,3 +113,82 @@ test('unauthorized retry terminates without a refresh loop', async () => {
   await f.restoreSession(); await assert.rejects(f.api.getCurrentProfile('old-token'), e => e.status === 401);
   assert.equal(refreshes, 1); assert.equal(f.sessionAccessToken(), null);
 });
+
+test('logout is single-flight and immediately blocks renewal and stale authenticated requests', async () => {
+  let release, logouts = 0, refreshes = 0;
+  const gate = new Promise(resolve => { release = resolve; });
+  const f = fixture(async url => {
+    if (url === '/api/auth/logout') { logouts++; await gate; return json({}); }
+    if (url === '/api/auth/refresh') refreshes++;
+    return json({}, 401);
+  });
+  await f.restoreSession();
+  const first = f.api.logout(), second = f.api.logout();
+  assert.equal(first, second);
+  await assert.rejects(f.api.getCurrentProfile('old-token'), e => e.status === 409);
+  release(); await first;
+  await assert.rejects(f.api.getCurrentProfile('old-token'), e => e.status === 401);
+  assert.equal(await f.restoreSession(), null);
+  assert.equal(logouts, 1); assert.equal(refreshes, 0);
+});
+
+test('logout does not wait for a pending refresh and the late token cannot restore auth', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const f = fixture(async url => {
+    if (url === '/api/auth/refresh') { await gate; return json({ accessToken: 'late-token' }); }
+    return json({}, url === '/api/auth/logout' ? 200 : 401);
+  });
+  await f.restoreSession();
+  const pending = f.api.getCurrentProfile('old-token');
+  await tick(); await f.api.logout(); release();
+  await assert.rejects(pending, e => e.status === 409);
+  assert.equal(f.sessionAccessToken(), null);
+  assert.equal(f.window.localStorage.getItem(f.TOKEN_STORAGE_KEY), null);
+});
+
+test('failed server revocation signs out locally, persists revocation intent, and permits retry', async () => {
+  let unavailable = true;
+  const f = fixture(async url => json({}, url === '/api/auth/logout' && unavailable ? 503 : 200));
+  await f.restoreSession();
+  await assert.rejects(f.api.logout(), e => e.status === 503);
+  assert.equal(f.sessionAccessToken(), null);
+  assert.equal(f.window.localStorage.getItem(f.LOGOUT_PENDING_STORAGE_KEY), 'true');
+  unavailable = false; await f.api.logout(); assert.equal(f.sessionAccessToken(), null);
+  assert.equal(f.window.localStorage.getItem(f.LOGOUT_PENDING_STORAGE_KEY), null);
+});
+
+test('login after logout creates a fresh session and repeated cycles clear both stores and user handoffs', async () => {
+  const f = fixture(async url => json(url === '/api/auth/login' ? { accessToken: 'fresh-token' } : {}));
+  await f.restoreSession();
+  for (const remember of [true, false, true]) {
+    await f.api.logout(); await f.api.login('qa@example.test', 'test-password', remember);
+    assert.equal(f.sessionAccessToken(), 'fresh-token');
+    f.window.localStorage.setItem('abhiai.active-conversation-id', 'private-chat');
+    f.window.sessionStorage.setItem('abhiai.pending-news-prompt', 'old article');
+    await f.api.logout();
+    assert.equal(f.window.localStorage.getItem(f.TOKEN_STORAGE_KEY), null);
+    assert.equal(f.window.sessionStorage.getItem(f.SESSION_TOKEN_STORAGE_KEY), null);
+    assert.equal(f.window.localStorage.getItem('abhiai.active-conversation-id'), null);
+    assert.equal(f.window.sessionStorage.getItem('abhiai.pending-news-prompt'), null);
+  }
+});
+
+test('logout in another tab invalidates the in-memory token and prevents refresh', async () => {
+  let calls = 0;
+  const f = fixture(async () => { calls++; return json({ accessToken: 'unexpected' }); });
+  await f.restoreSession(); f.window.localStorage.removeItem(f.TOKEN_STORAGE_KEY); f.syncStoredSession();
+  assert.equal(f.sessionAccessToken(), null);
+  await assert.rejects(f.api.getCurrentProfile('old-token'), e => e.status === 401);
+  assert.equal(calls, 0);
+});
+
+test('reloading after failed logout retries revocation and never restores the remaining cookie', async () => {
+  const actions = [];
+  const f = fixture(async url => { actions.push(url); return json({}, 503); });
+  f.window.localStorage.setItem(f.LOGOUT_PENDING_STORAGE_KEY, 'true');
+  await assert.rejects(f.restoreSession(), e => e.status === 503);
+  assert.deepEqual(actions, ['/api/auth/logout']);
+  assert.equal(f.sessionAccessToken(), null);
+  assert.equal(f.window.localStorage.getItem(f.TOKEN_STORAGE_KEY), null);
+});
