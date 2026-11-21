@@ -8,6 +8,18 @@ The web client for **AbhiAI**—a unified AI assistant and social platform. It p
 
 > **Status:** active development. The core assistant and social workspace are implemented. Reliability, accessibility, testing, advanced multimodal experiences, and production delivery are tracked in the public [AbhiAI Development Roadmap](https://github.com/users/Ap-95671/projects/2).
 
+## Product screenshots
+
+AbhiAI test-account captures showing the assistant and social workspaces.
+
+### Assistant workspace
+
+![AbhiAI conversation workspace with model selection, message composer, and the assistant panel](docs/screenshots/assistant-workspace.png)
+
+### Social feed
+
+![AbhiAI home feed showing the post composer, visibility control, and a sample post](docs/screenshots/social-feed.png)
+
 ## Product capabilities
 
 ### AI workspace
